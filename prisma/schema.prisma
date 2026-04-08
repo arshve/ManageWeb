@@ -1,0 +1,119 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  ADMIN
+  SALES
+}
+
+enum AnimalType {
+  KAMBING
+  DOMBA
+  SAPI
+}
+
+enum AnimalGrade {
+  SUPER
+  A
+  B
+  C
+  D
+}
+
+enum AnimalCondition {
+  SEHAT
+  MATI
+  SAKIT
+}
+
+enum EntryStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum PaymentStatus {
+  BELUM_BAYAR
+  DP
+  LUNAS
+}
+
+model Profile {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  password  String
+  name      String
+  role      Role     @default(SALES)
+  phone     String?
+  isActive  Boolean  @default(true)
+  entries   Entry[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Livestock {
+  id         String          @id @default(cuid())
+  sku        String          @unique
+  type       AnimalType
+  grade      AnimalGrade
+  condition  AnimalCondition @default(SEHAT)
+  weight     Float?
+  tagBsd     String?
+  tagKandang String?
+  tagMf      String?
+  photoUrl   String?
+  notes      String?
+  isSold     Boolean         @default(false)
+  entry      Entry?
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+}
+
+model Entry {
+  id            String        @id @default(cuid())
+  invoiceNo     String        @unique
+  status        EntryStatus   @default(PENDING)
+  livestockId   String        @unique
+  livestock     Livestock     @relation(fields: [livestockId], references: [id])
+  salesId       String
+  sales         Profile       @relation(fields: [salesId], references: [id])
+  hargaJual     Float
+  hargaModal    Float?
+  resellerCut   Float?
+  hpp           Float?
+  profit        Float?
+  dp            Float?
+  totalBayar    Float?
+  paymentStatus PaymentStatus @default(BELUM_BAYAR)
+  buyerName     String
+  buyerPhone    String?
+  buyerWa       String?
+  buyerAddress  String?
+  buyerMaps     String?
+  notes         String?
+  isSent        Boolean       @default(false)
+  approvedAt    DateTime?
+  approvedBy    String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model Pricing {
+  id         String      @id @default(cuid())
+  animalType AnimalType
+  grade      AnimalGrade
+  hargaBeli  Float
+  hargaJual  Float
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  @@unique([animalType, grade])
+}

@@ -1,52 +1,65 @@
-/**
- * POST /api/upload
- *
- * Handles file uploads (livestock photos).
- * Saves files to the local filesystem at public/uploads/ so they can
- * be served as static files by Next.js (e.g., /uploads/12345-abc.jpg).
- *
- * Flow:
- * 1. Verifies the user is logged in (via session cookie)
- * 2. Reads the file from the multipart form data
- * 3. Generates a unique filename using timestamp + random string
- * 4. Creates the uploads directory if it doesn't exist
- * 5. Writes the file to disk
- * 6. Returns the public URL path
- *
- * Note: In production, you'd want to use cloud storage (S3, etc.) instead.
- */
-
-import { getSessionUserId } from "@/lib/session";
-import { NextRequest, NextResponse } from "next/server";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
+import { getSessionUserId } from '@/lib/session';
+import { NextRequest, NextResponse } from 'next/server';
+import { writeFile, mkdir } from 'fs/promises';
+import path from 'path';
+import { supabase } from '@/lib/supabase';
 
 export async function POST(request: NextRequest) {
-  // Auth check — only logged-in users can upload
+  // 1. Auth check — only logged-in users can upload
   const userId = await getSessionUserId();
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const formData = await request.formData();
-  const file = formData.get("file") as File;
+  const file = formData.get('file') as File;
 
   if (!file) {
-    return NextResponse.json({ error: "No file provided" }, { status: 400 });
+    return NextResponse.json({ error: 'No file provided' }, { status: 400 });
   }
 
-  // Generate a unique filename: timestamp-randomstring.extension
-  const ext = file.name.split(".").pop();
+  // 2. Generate a unique filename
+  const ext = file.name.split('.').pop();
   const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
-  // Ensure the uploads directory exists
-  const uploadDir = path.join(process.cwd(), "public", "uploads");
-  await mkdir(uploadDir, { recursive: true });
+  // 3. ROUTE BASED ON ENVIRONMENT
+  if (process.env.NODE_ENV === 'development') {
+    // ==========================================
+    // DEVELOPMENT: Save internally to local disk
+    // ==========================================
+    const uploadDir = path.join(process.cwd(), 'public', 'uploads');
+    await mkdir(uploadDir, { recursive: true });
 
-  // Write the file to disk
-  const buffer = Buffer.from(await file.arrayBuffer());
-  await writeFile(path.join(uploadDir, fileName), buffer);
+    const buffer = Buffer.from(await file.arrayBuffer());
+    await writeFile(path.join(uploadDir, fileName), buffer);
 
-  // Return the public URL path (served by Next.js static file serving)
-  return NextResponse.json({ url: `/uploads/${fileName}` });
+    return NextResponse.json({ url: `/uploads/${fileName}` });
+  } else {
+    // ==========================================
+    // PRODUCTION: Upload live to Supabase
+    // ==========================================
+    const filePath = `livestock/${fileName}`;
+
+    const { error } = await supabase.storage
+      .from('uploads')
+      .upload(filePath, file, {
+        contentType: file.type,
+        upsert: false,
+      });
+
+    if (error) {
+      console.error('Supabase upload error:', error);
+      return NextResponse.json(
+        { error: 'Failed to upload to cloud storage' },
+        { status: 500 },
+      );
+    }
+
+    // Get the public URL from Supabase
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from('uploads').getPublicUrl(filePath);
+
+    return NextResponse.json({ url: publicUrl });
+  }
 }

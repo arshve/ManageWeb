@@ -6,17 +6,19 @@
  * in the table (no popup modal).
  *
  * Features:
+ * - Search: Filter by invoice, buyer name, SKU, or sales name
+ * - Filter: By status, payment status, and delivery status
+ * - Sort: Click column headers to sort ascending/descending
  * - Inline edit: Click pencil → row expands with input fields → Save/Cancel
  * - Approve/Reject: Only shown for PENDING entries
  * - Delete: Removes entry and marks livestock as available again
- * - Live profit calculation in the edit row
  *
  * Each row is its own component (EntryRow) with isolated state for editing.
  */
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -30,7 +32,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Check, X, Trash2, Pencil, Save, XCircle } from 'lucide-react';
+import {
+  Check,
+  X,
+  Trash2,
+  Pencil,
+  Save,
+  XCircle,
+  Search,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+} from 'lucide-react';
 import {
   updateEntry,
   approveEntry,
@@ -64,64 +77,275 @@ export interface EntryData {
   sales: { name: string };
 }
 
-export function EntryTable({ entries }: { entries: EntryData[] }) {
+type SortField =
+  | 'invoiceNo'
+  | 'buyerName'
+  | 'sales'
+  | 'hargaJual'
+  | 'profit'
+  | 'createdAt';
+type SortDir = 'asc' | 'desc';
+
+export function EntryTable({
+  entries,
+  isAdmin = false,
+}: {
+  entries: EntryData[];
+  isAdmin?: boolean;
+}) {
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [paymentFilter, setPaymentFilter] = useState('ALL');
+  const [sentFilter, setSentFilter] = useState('ALL');
+  const [sortField, setSortField] = useState<SortField>('createdAt');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
+
+  function toggleSort(field: SortField) {
+    if (sortField === field) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDir('asc');
+    }
+  }
+
+  function SortIcon({ field }: { field: SortField }) {
+    if (sortField !== field)
+      return <ArrowUpDown className="h-3 w-3 opacity-40" />;
+    return sortDir === 'asc' ? (
+      <ArrowUp className="h-3 w-3" />
+    ) : (
+      <ArrowDown className="h-3 w-3" />
+    );
+  }
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    let result = entries;
+
+    if (q) {
+      result = result.filter(
+        (e) =>
+          e.invoiceNo.toLowerCase().includes(q) ||
+          e.buyerName.toLowerCase().includes(q) ||
+          e.livestock.sku.toLowerCase().includes(q) ||
+          e.sales.name.toLowerCase().includes(q) ||
+          (e.buyerPhone && e.buyerPhone.includes(q)),
+      );
+    }
+
+    if (statusFilter !== 'ALL') {
+      result = result.filter((e) => e.status === statusFilter);
+    }
+    if (paymentFilter !== 'ALL') {
+      result = result.filter((e) => e.paymentStatus === paymentFilter);
+    }
+    if (sentFilter !== 'ALL') {
+      result = result.filter((e) =>
+        sentFilter === 'YES' ? e.isSent : !e.isSent,
+      );
+    }
+
+    result = [...result].sort((a, b) => {
+      let cmp = 0;
+      switch (sortField) {
+        case 'invoiceNo':
+          cmp = a.invoiceNo.localeCompare(b.invoiceNo);
+          break;
+        case 'buyerName':
+          cmp = a.buyerName.localeCompare(b.buyerName);
+          break;
+        case 'sales':
+          cmp = a.sales.name.localeCompare(b.sales.name);
+          break;
+        case 'hargaJual':
+          cmp = a.hargaJual - b.hargaJual;
+          break;
+        case 'profit':
+          cmp = (a.profit ?? 0) - (b.profit ?? 0);
+          break;
+        case 'createdAt':
+          cmp =
+            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+          break;
+      }
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+
+    return result;
+  }, [entries, search, statusFilter, paymentFilter, sentFilter, sortField, sortDir]);
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b bg-muted/50">
-            <th className="text-center p-3 font-medium">Invoice</th>
-            <th className="text-center p-3 font-medium">Hewan</th>
-            <th className="text-center p-3 font-medium">Pembeli</th>
-            <th className="text-center p-3 font-medium">Sales</th>
-            <th className="text-center p-3 font-medium">Sales Cut</th>
-            <th className="text-center p-3 font-medium">Harga Jual</th>
-            <th className="text-center p-3 font-medium">Modal</th>
-            <th className="text-center p-3 font-medium">Profit</th>
-            <th className="text-center p-3 font-medium">Bayar</th>
-            <th className="text-center p-3 font-medium">Kirim</th>
-            <th className="text-center p-3 font-medium">Status</th>
-            <th className="text-center p-3 font-medium">Tanggal</th>
-            <th className="text-center p-3 font-medium">Aksi</th>
-          </tr>
-        </thead>
-        <tbody>
-          {entries.map((entry) => (
-            <EntryRow
-              key={entry.id}
-              entry={entry}
-              isEditing={editingId === entry.id}
-              onEdit={() => setEditingId(entry.id)}
-              onCancel={() => setEditingId(null)}
-              onSaved={() => setEditingId(null)}
-            />
-          ))}
-          {entries.length === 0 && (
-            <tr>
-              <td
-                colSpan={12}
-                className="p-8 text-center text-muted-foreground"
-              >
-                Belum ada entry penjualan.
-              </td>
-            </tr>
+    <div>
+      {/* Toolbar: Search + Filters */}
+      <div className="p-3 border-b space-y-3">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Cari invoice, pembeli, SKU, sales..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9 h-9"
+          />
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val ?? 'ALL')}>
+            <SelectTrigger className="h-8 w-[140px] text-xs">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">Semua Status</SelectItem>
+              <SelectItem value="PENDING">Pending</SelectItem>
+              <SelectItem value="APPROVED">Approved</SelectItem>
+              <SelectItem value="REJECTED">Rejected</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={paymentFilter} onValueChange={(val) => setPaymentFilter(val ?? 'ALL')}>
+            <SelectTrigger className="h-8 w-[150px] text-xs">
+              <SelectValue placeholder="Pembayaran" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">Semua Bayar</SelectItem>
+              <SelectItem value="BELUM_BAYAR">Belum Bayar</SelectItem>
+              <SelectItem value="DP">DP</SelectItem>
+              <SelectItem value="LUNAS">Lunas</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={sentFilter} onValueChange={(val) => setSentFilter(val ?? 'ALL')}>
+            <SelectTrigger className="h-8 w-[140px] text-xs">
+              <SelectValue placeholder="Pengiriman" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">Semua Kirim</SelectItem>
+              <SelectItem value="YES">Sudah Kirim</SelectItem>
+              <SelectItem value="NO">Belum Kirim</SelectItem>
+            </SelectContent>
+          </Select>
+          {(search || statusFilter !== 'ALL' || paymentFilter !== 'ALL' || sentFilter !== 'ALL') && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 text-xs"
+              onClick={() => {
+                setSearch('');
+                setStatusFilter('ALL');
+                setPaymentFilter('ALL');
+                setSentFilter('ALL');
+              }}
+            >
+              <X className="h-3 w-3 mr-1" />
+              Reset
+            </Button>
           )}
-        </tbody>
-      </table>
+          <span className="ml-auto text-xs text-muted-foreground self-center">
+            {filtered.length} dari {entries.length} entry
+          </span>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b bg-muted/50">
+              <th
+                className="text-center p-3 font-medium cursor-pointer select-none hover:bg-muted/80"
+                onClick={() => toggleSort('invoiceNo')}
+              >
+                <span className="inline-flex items-center gap-1">
+                  Invoice <SortIcon field="invoiceNo" />
+                </span>
+              </th>
+              <th className="text-center p-3 font-medium">Hewan</th>
+              <th
+                className="text-center p-3 font-medium cursor-pointer select-none hover:bg-muted/80"
+                onClick={() => toggleSort('buyerName')}
+              >
+                <span className="inline-flex items-center gap-1">
+                  Pembeli <SortIcon field="buyerName" />
+                </span>
+              </th>
+              <th
+                className="text-center p-3 font-medium cursor-pointer select-none hover:bg-muted/80"
+                onClick={() => toggleSort('sales')}
+              >
+                <span className="inline-flex items-center gap-1">
+                  Sales <SortIcon field="sales" />
+                </span>
+              </th>
+              <th className="text-center p-3 font-medium">Sales Cut</th>
+              <th
+                className="text-center p-3 font-medium cursor-pointer select-none hover:bg-muted/80"
+                onClick={() => toggleSort('hargaJual')}
+              >
+                <span className="inline-flex items-center gap-1">
+                  Harga Jual <SortIcon field="hargaJual" />
+                </span>
+              </th>
+              <th className="text-center p-3 font-medium">Modal</th>
+              <th
+                className="text-center p-3 font-medium cursor-pointer select-none hover:bg-muted/80"
+                onClick={() => toggleSort('profit')}
+              >
+                <span className="inline-flex items-center gap-1">
+                  Profit <SortIcon field="profit" />
+                </span>
+              </th>
+              <th className="text-center p-3 font-medium">Bayar</th>
+              <th className="text-center p-3 font-medium">Kirim</th>
+              <th className="text-center p-3 font-medium">Status</th>
+              <th
+                className="text-center p-3 font-medium cursor-pointer select-none hover:bg-muted/80"
+                onClick={() => toggleSort('createdAt')}
+              >
+                <span className="inline-flex items-center gap-1">
+                  Tanggal <SortIcon field="createdAt" />
+                </span>
+              </th>
+              <th className="text-center p-3 font-medium">Aksi</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((entry) => (
+              <EntryRow
+                key={entry.id}
+                entry={entry}
+                isAdmin={isAdmin}
+                isEditing={editingId === entry.id}
+                onEdit={() => setEditingId(entry.id)}
+                onCancel={() => setEditingId(null)}
+                onSaved={() => setEditingId(null)}
+              />
+            ))}
+            {filtered.length === 0 && (
+              <tr>
+                <td
+                  colSpan={13}
+                  className="p-8 text-center text-muted-foreground"
+                >
+                  {entries.length === 0
+                    ? 'Belum ada entry penjualan.'
+                    : 'Tidak ada entry yang cocok dengan filter.'}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
 
 function EntryRow({
   entry,
+  isAdmin,
   isEditing,
   onEdit,
   onCancel,
   onSaved,
 }: {
   entry: EntryData;
+  isAdmin: boolean;
   isEditing: boolean;
   onEdit: () => void;
   onCancel: () => void;
@@ -305,7 +529,7 @@ function EntryRow({
               </>
             ) : (
               <>
-                {entry.status === 'PENDING' && (
+                {isAdmin && entry.status === 'PENDING' && (
                   <>
                     <Button
                       variant="ghost"
@@ -354,7 +578,7 @@ function EntryRow({
       {/* Inline edit row */}
       {isEditing && (
         <tr className="border-b bg-muted/20">
-          <td colSpan={12} className="p-4">
+          <td colSpan={13} className="p-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {/* Buyer */}
               <div className="space-y-1">

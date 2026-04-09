@@ -13,11 +13,11 @@
  * - "Ke Website" link to go back to the public landing page
  */
 
-"use client";
+'use client';
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { cn } from "@/lib/utils";
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
   Beef,
@@ -28,43 +28,42 @@ import {
   Menu,
   X,
   ChevronLeft,
-} from "lucide-react";
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { useRouter } from "next/navigation";
+} from 'lucide-react';
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { useRouter } from 'next/navigation';
 
 interface SidebarProps {
-  role: "ADMIN" | "SALES";
+  role: 'ADMIN' | 'SALES';
   userName: string;
 }
 
 // Navigation links for each role
 const adminLinks = [
-  { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/admin/livestock", label: "Hewan", icon: Beef },
-  { href: "/admin/entries", label: "Entry Penjualan", icon: ClipboardList },
-  { href: "/admin/users", label: "Kelola User", icon: Users },
-  { href: "/admin/pricing", label: "Harga", icon: DollarSign },
+  { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/admin/livestock', label: 'Hewan', icon: Beef },
+  { href: '/admin/users', label: 'Kelola User', icon: Users },
+  { href: '/admin/pricing', label: 'Harga', icon: DollarSign },
 ];
 
 const salesLinks = [
-  { href: "/sales", label: "Entry Saya", icon: ClipboardList },
-  { href: "/sales/new", label: "Tambah Entry", icon: Beef },
+  { href: '/sales', label: 'Entry Saya', icon: ClipboardList },
+  { href: '/sales/new', label: 'Tambah Entry', icon: Beef },
 ];
 
 export function Sidebar({ role, userName }: SidebarProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false); // Mobile menu state
   const router = useRouter();
-  const links = role === "ADMIN" ? adminLinks : salesLinks;
+  const links = role === 'ADMIN' ? adminLinks : salesLinks;
 
   /**
    * Handles logout: calls the logout API to clear the session cookie,
    * then redirects to the login page.
    */
   async function handleLogout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/login");
+    await fetch('/api/auth/logout', { method: 'POST' });
+    router.push('/login');
     router.refresh();
   }
 
@@ -89,8 +88,8 @@ export function Sidebar({ role, userName }: SidebarProps) {
       {/* Sidebar panel — slides in on mobile, always visible on desktop */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-64 bg-sidebar text-sidebar-foreground flex flex-col transition-transform duration-200 md:translate-x-0 md:static md:z-auto",
-          open ? "translate-x-0" : "-translate-x-full"
+          'fixed inset-y-0 left-0 z-50 w-64 bg-sidebar text-sidebar-foreground flex flex-col transition-transform duration-200 md:translate-x-0 md:static md:z-auto',
+          open ? 'translate-x-0' : '-translate-x-full',
         )}
       >
         {/* Header with brand name */}
@@ -111,8 +110,8 @@ export function Sidebar({ role, userName }: SidebarProps) {
             // Determine if this link is active (current page)
             const isActive =
               pathname === link.href ||
-              (link.href !== "/admin" &&
-                link.href !== "/sales" &&
+              (link.href !== '/admin' &&
+                link.href !== '/sales' &&
                 pathname.startsWith(link.href));
             return (
               <Link
@@ -120,10 +119,10 @@ export function Sidebar({ role, userName }: SidebarProps) {
                 href={link.href}
                 onClick={() => setOpen(false)}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
                   isActive
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                    ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                    : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
                 )}
               >
                 <link.icon className="h-4 w-4" />
@@ -138,13 +137,13 @@ export function Sidebar({ role, userName }: SidebarProps) {
           <div className="px-3 py-2 text-xs text-sidebar-foreground/50 truncate">
             {userName}
           </div>
-          <Link
+          {/* <Link
             href="/"
             className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-sidebar-foreground/70 hover:bg-sidebar-accent/50 transition-colors"
           >
             <ChevronLeft className="h-4 w-4" />
             Ke Website
-          </Link>
+          </Link> */}
           <Button
             variant="ghost"
             onClick={handleLogout}

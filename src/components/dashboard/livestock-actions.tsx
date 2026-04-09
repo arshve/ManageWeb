@@ -31,9 +31,8 @@ interface LivestockActionsProps {
     grade: string;
     condition: string;
     weight: number | null;
-    tagBsd: string | null;
-    tagKandang: string | null;
-    tagMf: string | null;
+    hargaJual: number | null;
+    tag: string | null;
     photoUrl: string | null;
     notes: string | null;
   };

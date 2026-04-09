@@ -32,9 +32,8 @@ export async function createLivestock(formData: FormData) {
     grade: formData.get("grade") as AnimalGrade,
     condition: (formData.get("condition") as AnimalCondition) || "SEHAT",
     weight: formData.get("weight") ? Number(formData.get("weight")) : null,
-    tagBsd: (formData.get("tagBsd") as string) || null,
-    tagKandang: (formData.get("tagKandang") as string) || null,
-    tagMf: (formData.get("tagMf") as string) || null,
+    hargaJual: formData.get("hargaJual") ? Number(formData.get("hargaJual")) : null,
+    tag: (formData.get("tag") as string) || null,
     photoUrl: (formData.get("photoUrl") as string) || null,
     notes: (formData.get("notes") as string) || null,
   };
@@ -61,9 +60,8 @@ export async function updateLivestock(id: string, formData: FormData) {
     grade: formData.get("grade") as AnimalGrade,
     condition: formData.get("condition") as AnimalCondition,
     weight: formData.get("weight") ? Number(formData.get("weight")) : null,
-    tagBsd: (formData.get("tagBsd") as string) || null,
-    tagKandang: (formData.get("tagKandang") as string) || null,
-    tagMf: (formData.get("tagMf") as string) || null,
+    hargaJual: formData.get("hargaJual") ? Number(formData.get("hargaJual")) : null,
+    tag: (formData.get("tag") as string) || null,
     photoUrl: (formData.get("photoUrl") as string) || null,
     notes: (formData.get("notes") as string) || null,
   };

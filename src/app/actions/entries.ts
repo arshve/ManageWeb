@@ -10,13 +10,13 @@
  *   When deleted, the livestock is automatically unmarked (available again).
  */
 
-"use server";
+'use server';
 
-import { prisma } from "@/lib/prisma";
-import { requireAuth, requireRole } from "@/lib/auth";
-import { revalidatePath } from "next/cache";
-import { generateInvoiceNo } from "@/lib/format";
-import type { AnimalType, AnimalGrade } from "@/generated/prisma/client";
+import { prisma } from '@/lib/prisma';
+import { requireAuth, requireRole } from '@/lib/auth';
+import { revalidatePath } from 'next/cache';
+import { generateInvoiceNo } from '@/lib/format';
+import type { AnimalType, AnimalGrade } from '@/generated/prisma/client';
 
 /**
  * Creates a new sale entry. Called by sales persons from the "Tambah Entry" form.
@@ -35,13 +35,13 @@ import type { AnimalType, AnimalGrade } from "@/generated/prisma/client";
 export async function createEntry(formData: FormData) {
   const profile = await requireAuth();
 
-  const livestockId = formData.get("livestockId") as string;
+  const livestockId = formData.get('livestockId') as string;
 
   const livestock = await prisma.livestock.findUnique({
     where: { id: livestockId },
   });
   if (!livestock || livestock.isSold) {
-    return { error: "Hewan tidak tersedia atau sudah terjual" };
+    return { error: 'Hewan tidak tersedia atau sudah terjual' };
   }
 
   // Look up pricing for auto-fill of hargaModal (buy price from pricing table)
@@ -55,14 +55,13 @@ export async function createEntry(formData: FormData) {
   });
 
   // Calculate financials
-  const hargaJual = Number(formData.get("hargaJual")) || pricing?.hargaJual || 0;
+  const hargaJual =
+    Number(formData.get('hargaJual')) || pricing?.hargaJual || 0;
   const hargaModal = pricing?.hargaBeli ?? null;
-  const resellerCut = formData.get("resellerCut")
-    ? Number(formData.get("resellerCut"))
+  const resellerCut = formData.get('resellerCut')
+    ? Number(formData.get('resellerCut'))
     : null;
-  const hpp = hargaModal
-    ? hargaModal + (resellerCut ?? 0)
-    : null;
+  const hpp = hargaModal ? hargaModal + (resellerCut ?? 0) : null;
   const profit = hpp !== null ? hargaJual - hpp : null;
 
   const entry = await prisma.entry.create({
@@ -75,24 +74,24 @@ export async function createEntry(formData: FormData) {
       resellerCut,
       hpp,
       profit,
-      dp: formData.get("dp") ? Number(formData.get("dp")) : null,
-      totalBayar: formData.get("totalBayar")
-        ? Number(formData.get("totalBayar"))
+      dp: formData.get('dp') ? Number(formData.get('dp')) : null,
+      totalBayar: formData.get('totalBayar')
+        ? Number(formData.get('totalBayar'))
         : null,
       paymentStatus:
-        (formData.get("paymentStatus") as "BELUM_BAYAR" | "DP" | "LUNAS") ||
-        "BELUM_BAYAR",
-      buyerName: formData.get("buyerName") as string,
-      buyerPhone: (formData.get("buyerPhone") as string) || null,
-      buyerWa: (formData.get("buyerWa") as string) || null,
-      buyerAddress: (formData.get("buyerAddress") as string) || null,
-      buyerMaps: (formData.get("buyerMaps") as string) || null,
-      notes: (formData.get("notes") as string) || null,
+        (formData.get('paymentStatus') as 'BELUM_BAYAR' | 'DP' | 'LUNAS') ||
+        'BELUM_BAYAR',
+      buyerName: formData.get('buyerName') as string,
+      buyerPhone: (formData.get('buyerPhone') as string) || null,
+      buyerWa: (formData.get('buyerWa') as string) || null,
+      buyerAddress: (formData.get('buyerAddress') as string) || null,
+      buyerMaps: (formData.get('buyerMaps') as string) || null,
+      notes: (formData.get('notes') as string) || null,
     },
   });
 
-  revalidatePath("/sales");
-  revalidatePath("/admin/entries");
+  revalidatePath('/sales');
+  revalidatePath('/admin');
   return { success: true, entryId: entry.id };
 }
 
@@ -109,16 +108,16 @@ export async function createEntry(formData: FormData) {
  * @returns { success } or { error }
  */
 export async function approveEntry(id: string) {
-  const admin = await requireRole("ADMIN");
+  const admin = await requireRole('ADMIN');
 
   const entry = await prisma.entry.findUnique({ where: { id } });
-  if (!entry) return { error: "Entry tidak ditemukan" };
+  if (!entry) return { error: 'Entry tidak ditemukan' };
 
   await prisma.$transaction([
     prisma.entry.update({
       where: { id },
       data: {
-        status: "APPROVED",
+        status: 'APPROVED',
         approvedAt: new Date(),
         approvedBy: admin.id,
       },
@@ -129,9 +128,9 @@ export async function approveEntry(id: string) {
     }),
   ]);
 
-  revalidatePath("/admin/entries");
-  revalidatePath("/sales");
-  revalidatePath("/catalogue");
+  revalidatePath('/admin');
+  revalidatePath('/sales');
+  revalidatePath('/catalogue');
   return { success: true };
 }
 
@@ -144,15 +143,15 @@ export async function approveEntry(id: string) {
  * @returns { success } or { error }
  */
 export async function rejectEntry(id: string) {
-  await requireRole("ADMIN");
+  await requireRole('ADMIN');
 
   await prisma.entry.update({
     where: { id },
-    data: { status: "REJECTED" },
+    data: { status: 'REJECTED' },
   });
 
-  revalidatePath("/admin/entries");
-  revalidatePath("/sales");
+  revalidatePath('/admin');
+  revalidatePath('/sales');
   return { success: true };
 }
 
@@ -166,21 +165,24 @@ export async function rejectEntry(id: string) {
  * @returns { success } or { error }
  */
 export async function updateEntry(id: string, formData: FormData) {
-  await requireRole("ADMIN");
+  const profile = await requireAuth();
 
   const entry = await prisma.entry.findUnique({ where: { id } });
-  if (!entry) return { error: "Entry tidak ditemukan" };
+  if (!entry) return { error: 'Entry tidak ditemukan' };
+
+  if (profile.role !== 'ADMIN' && entry.salesId !== profile.id) {
+    return { error: 'Anda tidak berhak mengubah entry ini' };
+  }
 
   // Recalculate financials with updated values
-  const hargaJual = Number(formData.get("hargaJual")) || entry.hargaJual;
-  const hargaModal = formData.get("hargaModal")
-    ? Number(formData.get("hargaModal"))
+  const hargaJual = Number(formData.get('hargaJual')) || entry.hargaJual;
+  const hargaModal = formData.get('hargaModal')
+    ? Number(formData.get('hargaModal'))
     : entry.hargaModal;
-  const resellerCut = formData.get("resellerCut")
-    ? Number(formData.get("resellerCut"))
+  const resellerCut = formData.get('resellerCut')
+    ? Number(formData.get('resellerCut'))
     : entry.resellerCut;
-  const hpp =
-    hargaModal !== null ? hargaModal + (resellerCut ?? 0) : null;
+  const hpp = hargaModal !== null ? hargaModal + (resellerCut ?? 0) : null;
   const profit = hpp !== null ? hargaJual - hpp : null;
 
   await prisma.entry.update({
@@ -191,25 +193,25 @@ export async function updateEntry(id: string, formData: FormData) {
       resellerCut,
       hpp,
       profit,
-      dp: formData.get("dp") ? Number(formData.get("dp")) : null,
-      totalBayar: formData.get("totalBayar")
-        ? Number(formData.get("totalBayar"))
+      dp: formData.get('dp') ? Number(formData.get('dp')) : null,
+      totalBayar: formData.get('totalBayar')
+        ? Number(formData.get('totalBayar'))
         : null,
       paymentStatus:
-        (formData.get("paymentStatus") as "BELUM_BAYAR" | "DP" | "LUNAS") ||
+        (formData.get('paymentStatus') as 'BELUM_BAYAR' | 'DP' | 'LUNAS') ||
         entry.paymentStatus,
-      buyerName: (formData.get("buyerName") as string) || entry.buyerName,
-      buyerPhone: (formData.get("buyerPhone") as string) || null,
-      buyerWa: (formData.get("buyerWa") as string) || null,
-      buyerAddress: (formData.get("buyerAddress") as string) || null,
-      buyerMaps: (formData.get("buyerMaps") as string) || null,
-      notes: (formData.get("notes") as string) || null,
-      isSent: formData.get("isSent") === "true",
+      buyerName: (formData.get('buyerName') as string) || entry.buyerName,
+      buyerPhone: (formData.get('buyerPhone') as string) || null,
+      buyerWa: (formData.get('buyerWa') as string) || null,
+      buyerAddress: (formData.get('buyerAddress') as string) || null,
+      buyerMaps: (formData.get('buyerMaps') as string) || null,
+      notes: (formData.get('notes') as string) || null,
+      isSent: formData.get('isSent') === 'true',
     },
   });
 
-  revalidatePath("/admin/entries");
-  revalidatePath("/sales");
+  revalidatePath('/admin');
+  revalidatePath('/sales');
   return { success: true };
 }
 
@@ -221,10 +223,14 @@ export async function updateEntry(id: string, formData: FormData) {
  * @returns { success } or { error }
  */
 export async function deleteEntry(id: string) {
-  await requireRole("ADMIN");
+  const profile = await requireAuth();
 
   const entry = await prisma.entry.findUnique({ where: { id } });
-  if (!entry) return { error: "Entry tidak ditemukan" };
+  if (!entry) return { error: 'Entry tidak ditemukan' };
+
+  if (profile.role !== 'ADMIN' && entry.salesId !== profile.id) {
+    return { error: 'Anda tidak berhak mengubah entry ini' };
+  }
 
   // Transaction: delete entry + mark livestock as available again
   await prisma.$transaction([
@@ -235,7 +241,7 @@ export async function deleteEntry(id: string) {
     }),
   ]);
 
-  revalidatePath("/admin/entries");
-  revalidatePath("/sales");
+  revalidatePath('/admin');
+  revalidatePath('/sales');
   return { success: true };
 }

@@ -40,9 +40,8 @@ interface LivestockFormProps {
     grade: string;
     condition: string;
     weight: number | null;
-    tagBsd: string | null;
-    tagKandang: string | null;
-    tagMf: string | null;
+    hargaJual: number | null;
+    tag: string | null;
     photoUrl: string | null;
     notes: string | null;
   };
@@ -59,9 +58,8 @@ export function LivestockForm({ livestock, trigger }: LivestockFormProps) {
   const [grade, setGrade] = useState(livestock?.grade ?? "A");
   const [condition, setCondition] = useState(livestock?.condition ?? "SEHAT");
   const [weight, setWeight] = useState(livestock?.weight?.toString() ?? "");
-  const [tagBsd, setTagBsd] = useState(livestock?.tagBsd ?? "");
-  const [tagKandang, setTagKandang] = useState(livestock?.tagKandang ?? "");
-  const [tagMf, setTagMf] = useState(livestock?.tagMf ?? "");
+  const [hargaJual, setHargaJual] = useState(livestock?.hargaJual?.toString() ?? "");
+  const [tag, setTag] = useState(livestock?.tag ?? "");
   const [photoUrl, setPhotoUrl] = useState(livestock?.photoUrl ?? "");
   const [notes, setNotes] = useState(livestock?.notes ?? "");
 
@@ -75,9 +73,8 @@ export function LivestockForm({ livestock, trigger }: LivestockFormProps) {
       formData.set("grade", grade);
       formData.set("condition", condition);
       formData.set("weight", weight);
-      formData.set("tagBsd", tagBsd);
-      formData.set("tagKandang", tagKandang);
-      formData.set("tagMf", tagMf);
+      formData.set("hargaJual", hargaJual);
+      formData.set("tag", tag);
       formData.set("photoUrl", photoUrl);
       formData.set("notes", notes);
 
@@ -178,32 +175,25 @@ export function LivestockForm({ livestock, trigger }: LivestockFormProps) {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="tagBsd">Tag BSD</Label>
+              <Label htmlFor="hargaJual">Harga Jual</Label>
               <Input
-                id="tagBsd"
-                value={tagBsd}
-                onChange={(e) => setTagBsd(e.target.value)}
+                id="hargaJual"
+                type="number"
+                value={hargaJual}
+                onChange={(e) => setHargaJual(e.target.value)}
+                placeholder="3500000"
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="tagKandang">Tag Kandang</Label>
-              <Input
-                id="tagKandang"
-                value={tagKandang}
-                onChange={(e) => setTagKandang(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="tagMf">Tag MF</Label>
-              <Input
-                id="tagMf"
-                value={tagMf}
-                onChange={(e) => setTagMf(e.target.value)}
-              />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="tag">Tag</Label>
+            <Input
+              id="tag"
+              value={tag}
+              onChange={(e) => setTag(e.target.value)}
+              placeholder="BSD-01 / K-01 / MF-01"
+            />
           </div>
 
           <div className="space-y-2">

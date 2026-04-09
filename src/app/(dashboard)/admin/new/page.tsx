@@ -27,7 +27,7 @@ interface AvailableLivestock {
   condition: string;
 }
 
-export default function NewEntryPage() {
+export default function AdminNewEntryPage() {
   const [livestock, setLivestock] = useState<AvailableLivestock[]>([]);
   const [selectedId, setSelectedId] = useState('');
   const [loading, setLoading] = useState(false);
@@ -54,8 +54,8 @@ export default function NewEntryPage() {
     if ('error' in result) {
       toast.error(result.error);
     } else {
-      toast.success('Entry berhasil dibuat, menunggu approval admin');
-      router.push('/sales');
+      toast.success('Entry berhasil dibuat');
+      router.push('/admin');
     }
     setLoading(false);
   }

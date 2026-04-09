@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { formatRupiah } from '@/lib/format';
 import { DashboardShell } from '@/components/dashboard/dashboard-shell';
 import { LivestockForm } from '@/components/dashboard/livestock-form';
 import { LivestockActions } from '@/components/dashboard/livestock-actions';
@@ -38,6 +39,7 @@ export default async function LivestockPage() {
                   <th className="text-left p-3 font-medium">Jenis</th>
                   <th className="text-left p-3 font-medium">Grade</th>
                   <th className="text-left p-3 font-medium">Berat</th>
+                  <th className="text-left p-3 font-medium">Harga</th>
                   <th className="text-left p-3 font-medium">Kondisi</th>
                   <th className="text-left p-3 font-medium">Status</th>
                   <th className="text-left p-3 font-medium">Tag</th>
@@ -54,6 +56,9 @@ export default async function LivestockPage() {
                     </td>
                     <td className="p-3">
                       {item.weight ? `${item.weight} kg` : '-'}
+                    </td>
+                    <td className="p-3">
+                      {item.hargaJual ? formatRupiah(item.hargaJual) : '-'}
                     </td>
                     <td className="p-3">
                       <Badge
@@ -78,9 +83,7 @@ export default async function LivestockPage() {
                       )}
                     </td>
                     <td className="p-3 text-xs text-muted-foreground">
-                      {[item.tagBsd, item.tagKandang, item.tagMf]
-                        .filter(Boolean)
-                        .join(' / ') || '-'}
+                      {item.tag || '-'}
                     </td>
                     <td className="p-3 text-right">
                       <LivestockActions livestock={item} />
@@ -90,7 +93,7 @@ export default async function LivestockPage() {
                 {livestock.length === 0 && (
                   <tr>
                     <td
-                      colSpan={8}
+                      colSpan={9}
                       className="p-8 text-center text-muted-foreground"
                     >
                       Belum ada hewan terdaftar.

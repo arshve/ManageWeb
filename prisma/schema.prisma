@@ -66,9 +66,8 @@ model Livestock {
   grade      AnimalGrade
   condition  AnimalCondition @default(SEHAT)
   weight     Float?
-  tagBsd     String?
-  tagKandang String?
-  tagMf      String?
+  hargaJual  Float?
+  tag        String?
   photoUrl   String?
   notes      String?
   isSold     Boolean         @default(false)

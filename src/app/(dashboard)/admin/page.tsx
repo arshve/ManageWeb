@@ -1,13 +1,17 @@
-import { prisma } from "@/lib/prisma";
-import { formatRupiah } from "@/lib/format";
-import { DashboardShell } from "@/components/dashboard/dashboard-shell";
+import { prisma } from '@/lib/prisma';
+import { formatRupiah } from '@/lib/format';
+import { DashboardShell } from '@/components/dashboard/dashboard-shell';
+import { EntryTable } from '@/components/dashboard/entry-table';
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Beef, ClipboardList, DollarSign, Users } from "lucide-react";
+} from '@/components/ui/card';
+import { Beef, ClipboardList, DollarSign, Users, Plus } from 'lucide-react';
+import Link from 'next/link';
+import { buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 export default async function AdminDashboardPage() {
   const [
@@ -16,50 +20,88 @@ export default async function AdminDashboardPage() {
     totalEntries,
     pendingEntries,
     totalSales,
-    entries,
+    approvedEntries,
+    allEntries,
   ] = await Promise.all([
     prisma.livestock.count(),
     prisma.livestock.count({ where: { isSold: true } }),
     prisma.entry.count(),
-    prisma.entry.count({ where: { status: "PENDING" } }),
-    prisma.profile.count({ where: { role: "SALES", isActive: true } }),
+    prisma.entry.count({ where: { status: 'PENDING' } }),
+    prisma.profile.count({ where: { role: 'SALES', isActive: true } }),
     prisma.entry.findMany({
-      where: { status: "APPROVED" },
+      where: { status: 'APPROVED' },
       select: { hargaJual: true, hargaModal: true, profit: true },
+    }),
+    prisma.entry.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: {
+        livestock: true,
+        sales: { select: { name: true } },
+      },
     }),
   ]);
 
-  const totalRevenue = entries.reduce((sum, e) => sum + e.hargaJual, 0);
-  const totalProfit = entries.reduce((sum, e) => sum + (e.profit ?? 0), 0);
-  const totalModal = entries.reduce((sum, e) => sum + (e.hargaModal ?? 0), 0);
+  const totalRevenue = approvedEntries.reduce((sum, e) => sum + e.hargaJual, 0);
+  const totalProfit = approvedEntries.reduce(
+    (sum, e) => sum + (e.profit ?? 0),
+    0,
+  );
+  const totalModal = approvedEntries.reduce(
+    (sum, e) => sum + (e.hargaModal ?? 0),
+    0,
+  );
 
-  const recentEntries = await prisma.entry.findMany({
-    take: 10,
-    orderBy: { createdAt: "desc" },
-    include: { livestock: true, sales: true },
-  });
+  const serialized = allEntries.map((entry) => ({
+    id: entry.id,
+    invoiceNo: entry.invoiceNo,
+    status: entry.status,
+    hargaJual: entry.hargaJual,
+    hargaModal: entry.hargaModal,
+    resellerCut: entry.resellerCut,
+    hpp: entry.hpp,
+    profit: entry.profit,
+    dp: entry.dp,
+    totalBayar: entry.totalBayar,
+    paymentStatus: entry.paymentStatus,
+    buyerName: entry.buyerName,
+    buyerPhone: entry.buyerPhone,
+    buyerWa: entry.buyerWa,
+    buyerAddress: entry.buyerAddress,
+    buyerMaps: entry.buyerMaps,
+    notes: entry.notes,
+    isSent: entry.isSent,
+    createdAt: entry.createdAt.toISOString(),
+    livestock: {
+      sku: entry.livestock.sku,
+      type: entry.livestock.type,
+      grade: entry.livestock.grade,
+    },
+    sales: {
+      name: entry.sales.name,
+    },
+  }));
 
   const stats = [
     {
-      title: "Total Hewan",
+      title: 'Total Hewan',
       value: totalLivestock,
       sub: `${soldLivestock} terjual`,
       icon: Beef,
     },
     {
-      title: "Entry Penjualan",
+      title: 'Entry Penjualan',
       value: totalEntries,
       sub: `${pendingEntries} menunggu approval`,
       icon: ClipboardList,
     },
     {
-      title: "Total Revenue",
+      title: 'Total Revenue',
       value: formatRupiah(totalRevenue),
       sub: `Modal: ${formatRupiah(totalModal)}`,
       icon: DollarSign,
     },
     {
-      title: "Total Profit",
+      title: 'Total Profit',
       value: formatRupiah(totalProfit),
       sub: `${totalSales} sales aktif`,
       icon: Users,
@@ -70,6 +112,15 @@ export default async function AdminDashboardPage() {
     <DashboardShell
       title="Dashboard"
       description="Ringkasan data Millenials Farm"
+      actions={
+        <Link
+          href="/admin/new"
+          className={cn(buttonVariants({ size: 'sm' }), 'gap-1')}
+        >
+          <Plus className="h-4 w-4" />
+          Tambah Entry
+        </Link>
+      }
     >
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 mb-6">
         {stats.map((stat) => (
@@ -90,57 +141,12 @@ export default async function AdminDashboardPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Entry Terbaru</CardTitle>
+          <CardTitle>
+            Entry Penjualan
+          </CardTitle>
         </CardHeader>
-        <CardContent>
-          {recentEntries.length === 0 ? (
-            <p className="text-muted-foreground text-sm">Belum ada entry.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left">
-                    <th className="pb-2 font-medium">Invoice</th>
-                    <th className="pb-2 font-medium">Hewan</th>
-                    <th className="pb-2 font-medium">Pembeli</th>
-                    <th className="pb-2 font-medium">Sales</th>
-                    <th className="pb-2 font-medium">Harga Jual</th>
-                    <th className="pb-2 font-medium">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentEntries.map((entry) => (
-                    <tr key={entry.id} className="border-b last:border-0">
-                      <td className="py-2 font-mono text-xs">
-                        {entry.invoiceNo}
-                      </td>
-                      <td className="py-2">
-                        {entry.livestock.type} - {entry.livestock.grade}
-                      </td>
-                      <td className="py-2">{entry.buyerName}</td>
-                      <td className="py-2">{entry.sales.name}</td>
-                      <td className="py-2">
-                        {formatRupiah(entry.hargaJual)}
-                      </td>
-                      <td className="py-2">
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                            entry.status === "APPROVED"
-                              ? "bg-primary/10 text-primary"
-                              : entry.status === "PENDING"
-                                ? "bg-yellow-100 text-yellow-800"
-                                : "bg-destructive/10 text-destructive"
-                          }`}
-                        >
-                          {entry.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+        <CardContent className="p-0">
+          <EntryTable entries={serialized} isAdmin={true} />
         </CardContent>
       </Card>
     </DashboardShell>

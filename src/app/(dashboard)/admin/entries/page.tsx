@@ -51,7 +51,7 @@ export default async function AdminEntriesPage() {
     >
       <Card>
         <CardContent className="p-0">
-          <EntryTable entries={serialized} />
+          <EntryTable entries={serialized} isAdmin={true} />
         </CardContent>
       </Card>
     </DashboardShell>

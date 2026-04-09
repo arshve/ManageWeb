@@ -56,21 +56,21 @@ async function main() {
 
   // Create livestock
   const livestockData = [
-    { sku: "MF-001K-Super", type: "KAMBING" as const, grade: "SUPER" as const, weight: 48, tagBsd: "BSD-01", tagKandang: "K-01", condition: "SEHAT" as const },
-    { sku: "MF-002K-A", type: "KAMBING" as const, grade: "A" as const, weight: 42, tagBsd: "BSD-02", tagKandang: "K-02", condition: "SEHAT" as const },
-    { sku: "MF-003K-A", type: "KAMBING" as const, grade: "A" as const, weight: 40, tagBsd: "BSD-03", tagKandang: "K-03", condition: "SEHAT" as const },
-    { sku: "MF-004K-B", type: "KAMBING" as const, grade: "B" as const, weight: 38, tagBsd: "BSD-04", tagKandang: "K-04", condition: "SEHAT" as const },
-    { sku: "MF-005K-B", type: "KAMBING" as const, grade: "B" as const, weight: 36, tagBsd: "BSD-05", tagKandang: "K-05", condition: "SEHAT" as const },
-    { sku: "MF-006K-C", type: "KAMBING" as const, grade: "C" as const, weight: 30, tagBsd: "BSD-06", tagKandang: "K-06", condition: "SEHAT" as const },
-    { sku: "MF-007K-C", type: "KAMBING" as const, grade: "C" as const, weight: 28, tagBsd: "BSD-07", tagKandang: "K-07", condition: "SAKIT" as const },
-    { sku: "MF-008K-D", type: "KAMBING" as const, grade: "D" as const, weight: 20, tagBsd: "BSD-08", tagKandang: "K-08", condition: "SEHAT" as const },
-    { sku: "MF-009D-A", type: "DOMBA" as const, grade: "A" as const, weight: 45, tagBsd: "BSD-09", tagKandang: "K-09", condition: "SEHAT" as const },
-    { sku: "MF-010D-B", type: "DOMBA" as const, grade: "B" as const, weight: 35, tagBsd: "BSD-10", tagKandang: "K-10", condition: "SEHAT" as const },
-    { sku: "MF-011D-C", type: "DOMBA" as const, grade: "C" as const, weight: 28, tagBsd: "BSD-11", tagKandang: "K-11", condition: "SEHAT" as const },
-    { sku: "MF-012S-A", type: "SAPI" as const, grade: "A" as const, weight: 350, tagBsd: "BSD-12", tagKandang: "K-12", condition: "SEHAT" as const },
-    { sku: "MF-013S-B", type: "SAPI" as const, grade: "B" as const, weight: 300, tagBsd: "BSD-13", tagKandang: "K-13", condition: "SEHAT" as const },
-    { sku: "MF-014S-C", type: "SAPI" as const, grade: "C" as const, weight: 250, tagBsd: "BSD-14", tagKandang: "K-14", condition: "SEHAT" as const },
-    { sku: "MF-015K-A", type: "KAMBING" as const, grade: "A" as const, weight: 43, tagBsd: "BSD-15", tagKandang: "K-15", condition: "SEHAT" as const },
+    { sku: "MF-001K-Super", type: "KAMBING" as const, grade: "SUPER" as const, weight: 48, hargaJual: 5000000, tag: "BSD-01 / K-01", condition: "SEHAT" as const },
+    { sku: "MF-002K-A", type: "KAMBING" as const, grade: "A" as const, weight: 42, hargaJual: 4400000, tag: "BSD-02 / K-02", condition: "SEHAT" as const },
+    { sku: "MF-003K-A", type: "KAMBING" as const, grade: "A" as const, weight: 40, hargaJual: 4400000, tag: "BSD-03 / K-03", condition: "SEHAT" as const },
+    { sku: "MF-004K-B", type: "KAMBING" as const, grade: "B" as const, weight: 38, hargaJual: 3800000, tag: "BSD-04 / K-04", condition: "SEHAT" as const },
+    { sku: "MF-005K-B", type: "KAMBING" as const, grade: "B" as const, weight: 36, hargaJual: 3800000, tag: "BSD-05 / K-05", condition: "SEHAT" as const },
+    { sku: "MF-006K-C", type: "KAMBING" as const, grade: "C" as const, weight: 30, hargaJual: 3300000, tag: "BSD-06 / K-06", condition: "SEHAT" as const },
+    { sku: "MF-007K-C", type: "KAMBING" as const, grade: "C" as const, weight: 28, hargaJual: 3300000, tag: "BSD-07 / K-07", condition: "SAKIT" as const },
+    { sku: "MF-008K-D", type: "KAMBING" as const, grade: "D" as const, weight: 20, hargaJual: 2350000, tag: "BSD-08 / K-08", condition: "SEHAT" as const },
+    { sku: "MF-009D-A", type: "DOMBA" as const, grade: "A" as const, weight: 45, hargaJual: 4000000, tag: "BSD-09 / K-09", condition: "SEHAT" as const },
+    { sku: "MF-010D-B", type: "DOMBA" as const, grade: "B" as const, weight: 35, hargaJual: 3400000, tag: "BSD-10 / K-10", condition: "SEHAT" as const },
+    { sku: "MF-011D-C", type: "DOMBA" as const, grade: "C" as const, weight: 28, hargaJual: 2800000, tag: "BSD-11 / K-11", condition: "SEHAT" as const },
+    { sku: "MF-012S-A", type: "SAPI" as const, grade: "A" as const, weight: 350, hargaJual: 25000000, tag: "BSD-12 / K-12", condition: "SEHAT" as const },
+    { sku: "MF-013S-B", type: "SAPI" as const, grade: "B" as const, weight: 300, hargaJual: 21000000, tag: "BSD-13 / K-13", condition: "SEHAT" as const },
+    { sku: "MF-014S-C", type: "SAPI" as const, grade: "C" as const, weight: 250, hargaJual: 18000000, tag: "BSD-14 / K-14", condition: "SEHAT" as const },
+    { sku: "MF-015K-A", type: "KAMBING" as const, grade: "A" as const, weight: 43, hargaJual: 4400000, tag: "BSD-15 / K-15", condition: "SEHAT" as const },
   ];
 
   for (const l of livestockData) {

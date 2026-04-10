@@ -174,7 +174,15 @@ export function EntryTable({
     });
 
     return result;
-  }, [entries, search, statusFilter, paymentFilter, sentFilter, sortField, sortDir]);
+  }, [
+    entries,
+    search,
+    statusFilter,
+    paymentFilter,
+    sentFilter,
+    sortField,
+    sortDir,
+  ]);
 
   return (
     <div>
@@ -190,7 +198,10 @@ export function EntryTable({
           />
         </div>
         <div className="flex flex-wrap gap-2">
-          <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val ?? 'ALL')}>
+          <Select
+            value={statusFilter}
+            onValueChange={(val) => setStatusFilter(val ?? 'ALL')}
+          >
             <SelectTrigger className="h-8 w-[140px] text-xs">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
@@ -201,7 +212,10 @@ export function EntryTable({
               <SelectItem value="REJECTED">Rejected</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={paymentFilter} onValueChange={(val) => setPaymentFilter(val ?? 'ALL')}>
+          <Select
+            value={paymentFilter}
+            onValueChange={(val) => setPaymentFilter(val ?? 'ALL')}
+          >
             <SelectTrigger className="h-8 w-[150px] text-xs">
               <SelectValue placeholder="Pembayaran" />
             </SelectTrigger>
@@ -212,7 +226,10 @@ export function EntryTable({
               <SelectItem value="LUNAS">Lunas</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={sentFilter} onValueChange={(val) => setSentFilter(val ?? 'ALL')}>
+          <Select
+            value={sentFilter}
+            onValueChange={(val) => setSentFilter(val ?? 'ALL')}
+          >
             <SelectTrigger className="h-8 w-[140px] text-xs">
               <SelectValue placeholder="Pengiriman" />
             </SelectTrigger>
@@ -222,7 +239,10 @@ export function EntryTable({
               <SelectItem value="NO">Belum Kirim</SelectItem>
             </SelectContent>
           </Select>
-          {(search || statusFilter !== 'ALL' || paymentFilter !== 'ALL' || sentFilter !== 'ALL') && (
+          {(search ||
+            statusFilter !== 'ALL' ||
+            paymentFilter !== 'ALL' ||
+            sentFilter !== 'ALL') && (
             <Button
               variant="ghost"
               size="sm"
@@ -265,15 +285,18 @@ export function EntryTable({
                   Pembeli <SortIcon field="buyerName" />
                 </span>
               </th>
-              <th
-                className="text-center p-3 font-medium cursor-pointer select-none hover:bg-muted/80"
-                onClick={() => toggleSort('sales')}
-              >
-                <span className="inline-flex items-center gap-1">
-                  Sales <SortIcon field="sales" />
-                </span>
-              </th>
-              <th className="text-center p-3 font-medium">Sales Cut</th>
+              {isAdmin && (
+                <>
+                  <th
+                    className="text-center p-3 font-medium cursor-pointer select-none hover:bg-muted/80"
+                    onClick={() => toggleSort('sales')}
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      Sales <SortIcon field="sales" />
+                    </span>
+                  </th>
+                </>
+              )}
               <th
                 className="text-center p-3 font-medium cursor-pointer select-none hover:bg-muted/80"
                 onClick={() => toggleSort('hargaJual')}
@@ -282,15 +305,20 @@ export function EntryTable({
                   Harga Jual <SortIcon field="hargaJual" />
                 </span>
               </th>
-              <th className="text-center p-3 font-medium">Modal</th>
-              <th
-                className="text-center p-3 font-medium cursor-pointer select-none hover:bg-muted/80"
-                onClick={() => toggleSort('profit')}
-              >
-                <span className="inline-flex items-center gap-1">
-                  Profit <SortIcon field="profit" />
-                </span>
-              </th>
+              <th className="text-center p-3 font-medium">Sales Cut</th>
+              {isAdmin && (
+                <>
+                  <th className="text-center p-3 font-medium">Modal</th>
+                  <th
+                    className="text-center p-3 font-medium cursor-pointer select-none hover:bg-muted/80"
+                    onClick={() => toggleSort('profit')}
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      Profit <SortIcon field="profit" />
+                    </span>
+                  </th>
+                </>
+              )}
               <th className="text-center p-3 font-medium">Bayar</th>
               <th className="text-center p-3 font-medium">Kirim</th>
               <th className="text-center p-3 font-medium">Status</th>
@@ -320,7 +348,7 @@ export function EntryTable({
             {filtered.length === 0 && (
               <tr>
                 <td
-                  colSpan={13}
+                  colSpan={isAdmin ? 13 : 10}
                   className="p-8 text-center text-muted-foreground"
                 >
                   {entries.length === 0
@@ -444,27 +472,35 @@ function EntryRow({
             </div>
           )}
         </td>
-        <td className="p-3">{entry.sales.name}</td>
+        {isAdmin && (
+          <>
+            <td className="p-3">{entry.sales.name}</td>
+          </>
+        )}
+        <td className="p-3 text-center">{formatRupiah(entry.hargaJual)}</td>
         <td className="p-3 text-center">
           {entry.resellerCut ? formatRupiah(entry.resellerCut) : '-'}
         </td>
-        <td className="p-3 text-center">{formatRupiah(entry.hargaJual)}</td>
-        <td className="p-3 text-center">
-          {entry.hargaModal ? formatRupiah(entry.hargaModal) : '-'}
-        </td>
-        <td className="p-3 text-center">
-          {entry.profit ? (
-            <span
-              className={
-                entry.profit >= 0 ? 'text-primary' : 'text-destructive'
-              }
-            >
-              {formatRupiah(entry.profit)}
-            </span>
-          ) : (
-            '-'
-          )}
-        </td>
+        {isAdmin && (
+          <>
+            <td className="p-3 text-center">
+              {entry.hargaModal ? formatRupiah(entry.hargaModal) : '-'}
+            </td>
+            <td className="p-3 text-center">
+              {entry.profit ? (
+                <span
+                  className={
+                    entry.profit >= 0 ? 'text-primary' : 'text-destructive'
+                  }
+                >
+                  {formatRupiah(entry.profit)}
+                </span>
+              ) : (
+                '-'
+              )}
+            </td>
+          </>
+        )}
         <td className="p-3 text-center">
           <Badge
             variant={
@@ -578,7 +614,7 @@ function EntryRow({
       {/* Inline edit row */}
       {isEditing && (
         <tr className="border-b bg-muted/20">
-          <td colSpan={13} className="p-4">
+          <td colSpan={isAdmin ? 13 : 10} className="p-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {/* Buyer */}
               <div className="space-y-1">
@@ -624,24 +660,28 @@ function EntryRow({
                   className="h-8 text-sm"
                 />
               </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Harga Modal</Label>
-                <Input
-                  type="number"
-                  value={form.hargaModal}
-                  onChange={(e) => update('hargaModal', e.target.value)}
-                  className="h-8 text-sm"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Reseller Cut</Label>
-                <Input
-                  type="number"
-                  value={form.resellerCut}
-                  onChange={(e) => update('resellerCut', e.target.value)}
-                  className="h-8 text-sm"
-                />
-              </div>
+              {isAdmin && (
+                <>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Harga Modal</Label>
+                    <Input
+                      type="number"
+                      value={form.hargaModal}
+                      onChange={(e) => update('hargaModal', e.target.value)}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Reseller Cut</Label>
+                    <Input
+                      type="number"
+                      value={form.resellerCut}
+                      onChange={(e) => update('resellerCut', e.target.value)}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                </>
+              )}
               <div className="space-y-1">
                 <Label className="text-xs">Status Bayar</Label>
                 <Select
@@ -680,15 +720,19 @@ function EntryRow({
                   className="h-8 text-sm"
                 />
               </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Sudah Dikirim</Label>
-                <div className="pt-1">
-                  <Switch
-                    checked={form.isSent}
-                    onCheckedChange={(val) => update('isSent', val)}
-                  />
-                </div>
-              </div>
+              {isAdmin && (
+                <>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Sudah Dikirim</Label>
+                    <div className="pt-1">
+                      <Switch
+                        checked={form.isSent}
+                        onCheckedChange={(val) => update('isSent', val)}
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
               <div className="space-y-1">
                 <Label className="text-xs">Alamat</Label>
                 <Input

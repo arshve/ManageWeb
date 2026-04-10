@@ -40,6 +40,17 @@ export async function createEntry(formData: FormData) {
   const livestock = await prisma.livestock.findUnique({
     where: { id: livestockId },
   });
+
+  const existingEntry = await prisma.entry.findUnique({
+    where: { livestockId },
+  });
+
+  if (existingEntry) {
+    return {
+      error: 'Hewan ini sudah memiliki entry penjualan (Pending/Approved)!',
+    };
+  }
+
   if (!livestock || livestock.isSold) {
     return { error: 'Hewan tidak tersedia atau sudah terjual' };
   }

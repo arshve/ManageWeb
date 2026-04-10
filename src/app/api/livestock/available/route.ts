@@ -9,13 +9,13 @@
  * Returns: Array of { id, sku, type, grade, weight, condition }
  */
 
-import { prisma } from "@/lib/prisma";
-import { NextResponse } from "next/server";
+import { prisma } from '@/lib/prisma';
+import { NextResponse } from 'next/server';
 
 export async function GET() {
   const livestock = await prisma.livestock.findMany({
-    where: { isSold: false, condition: "SEHAT" },
-    orderBy: { createdAt: "desc" },
+    where: { isSold: false, condition: 'SEHAT', entry: null },
+    orderBy: { createdAt: 'desc' },
     select: {
       id: true,
       sku: true,

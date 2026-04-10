@@ -13,16 +13,16 @@
  * Uses the `jose` library for JWT signing/verification with HS256 algorithm.
  */
 
-import { SignJWT, jwtVerify } from "jose";
-import { cookies } from "next/headers";
+import { SignJWT, jwtVerify } from 'jose';
+import { cookies } from 'next/headers';
 
 // Encode the secret key for use with jose. Falls back to a dev secret if not set.
 const SECRET = new TextEncoder().encode(
-  process.env.SESSION_SECRET || "millenials-farm-dev-secret-change-in-prod"
+  process.env.SESSION_SECRET || 'millenials-farm-dev-secret-change-in-prod',
 );
 
 // Name of the cookie that stores the JWT token
-const COOKIE_NAME = "mf-session";
+const COOKIE_NAME = 'mf-session';
 
 /**
  * Creates a new session for a user after successful login.
@@ -32,18 +32,18 @@ const COOKIE_NAME = "mf-session";
  * @param userId - The database ID of the authenticated user
  * @returns The signed JWT token string
  */
-export async function createSession(userId: string) {
-  const token = await new SignJWT({ userId })
-    .setProtectedHeader({ alg: "HS256" })
-    .setExpirationTime("7d")
+export async function createSession(userId: string, role: string) {
+  const token = await new SignJWT({ userId, role })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setExpirationTime('7d')
     .sign(SECRET);
 
   const cookieStore = await cookies();
   cookieStore.set(COOKIE_NAME, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
     maxAge: 60 * 60 * 24 * 7, // 7 days in seconds
   });
 

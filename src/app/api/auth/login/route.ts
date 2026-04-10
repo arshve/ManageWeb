@@ -17,18 +17,18 @@
  * - 403: Account is deactivated by admin
  */
 
-import { prisma } from "@/lib/prisma";
-import { createSession } from "@/lib/session";
-import { compareSync } from "bcryptjs";
-import { NextRequest, NextResponse } from "next/server";
+import { prisma } from '@/lib/prisma';
+import { createSession } from '@/lib/session';
+import { compareSync } from 'bcryptjs';
+import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   const { username, password } = await request.json();
 
   if (!username || !password) {
     return NextResponse.json(
-      { error: "Username dan password harus diisi" },
-      { status: 400 }
+      { error: 'Username dan password harus diisi' },
+      { status: 400 },
     );
   }
 
@@ -40,21 +40,21 @@ export async function POST(request: NextRequest) {
   // Compare plain-text password against bcrypt hash in database
   if (!profile || !compareSync(password, profile.password)) {
     return NextResponse.json(
-      { error: "Username atau password salah" },
-      { status: 401 }
+      { error: 'Username atau password salah' },
+      { status: 401 },
     );
   }
 
   // Check if the account has been deactivated by admin
   if (!profile.isActive) {
     return NextResponse.json(
-      { error: "Akun Anda tidak aktif. Hubungi admin." },
-      { status: 403 }
+      { error: 'Akun Anda tidak aktif. Hubungi admin.' },
+      { status: 403 },
     );
   }
 
   // Create JWT session cookie — user is now logged in
-  await createSession(profile.id);
+  await createSession(profile.id, profile.role);
 
   return NextResponse.json({
     success: true,

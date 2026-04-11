@@ -9,19 +9,19 @@
  * (Prisma enforces the foreign key constraint).
  */
 
-"use client";
+'use client';
 
-import { Button } from "@/components/ui/button";
+import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
-import { deleteLivestock } from "@/app/actions/livestock";
-import { LivestockForm } from "./livestock-form";
-import { toast } from "sonner";
+} from '@/components/ui/dropdown-menu';
+import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { deleteLivestock } from '@/app/actions/livestock';
+import { LivestockForm } from './livestock-form';
+import { toast } from 'sonner';
 
 interface LivestockActionsProps {
   livestock: {
@@ -44,12 +44,12 @@ export function LivestockActions({ livestock }: LivestockActionsProps) {
    * Calls the deleteLivestock server action after user confirms.
    */
   async function handleDelete() {
-    if (!confirm("Yakin ingin menghapus hewan ini?")) return;
+    if (!confirm('Yakin ingin menghapus hewan ini?')) return;
     const result = await deleteLivestock(livestock.id);
-    if ("error" in result) {
+    if ('error' in result) {
       toast.error(result.error as string);
     } else {
-      toast.success("Hewan dihapus");
+      toast.success('Hewan dihapus');
     }
   }
 

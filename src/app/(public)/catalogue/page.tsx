@@ -42,54 +42,56 @@ export default async function CataloguePage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-            {livestock.map((item) => (
-                <div
-                  key={item.id}
-                  className="group"
-                >
-                  {/* Image area */}
-                  <div className="relative aspect-[4/3] bg-secondary mb-4 overflow-hidden">
-                    {item.photoUrl ? (
-                      <Image
-                        src={item.photoUrl}
-                        alt={`${item.type} ${item.grade} - ${item.sku}`}
-                        fill
-                        className="object-cover group-hover:scale-105 transition-transform duration-500"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Beef className="h-16 w-16 text-muted-foreground/20" />
-                      </div>
-                    )}
-                  </div>
-                  {/* Info */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-semibold">
-                        {typeLabels[item.type]} — Grade {item.grade}
-                      </h3>
-                      <Badge variant="outline" className="text-xs font-normal">
-                        {item.condition}
-                      </Badge>
+            {livestock.map((item, index) => (
+              <div key={item.id} className="group">
+                {/* Image area */}
+                <div className="relative aspect-[4/3] bg-secondary mb-4 overflow-hidden">
+                  {item.photoUrl ? (
+                    <Image
+                      src={item.photoUrl}
+                      alt={`${item.type} ${item.grade} - ${item.sku}`}
+                      fill
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                      loading={index === 0 ? 'eager' : 'lazy'}
+                      priority={index === 0}
+                      className="object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Beef className="h-16 w-16 text-muted-foreground/20" />
                     </div>
-                    <p className="text-xs text-muted-foreground font-mono">
-                      {item.sku}
-                    </p>
-                    {item.weight && (
-                      <p className="text-sm text-muted-foreground">
-                        Berat: {item.weight} kg
-                      </p>
-                    )}
-                    {item.hargaJual && (
-                      <p className="text-lg font-bold">{formatRupiah(item.hargaJual)}</p>
-                    )}
-                    {item.tag && (
-                      <p className="text-xs text-muted-foreground pt-1">
-                        Tag: {item.tag}
-                      </p>
-                    )}
-                  </div>
+                  )}
                 </div>
+                {/* Info */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold">
+                      {typeLabels[item.type]} — Grade {item.grade}
+                    </h3>
+                    <Badge variant="outline" className="text-xs font-normal">
+                      {item.condition}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground font-mono">
+                    {item.sku}
+                  </p>
+                  {item.weight && (
+                    <p className="text-sm text-muted-foreground">
+                      Berat: {item.weight} kg
+                    </p>
+                  )}
+                  {item.hargaJual && (
+                    <p className="text-lg font-bold">
+                      {formatRupiah(item.hargaJual)}
+                    </p>
+                  )}
+                  {item.tag && (
+                    <p className="text-xs text-muted-foreground pt-1">
+                      Tag: {item.tag}
+                    </p>
+                  )}
+                </div>
+              </div>
             ))}
           </div>
         )}

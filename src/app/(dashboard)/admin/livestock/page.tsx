@@ -3,6 +3,7 @@ import { formatRupiah } from '@/lib/format';
 import { DashboardShell } from '@/components/dashboard/dashboard-shell';
 import { LivestockForm } from '@/components/dashboard/livestock-form';
 import { LivestockActions } from '@/components/dashboard/livestock-actions';
+import { LivestockPhoto } from '@/components/dashboard/livestock-photo';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -35,32 +36,47 @@ export default async function LivestockPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-muted/50">
-                  <th className="text-left p-3 font-medium">SKU</th>
-                  <th className="text-left p-3 font-medium">Jenis</th>
-                  <th className="text-left p-3 font-medium">Grade</th>
-                  <th className="text-left p-3 font-medium">Berat</th>
-                  <th className="text-left p-3 font-medium">Harga</th>
-                  <th className="text-left p-3 font-medium">Kondisi</th>
-                  <th className="text-left p-3 font-medium">Status</th>
-                  <th className="text-left p-3 font-medium">Tag</th>
-                  <th className="text-center p-3 font-medium">Aksi</th>
+                  <th className="p-3 font-medium w-16"></th>
+                  {/* Foto */}
+                  <th className="p-3 font-medium text-center">SKU</th>
+                  <th className="p-3 font-medium text-center">Jenis</th>
+                  <th className="p-3 font-medium text-center">Grade</th>
+                  <th className="p-3 font-medium text-center">Berat</th>
+                  <th className="p-3 font-medium text-center">Harga</th>
+                  <th className="p-3 font-medium text-center">Kondisi</th>
+                  <th className="p-3 font-medium text-center">Status</th>
+                  <th className="p-3 font-medium text-center">Tag</th>
+                  <th className="p-3 font-medium text-left">Aksi</th>
                 </tr>
               </thead>
               <tbody>
                 {livestock.map((item) => (
-                  <tr key={item.id} className="border-b last:border-0">
-                    <td className="p-3 font-mono text-xs">{item.sku}</td>
-                    <td className="p-3">{item.type}</td>
+                  <tr
+                    key={item.id}
+                    className="border-b last:border-0 hover:bg-muted/30 transition-colors"
+                  >
                     <td className="p-3">
+                      <LivestockPhoto
+                        photoUrl={item.photoUrl}
+                        alt={`${item.type} ${item.grade} - ${item.sku}`}
+                      />
+                    </td>
+                    <td className="p-3 text-center font-mono text-xs">
+                      {item.sku}
+                    </td>
+                    <td className="p-3 text-center">
+                      {item.type.charAt(0) + item.type.slice(1).toLowerCase()}
+                    </td>
+                    <td className="p-3 text-center">
                       <Badge variant="outline">{item.grade}</Badge>
                     </td>
-                    <td className="p-3">
-                      {item.weight ? `${item.weight} kg` : '-'}
+                    <td className="p-3 text-center tabular-nums">
+                      {item.weight ? `${item.weight} kg` : '—'}
                     </td>
-                    <td className="p-3">
-                      {item.hargaJual ? formatRupiah(item.hargaJual) : '-'}
+                    <td className="p-3 text-center tabular-nums">
+                      {item.hargaJual ? formatRupiah(item.hargaJual) : '—'}
                     </td>
-                    <td className="p-3">
+                    <td className="p-3 text-center">
                       <Badge
                         variant={
                           item.condition === 'SEHAT'
@@ -70,10 +86,11 @@ export default async function LivestockPage() {
                               : 'destructive'
                         }
                       >
-                        {item.condition}
+                        {item.condition.charAt(0) +
+                          item.condition.slice(1).toLowerCase()}
                       </Badge>
                     </td>
-                    <td className="p-3">
+                    <td className="p-3 text-center">
                       {item.isSold ? (
                         <Badge variant="secondary">Terjual</Badge>
                       ) : (
@@ -82,10 +99,10 @@ export default async function LivestockPage() {
                         </Badge>
                       )}
                     </td>
-                    <td className="p-3 text-xs text-muted-foreground">
-                      {item.tag || '-'}
+                    <td className="p-3 text-center text-muted-foreground">
+                      {item.tag || '—'}
                     </td>
-                    <td className="p-3 text-right">
+                    <td className="p-3 text-center">
                       <LivestockActions livestock={item} />
                     </td>
                   </tr>
@@ -93,7 +110,7 @@ export default async function LivestockPage() {
                 {livestock.length === 0 && (
                   <tr>
                     <td
-                      colSpan={9}
+                      colSpan={10}
                       className="p-8 text-center text-muted-foreground"
                     >
                       Belum ada hewan terdaftar.

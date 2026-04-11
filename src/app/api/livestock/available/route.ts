@@ -23,6 +23,7 @@ export async function GET() {
       grade: true,
       weight: true,
       condition: true,
+      photoUrl: true,
     },
   });
 

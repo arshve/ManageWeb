@@ -17,6 +17,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DashboardShell } from '@/components/dashboard/dashboard-shell';
 import { createEntry } from '@/app/actions/entries';
 import { toast } from 'sonner';
+import { Beef } from 'lucide-react';
+import { LivestockPhoto } from '@/components/dashboard/livestock-photo';
 
 interface AvailableLivestock {
   id: string;
@@ -25,6 +27,7 @@ interface AvailableLivestock {
   grade: string;
   weight: number | null;
   condition: string;
+  photoUrl: string | null;
 }
 
 export default function AdminNewEntryPage() {
@@ -91,21 +94,40 @@ export default function AdminNewEntryPage() {
               </SelectContent>
             </Select>
             {selected && (
-              <div className="mt-3 p-3 bg-muted rounded-lg text-sm">
-                <p>
-                  <strong>SKU:</strong> {selected.sku}
-                </p>
-                <p>
-                  <strong>Jenis:</strong> {selected.type} | Grade:{' '}
-                  {selected.grade}
-                </p>
-                <p>
-                  <strong>Berat:</strong>{' '}
-                  {selected.weight ? `${selected.weight} kg` : 'Belum diisi'}
-                </p>
-                <p>
-                  <strong>Kondisi:</strong> {selected.condition}
-                </p>
+              <div className="flex gap-4 p-3 bg-muted rounded-lg text-sm">
+                {/* Photo */}
+                <div className="relative w-24 h-24 flex-shrink-0 rounded-md overflow-hidden bg-background">
+                  {selected.photoUrl ? (
+                    <LivestockPhoto
+                      photoUrl={selected.photoUrl}
+                      alt={`${selected.type} ${selected.grade}`}
+                      thumbnailClassName="w-24 h-24"
+                      priority
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Beef className="h-8 w-8 text-muted-foreground/30" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Info */}
+                <div className="space-y-1">
+                  <p>
+                    <strong>SKU:</strong> {selected.sku}
+                  </p>
+                  <p>
+                    <strong>Jenis:</strong> {selected.type} | Grade:{' '}
+                    {selected.grade}
+                  </p>
+                  <p>
+                    <strong>Berat:</strong>{' '}
+                    {selected.weight ? `${selected.weight} kg` : 'Belum diisi'}
+                  </p>
+                  <p>
+                    <strong>Kondisi:</strong> {selected.condition}
+                  </p>
+                </div>
               </div>
             )}
           </CardContent>

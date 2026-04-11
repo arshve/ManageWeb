@@ -1,11 +1,3 @@
-/**
- * LivestockPhoto — Thumbnail with lightbox preview for the admin livestock table.
- *
- * Shows a small 40x40 avatar-style thumbnail in the table row.
- * Clicking it opens a centered lightbox overlay with the full image.
- * Clicking the overlay or the X button closes it.
- */
-
 'use client';
 
 import { useState } from 'react';
@@ -15,15 +7,21 @@ import { X, Beef } from 'lucide-react';
 export function LivestockPhoto({
   photoUrl,
   alt,
+  thumbnailClassName = 'w-10 h-10',
+  priority = false,
 }: {
   photoUrl: string | null;
   alt: string;
+  thumbnailClassName?: string;
+  priority?: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
   if (!photoUrl) {
     return (
-      <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
+      <div
+        className={`${thumbnailClassName} rounded bg-muted flex items-center justify-center flex-shrink-0`}
+      >
         <Beef className="h-4 w-4 text-muted-foreground/40" />
       </div>
     );
@@ -31,18 +29,20 @@ export function LivestockPhoto({
 
   return (
     <>
-      {/* Thumbnail */}
+      {/* Thumbnail — size controlled by thumbnailClassName */}
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="w-10 h-10 rounded overflow-hidden relative flex-shrink-0 ring-1 ring-border hover:ring-2 hover:ring-primary transition-all"
+        className={`${thumbnailClassName} rounded-md overflow-hidden relative flex-shrink-0 ring-1 ring-border hover:ring-2 hover:ring-primary transition-all cursor-zoom-in`}
         title="Lihat foto"
       >
         <Image
           src={photoUrl}
           alt={alt}
           fill
-          sizes="40px"
+          sizes={thumbnailClassName.includes('w-24') ? '96px' : '40px'}
+          loading={priority ? 'eager' : 'lazy'}
+          priority={priority}
           className="object-cover"
         />
       </button>

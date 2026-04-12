@@ -16,7 +16,27 @@ import { prisma } from '@/lib/prisma';
 import { requireAuth, requireRole } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
 import { generateInvoiceNo } from '@/lib/format';
+import { supabaseAdmin } from '@/lib/supabase';
 import type { AnimalType, AnimalGrade } from '@/generated/prisma/client';
+
+/**
+ * Deletes files from Supabase Storage given their public URLs.
+ * Extracts the storage path from the URL and calls the admin client.
+ * Only runs in production — dev uses local disk.
+ */
+async function deleteStorageFiles(urls: string[]) {
+  if (process.env.NODE_ENV === 'development' || urls.length === 0) return;
+  const paths = urls
+    .map((url) => {
+      const match = url.match(/\/object\/public\/uploads\/(.+)$/);
+      return match ? match[1] : null;
+    })
+    .filter(Boolean) as string[];
+  if (paths.length > 0) {
+    const { error } = await supabaseAdmin.storage.from('uploads').remove(paths);
+    if (error) console.error('Storage cleanup error:', error);
+  }
+}
 
 /**
  * Creates a new sale entry. Called by sales persons from the "Tambah Entry" form.
@@ -233,6 +253,10 @@ export async function updateEntry(id: string, formData: FormData) {
     },
   });
 
+  // Delete removed photos from storage (diff between old and new URL list)
+  const removedUrls = entry.buktiTransfer.filter((url) => !buktiTransfer.includes(url));
+  await deleteStorageFiles(removedUrls);
+
   revalidatePath('/admin');
   revalidatePath('/sales');
   return { success: true };
@@ -263,6 +287,9 @@ export async function deleteEntry(id: string) {
       data: { isSold: false },
     }),
   ]);
+
+  // Delete all bukti transfer photos from storage
+  await deleteStorageFiles(entry.buktiTransfer);
 
   revalidatePath('/admin');
   revalidatePath('/sales');

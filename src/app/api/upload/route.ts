@@ -2,7 +2,7 @@ import { getSessionUserId } from '@/lib/session';
 import { NextRequest, NextResponse } from 'next/server';
 import { writeFile, mkdir, unlink } from 'fs/promises';
 import path from 'path';
-import { supabase } from '@/lib/supabase';
+import { supabase, supabaseAdmin } from '@/lib/supabase';
 
 export async function POST(request: NextRequest) {
   // 1. Auth check — only logged-in users can upload
@@ -96,7 +96,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     const filePath = match[1]; // e.g. "transfers/filename.jpg"
-    const { error } = await supabase.storage.from('uploads').remove([filePath]);
+    const { error } = await supabaseAdmin.storage.from('uploads').remove([filePath]);
 
     if (error) {
       console.error('Supabase delete error:', error);

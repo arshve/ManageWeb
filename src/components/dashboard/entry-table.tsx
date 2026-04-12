@@ -490,8 +490,6 @@ function EntryRow({
   const [buktiTransferUrls, setBuktiTransferUrls] = useState<string[]>(
     entry.buktiTransfer ?? [],
   );
-  // URLs of existing photos marked for deletion — executed only after successful save
-  const pendingDeletes = useRef<string[]>([]);
 
   function update(field: string, value: string | boolean) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -526,21 +524,6 @@ function EntryRow({
         toast.error(String(result.error));
       } else {
         toast.success('Entry diperbarui');
-        // Now safe to delete removed existing photos from storage
-        await Promise.all(
-          pendingDeletes.current.map(async (url) => {
-            try {
-              await fetch('/api/upload', {
-                method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url }),
-              });
-            } catch {
-              console.warn('Failed to delete file after save:', url);
-            }
-          }),
-        );
-        pendingDeletes.current = [];
         onSaved();
       }
     } catch {
@@ -863,9 +846,6 @@ function EntryRow({
                   key={entry.id + '-bukti'}
                   initialUrls={entry.buktiTransfer ?? []}
                   onChange={setBuktiTransferUrls}
-                  onPendingDeletes={(urls) => {
-                    pendingDeletes.current = urls;
-                  }}
                 />
               </div>
             </div>

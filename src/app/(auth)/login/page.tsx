@@ -41,7 +41,13 @@ export default function LoginPage() {
       return;
     }
 
-    router.push(data.role === 'ADMIN' ? '/admin' : '/sales');
+    router.push(
+      data.role === 'ADMIN'
+        ? '/admin'
+        : data.role === 'MANAGE'
+          ? '/manage'
+          : '/sales',
+    );
     router.refresh();
   }
 

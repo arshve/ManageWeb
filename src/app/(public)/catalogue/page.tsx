@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { prisma } from '@/lib/prisma';
-import { formatRupiah } from '@/lib/format';
+import { formatRupiah, formatWeight } from '@/lib/format';
 import { Badge } from '@/components/ui/badge';
 import { Beef } from 'lucide-react';
 import Image from 'next/image';
@@ -49,7 +49,7 @@ export default async function CataloguePage() {
                   {item.photoUrl ? (
                     <Image
                       src={item.photoUrl}
-                      alt={`${item.type} ${item.grade} - ${item.sku}`}
+                      alt={`${item.type}${item.grade ? ' ' + item.grade : ''} - ${item.sku}`}
                       fill
                       sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                       loading={index === 0 ? 'eager' : 'lazy'}
@@ -66,7 +66,8 @@ export default async function CataloguePage() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <h3 className="font-semibold">
-                      {typeLabels[item.type]} — Grade {item.grade}
+                      {typeLabels[item.type]}
+                      {item.grade ? ` — Grade ${item.grade}` : ''}
                     </h3>
                     <Badge variant="outline" className="text-xs font-normal">
                       {item.condition}
@@ -75,9 +76,9 @@ export default async function CataloguePage() {
                   <p className="text-xs text-muted-foreground font-mono">
                     {item.sku}
                   </p>
-                  {item.weight && (
+                  {formatWeight(item.weightMin, item.weightMax) && (
                     <p className="text-sm text-muted-foreground">
-                      Berat: {item.weight} kg
+                      Berat: {formatWeight(item.weightMin, item.weightMax)}
                     </p>
                   )}
                   {item.hargaJual && (

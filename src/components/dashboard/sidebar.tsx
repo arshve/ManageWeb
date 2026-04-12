@@ -34,7 +34,7 @@ import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 
 interface SidebarProps {
-  role: 'ADMIN' | 'SALES';
+  role: 'ADMIN' | 'SALES' | 'MANAGE';
   userName: string;
 }
 
@@ -51,11 +51,18 @@ const salesLinks = [
   { href: '/sales/new', label: 'Tambah Entry', icon: Beef },
 ];
 
+const manageLinks = [{ href: '/manage', label: 'Katalog', icon: Beef }];
+
 export function Sidebar({ role, userName }: SidebarProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false); // Mobile menu state
   const router = useRouter();
-  const links = role === 'ADMIN' ? adminLinks : salesLinks;
+  const links =
+    role === 'ADMIN'
+      ? adminLinks
+      : role === 'MANAGE'
+        ? manageLinks
+        : salesLinks;
 
   /**
    * Handles logout: calls the logout API to clear the session cookie,

@@ -20,13 +20,15 @@ import { toast } from 'sonner';
 import { Beef } from 'lucide-react';
 import { LivestockPhoto } from '@/components/dashboard/livestock-photo';
 import { BuktiTransferUpload } from '@/components/dashboard/bukti-transfer-upload';
+import { formatWeight } from '@/lib/format';
 
 interface AvailableLivestock {
   id: string;
   sku: string;
   type: string;
-  grade: string;
-  weight: number | null;
+  grade: string | null;
+  weightMin: number | null;
+  weightMax: number | null;
   condition: string;
   photoUrl: string | null;
 }
@@ -88,12 +90,16 @@ export default function AdminNewEntryPage() {
                 </SelectValue>
               </SelectTrigger>
               <SelectContent className="min-w-max w-auto">
-                {livestock.map((l) => (
-                  <SelectItem key={l.id} value={l.id}>
-                    {l.sku} — {l.type} Grade {l.grade}
-                    {l.weight ? ` (${l.weight}kg)` : ''}
-                  </SelectItem>
-                ))}
+                {livestock.map((l) => {
+                  const weightStr = formatWeight(l.weightMin, l.weightMax);
+                  return (
+                    <SelectItem key={l.id} value={l.id}>
+                      {l.sku} — {l.type}
+                      {l.grade ? ` Grade ${l.grade}` : ''}
+                      {weightStr ? ` (${weightStr})` : ''}
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
             {selected && (
@@ -103,7 +109,7 @@ export default function AdminNewEntryPage() {
                   {selected.photoUrl ? (
                     <LivestockPhoto
                       photoUrl={selected.photoUrl}
-                      alt={`${selected.type} ${selected.grade}`}
+                      alt={`${selected.type}${selected.grade ? ' ' + selected.grade : ''}`}
                       thumbnailClassName="w-24 h-24"
                       priority
                     />
@@ -120,12 +126,13 @@ export default function AdminNewEntryPage() {
                     <strong>SKU:</strong> {selected.sku}
                   </p>
                   <p>
-                    <strong>Jenis:</strong> {selected.type} | Grade:{' '}
-                    {selected.grade}
+                    <strong>Jenis:</strong> {selected.type}
+                    {selected.grade ? ` | Grade: ${selected.grade}` : ''}
                   </p>
                   <p>
                     <strong>Berat:</strong>{' '}
-                    {selected.weight ? `${selected.weight} kg` : 'Belum diisi'}
+                    {formatWeight(selected.weightMin, selected.weightMax) ??
+                      'Belum diisi'}
                   </p>
                   <p>
                     <strong>Kondisi:</strong> {selected.condition}

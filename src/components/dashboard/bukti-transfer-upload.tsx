@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { X, Paperclip, Loader2 } from 'lucide-react';
+import { X, Plus, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import { toast } from 'sonner';
 
@@ -9,7 +9,6 @@ const MAX_PHOTOS = 5;
 
 interface UploadedPhoto {
   url: string;
-  label: string;
   isNew: boolean; // true = just uploaded, not yet in DB
 }
 
@@ -17,11 +16,6 @@ interface BuktiTransferUploadProps {
   /** Pre-existing URLs (edit mode) — component manages them alongside new uploads */
   initialUrls?: string[];
   onChange: (urls: string[]) => void;
-  /**
-   * Called with URLs to delete from storage after the parent successfully saves.
-   * Only existing (DB-saved) photos are deferred — new uploads are deleted immediately.
-   */
-  onPendingDeletes?: (urlsToDelete: string[]) => void;
 }
 
 async function deleteFromStorage(url: string) {
@@ -40,22 +34,14 @@ async function deleteFromStorage(url: string) {
 export function BuktiTransferUpload({
   initialUrls = [],
   onChange,
-  onPendingDeletes,
 }: BuktiTransferUploadProps) {
   const [photos, setPhotos] = useState<UploadedPhoto[]>(
-    initialUrls.map((url, i) => ({
-      url,
-      label: `Bukti Transfer ${i + 1}`,
-      isNew: false,
-    })),
+    initialUrls.map((url) => ({ url, isNew: false })),
   );
   const [uploading, setUploading] = useState(false);
   const [removingUrl, setRemovingUrl] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // URLs of existing (DB-saved) photos the user removed — defer deletion until after save
-  const pendingDeletes = useRef<string[]>([]);
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -91,10 +77,7 @@ export function BuktiTransferUpload({
       }
 
       const { url } = await res.json();
-      const newPhotos = [
-        ...photos,
-        { url, label: `Bukti Transfer ${photos.length + 1}`, isNew: true },
-      ];
+      const newPhotos = [...photos, { url, isNew: true }];
       setPhotos(newPhotos);
       onChange(newPhotos.map((p) => p.url));
     } catch (err) {
@@ -108,75 +91,69 @@ export function BuktiTransferUpload({
     const photo = photos[index];
     setRemovingUrl(photo.url);
 
+    // New uploads (not yet saved) are deleted from storage immediately.
+    // Existing DB photos are cleaned up server-side after updateEntry saves.
     if (photo.isNew) {
-      // New upload not yet in DB — safe to delete from storage immediately
       await deleteFromStorage(photo.url);
-    } else {
-      // Existing DB photo — defer deletion until after parent saves
-      pendingDeletes.current = [...pendingDeletes.current, photo.url];
-      onPendingDeletes?.(pendingDeletes.current);
     }
 
     setRemovingUrl(null);
 
-    const newPhotos = photos
-      .filter((_, i) => i !== index)
-      .map((p, i) => ({ ...p, label: `Bukti Transfer ${i + 1}` }));
+    const newPhotos = photos.filter((_, i) => i !== index);
     setPhotos(newPhotos);
     onChange(newPhotos.map((p) => p.url));
   }
 
   return (
-    <div className="space-y-2">
-      {photos.length > 0 && (
-        <ul className="space-y-1.5">
-          {photos.map((photo, index) => (
-            <li key={photo.url} className="flex items-center gap-2 text-sm">
-              <Paperclip className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-              <button
-                type="button"
-                onClick={() => setPreviewUrl(photo.url)}
-                className="text-primary underline underline-offset-2 hover:text-primary/80 transition-colors text-left"
-              >
-                {photo.label}
-              </button>
-              <button
-                type="button"
-                onClick={() => handleRemove(index)}
-                disabled={removingUrl === photo.url}
-                className="ml-auto text-muted-foreground hover:text-destructive transition-colors disabled:opacity-50"
-                title="Hapus"
-              >
-                {removingUrl === photo.url ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <X className="h-3.5 w-3.5" />
-                )}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+    <div className="flex flex-wrap items-center gap-1.5">
+      {photos.map((photo, index) => (
+        <div
+          key={photo.url}
+          className="relative w-9 h-9 rounded-md overflow-hidden border bg-muted"
+        >
+          <button
+            type="button"
+            onClick={() => setPreviewUrl(photo.url)}
+            className="block w-full h-full"
+            title="Lihat bukti transfer"
+          >
+            <Image
+              src={photo.url}
+              alt="Bukti transfer"
+              fill
+              sizes="36px"
+              className="object-cover"
+            />
+          </button>
+          <button
+            type="button"
+            onClick={() => handleRemove(index)}
+            disabled={removingUrl === photo.url}
+            className="absolute -top-1 -right-1 bg-background border border-border hover:bg-destructive hover:text-destructive-foreground text-muted-foreground rounded-full p-0.5 transition-colors disabled:opacity-50 shadow-sm"
+            title="Hapus"
+          >
+            {removingUrl === photo.url ? (
+              <Loader2 className="h-2.5 w-2.5 animate-spin" />
+            ) : (
+              <X className="h-2.5 w-2.5" />
+            )}
+          </button>
+        </div>
+      ))}
 
       {photos.length < MAX_PHOTOS && (
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
-          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground border border-dashed border-muted-foreground/30 hover:border-muted-foreground/60 rounded-md px-3 py-2 w-full transition-colors disabled:opacity-50"
+          className="w-9 h-9 rounded-md border border-dashed border-muted-foreground/40 hover:border-muted-foreground hover:bg-muted/50 flex items-center justify-center text-muted-foreground transition-colors disabled:opacity-50"
+          title={uploading ? 'Mengunggah...' : 'Tambah bukti transfer'}
         >
           {uploading ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
-            <Paperclip className="h-4 w-4" />
+            <Plus className="h-4 w-4" />
           )}
-          <span>
-            {uploading
-              ? 'Mengunggah...'
-              : photos.length === 0
-                ? 'Tambah bukti transfer'
-                : `Tambah lagi (${photos.length}/${MAX_PHOTOS})`}
-          </span>
         </button>
       )}
 

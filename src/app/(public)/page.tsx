@@ -114,7 +114,7 @@ export default function HomePage() {
               {
                 name: "Sapi",
                 weight: "200 — 400+ kg",
-                grades: "Super, A, B, C",
+                grades: "—",
                 desc: "Untuk qurban berjamaah. Sapi sehat dengan bobot optimal.",
               },
             ].map((animal) => (

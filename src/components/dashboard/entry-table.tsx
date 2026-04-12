@@ -77,7 +77,7 @@ export interface EntryData {
   buktiTransfer: string[];
   isSent: boolean;
   createdAt: string;
-  livestock: { sku: string; type: string; grade: string };
+  livestock: { sku: string; type: string; grade: string | null };
   sales: { name: string };
 }
 
@@ -560,7 +560,8 @@ function EntryRow({
       >
         <td className="p-3 font-mono text-xs">{entry.invoiceNo}</td>
         <td className="p-3">
-          {entry.livestock.type} {entry.livestock.grade}
+          {entry.livestock.type}
+          {entry.livestock.grade ? ' ' + entry.livestock.grade : ''}
           <div className="text-xs text-muted-foreground">
             {entry.livestock.sku}
           </div>
@@ -770,24 +771,6 @@ function EntryRow({
                   </div>
                 </>
               )}
-              <div className="space-y-1">
-                <Label className="text-xs">Status Bayar</Label>
-                <Select
-                  value={form.paymentStatus}
-                  onValueChange={(val) =>
-                    update('paymentStatus', val ?? form.paymentStatus)
-                  }
-                >
-                  <SelectTrigger className="h-8 text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="BELUM_BAYAR">Belum Bayar</SelectItem>
-                    <SelectItem value="DP">DP</SelectItem>
-                    <SelectItem value="LUNAS">Lunas</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
 
               {/* Payment */}
               <div className="space-y-1">
@@ -828,6 +811,38 @@ function EntryRow({
                 />
               </div>
 
+              {/* Status Bayar + Bukti Transfer — combined row so they sit side by side */}
+              <div className="col-span-2 md:col-span-4">
+                <div className="flex flex-wrap items-end gap-4">
+                  <div className="space-y-1 w-[180px]">
+                    <Label className="text-xs">Status Bayar</Label>
+                    <Select
+                      value={form.paymentStatus}
+                      onValueChange={(val) =>
+                        update('paymentStatus', val ?? form.paymentStatus)
+                      }
+                    >
+                      <SelectTrigger className="h-8 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="BELUM_BAYAR">Belum Bayar</SelectItem>
+                        <SelectItem value="DP">DP</SelectItem>
+                        <SelectItem value="LUNAS">Lunas</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1 flex-1 min-w-[200px]">
+                    <Label className="text-xs">Bukti Transfer</Label>
+                    <BuktiTransferUpload
+                      key={entry.id + '-bukti'}
+                      initialUrls={entry.buktiTransfer ?? []}
+                      onChange={setBuktiTransferUrls}
+                    />
+                  </div>
+                </div>
+              </div>
+
               {/* Notes - full width */}
               <div className="col-span-2 md:col-span-4 space-y-1">
                 <Label className="text-xs">Catatan</Label>
@@ -836,16 +851,6 @@ function EntryRow({
                   onChange={(e) => update('notes', e.target.value)}
                   rows={2}
                   className="text-sm"
-                />
-              </div>
-
-              {/* Bukti Transfer — single unified component handles existing + new */}
-              <div className="col-span-2 md:col-span-4 space-y-1">
-                <Label className="text-xs">Bukti Transfer</Label>
-                <BuktiTransferUpload
-                  key={entry.id + '-bukti'}
-                  initialUrls={entry.buktiTransfer ?? []}
-                  onChange={setBuktiTransferUrls}
                 />
               </div>
             </div>

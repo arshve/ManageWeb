@@ -6,7 +6,7 @@
  * Used by the "Tambah Entry" form (sales/new page) to populate the
  * animal selection dropdown.
  *
- * Returns: Array of { id, sku, type, grade, weight, condition }
+ * Returns: Array of { id, sku, type, grade, weightMin, weightMax, condition }
  */
 
 import { prisma } from '@/lib/prisma';
@@ -21,7 +21,8 @@ export async function GET() {
       sku: true,
       type: true,
       grade: true,
-      weight: true,
+      weightMin: true,
+      weightMax: true,
       condition: true,
       photoUrl: true,
     },

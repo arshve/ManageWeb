@@ -75,19 +75,26 @@ export async function createEntry(formData: FormData) {
     return { error: 'Hewan tidak tersedia atau sudah terjual' };
   }
 
-  // Look up pricing for auto-fill of hargaModal (buy price from pricing table)
-  const pricing = await prisma.pricing.findUnique({
-    where: {
-      animalType_grade: {
-        animalType: livestock.type,
-        grade: livestock.grade,
-      },
-    },
-  });
+  // Look up pricing for auto-fill of hargaModal (buy price from pricing table).
+  // Sapi has no grade, so pricing lookup is skipped — admin enters hargaModal manually.
+  const pricing =
+    livestock.grade != null
+      ? await prisma.pricing.findUnique({
+          where: {
+            animalType_grade: {
+              animalType: livestock.type,
+              grade: livestock.grade,
+            },
+          },
+        })
+      : null;
 
-  // Calculate financials
+  // Calculate financials — prefer livestock.hargaJual (per-animal), fall back to pricing table
   const hargaJual =
-    Number(formData.get('hargaJual')) || pricing?.hargaJual || 0;
+    Number(formData.get('hargaJual')) ||
+    livestock.hargaJual ||
+    pricing?.hargaJual ||
+    0;
   const hargaModal = pricing?.hargaBeli ?? null;
   const resellerCut = formData.get('resellerCut')
     ? Number(formData.get('resellerCut'))

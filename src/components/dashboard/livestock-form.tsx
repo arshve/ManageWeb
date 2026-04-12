@@ -32,15 +32,17 @@ import {
 import { createLivestock, updateLivestock } from '@/app/actions/livestock';
 import { toast } from 'sonner';
 import { ImagePlus, X } from 'lucide-react';
+import { parseWeightInput, formatWeight } from '@/lib/format';
 
 interface LivestockFormProps {
   livestock?: {
     id: string;
     sku: string;
     type: string;
-    grade: string;
+    grade: string | null;
     condition: string;
-    weight: number | null;
+    weightMin: number | null;
+    weightMax: number | null;
     hargaJual: number | null;
     tag: string | null;
     photoUrl: string | null;
@@ -58,7 +60,13 @@ export function LivestockForm({ livestock, trigger }: LivestockFormProps) {
   const [type, setType] = useState(livestock?.type ?? 'KAMBING');
   const [grade, setGrade] = useState(livestock?.grade ?? 'A');
   const [condition, setCondition] = useState(livestock?.condition ?? 'SEHAT');
-  const [weight, setWeight] = useState(livestock?.weight?.toString() ?? '');
+  // Single text input — accepts "300" or "250-300". Parsed on submit into min/max.
+  const [weight, setWeight] = useState(
+    formatWeight(
+      livestock?.weightMin ?? null,
+      livestock?.weightMax ?? null,
+    )?.replace(' kg', '') ?? '',
+  );
   const [hargaJual, setHargaJual] = useState(
     livestock?.hargaJual?.toString() ?? '',
   );
@@ -139,6 +147,19 @@ export function LivestockForm({ livestock, trigger }: LivestockFormProps) {
     e.preventDefault();
     setLoading(true);
 
+    // Parse weight input ("300" or "250-300") into min/max before uploading anything
+    let weightMin: number | null = null;
+    let weightMax: number | null = null;
+    try {
+      const parsed = parseWeightInput(weight);
+      weightMin = parsed.min;
+      weightMax = parsed.max;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Format berat tidak valid');
+      setLoading(false);
+      return;
+    }
+
     try {
       // If a new file was picked, upload it first and get the URL
       let finalPhotoUrl = photoUrl;
@@ -158,9 +179,11 @@ export function LivestockForm({ livestock, trigger }: LivestockFormProps) {
       const formData = new FormData();
       formData.set('sku', sku);
       formData.set('type', type);
-      formData.set('grade', grade);
+      // Sapi has no grade — omit so server writes null
+      if (type !== 'SAPI') formData.set('grade', grade);
       formData.set('condition', condition);
-      formData.set('weight', weight);
+      if (weightMin !== null) formData.set('weightMin', weightMin.toString());
+      if (weightMax !== null) formData.set('weightMax', weightMax.toString());
       formData.set('hargaJual', hargaJual);
       formData.set('tag', tag);
       formData.set('photoUrl', finalPhotoUrl);
@@ -224,24 +247,26 @@ export function LivestockForm({ livestock, trigger }: LivestockFormProps) {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="grade">Grade</Label>
-                <Select
-                  value={grade}
-                  onValueChange={(val) => setGrade(val ?? grade)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="SUPER">Super</SelectItem>
-                    <SelectItem value="A">A</SelectItem>
-                    <SelectItem value="B">B</SelectItem>
-                    <SelectItem value="C">C</SelectItem>
-                    <SelectItem value="D">D</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {type !== 'SAPI' && (
+                <div className="space-y-2">
+                  <Label htmlFor="grade">Grade</Label>
+                  <Select
+                    value={grade ?? 'A'}
+                    onValueChange={(val) => setGrade(val ?? grade ?? 'A')}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="SUPER">Super</SelectItem>
+                      <SelectItem value="A">A</SelectItem>
+                      <SelectItem value="B">B</SelectItem>
+                      <SelectItem value="C">C</SelectItem>
+                      <SelectItem value="D">D</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="condition">Kondisi</Label>
                 <Select
@@ -265,11 +290,11 @@ export function LivestockForm({ livestock, trigger }: LivestockFormProps) {
                 <Label htmlFor="weight">Berat (kg)</Label>
                 <Input
                   id="weight"
-                  type="number"
-                  step="0.1"
+                  type="text"
+                  inputMode="decimal"
                   value={weight}
                   onChange={(e) => setWeight(e.target.value)}
-                  placeholder="45"
+                  placeholder={type === 'SAPI' ? '250-300' : '45'}
                 />
               </div>
               <div className="space-y-2">

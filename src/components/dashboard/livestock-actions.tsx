@@ -28,9 +28,10 @@ interface LivestockActionsProps {
     id: string;
     sku: string;
     type: string;
-    grade: string;
+    grade: string | null;
     condition: string;
-    weight: number | null;
+    weightMin: number | null;
+    weightMax: number | null;
     hargaJual: number | null;
     tag: string | null;
     photoUrl: string | null;

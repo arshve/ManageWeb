@@ -13,6 +13,7 @@ datasource db {
 enum Role {
   ADMIN
   SALES
+  MANAGE
 }
 
 enum AnimalType {
@@ -64,9 +65,10 @@ model Livestock {
   id         String          @id @default(cuid())
   sku        String          @unique
   type       AnimalType
-  grade      AnimalGrade
+  grade      AnimalGrade?
   condition  AnimalCondition @default(SEHAT)
-  weight     Float?
+  weightMin  Float?
+  weightMax  Float?
   hargaJual  Float?
   tag        String?
   photoUrl   String?
@@ -78,33 +80,33 @@ model Livestock {
 }
 
 model Entry {
-  id              String        @id @default(cuid())
-  invoiceNo       String        @unique
-  status          EntryStatus   @default(PENDING)
-  livestockId     String        @unique
-  livestock       Livestock     @relation(fields: [livestockId], references: [id])
-  salesId         String
-  sales           Profile       @relation(fields: [salesId], references: [id])
-  hargaJual       Float
-  hargaModal      Float?
-  resellerCut     Float?
-  hpp             Float?
-  profit          Float?
-  dp              Float?
-  totalBayar      Float?
-  paymentStatus   PaymentStatus @default(BELUM_BAYAR)
-  buyerName       String
-  buyerPhone      String?
-  buyerWa         String?
-  buyerAddress    String?
-  buyerMaps       String?
-  notes           String?
-  buktiTransfer   String[]      @default([])
-  isSent          Boolean       @default(false)
-  approvedAt      DateTime?
-  approvedBy      String?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  id            String        @id @default(cuid())
+  invoiceNo     String        @unique
+  status        EntryStatus   @default(PENDING)
+  livestockId   String        @unique
+  livestock     Livestock     @relation(fields: [livestockId], references: [id])
+  salesId       String
+  sales         Profile       @relation(fields: [salesId], references: [id])
+  hargaJual     Float
+  hargaModal    Float?
+  resellerCut   Float?
+  hpp           Float?
+  profit        Float?
+  dp            Float?
+  totalBayar    Float?
+  paymentStatus PaymentStatus @default(BELUM_BAYAR)
+  buyerName     String
+  buyerPhone    String?
+  buyerWa       String?
+  buyerAddress  String?
+  buyerMaps     String?
+  notes         String?
+  buktiTransfer String[]      @default([])
+  isSent        Boolean       @default(false)
+  approvedAt    DateTime?
+  approvedBy    String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 }
 
 model Pricing {

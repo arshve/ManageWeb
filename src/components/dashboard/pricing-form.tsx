@@ -99,7 +99,6 @@ export function PricingForm({ pricing, trigger }: PricingFormProps) {
                 <SelectContent>
                   <SelectItem value="KAMBING">Kambing</SelectItem>
                   <SelectItem value="DOMBA">Domba</SelectItem>
-                  <SelectItem value="SAPI">Sapi</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -55,6 +55,49 @@ export function formatDateTime(date: Date | string): string {
 }
 
 /**
+ * Formats a weight (or weight range) into a display string.
+ * - min == max (or max is null) → single value: "45 kg"
+ * - min != max → range: "250-300 kg"
+ * - both null → null (caller decides how to render)
+ */
+export function formatWeight(
+  min: number | null,
+  max: number | null,
+): string | null {
+  if (min == null && max == null) return null;
+  const lo = min ?? max!;
+  const hi = max ?? min!;
+  if (lo === hi) return `${lo} kg`;
+  return `${lo}-${hi} kg`;
+}
+
+/**
+ * Parses a weight input string like "300" or "250-300" into min/max numbers.
+ * Returns null values on empty input. Throws on malformed input.
+ */
+export function parseWeightInput(input: string): {
+  min: number | null;
+  max: number | null;
+} {
+  const trimmed = input.trim();
+  if (!trimmed) return { min: null, max: null };
+
+  const rangeMatch = trimmed.match(/^(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)$/);
+  if (rangeMatch) {
+    const min = Number(rangeMatch[1]);
+    const max = Number(rangeMatch[2]);
+    if (max < min) throw new Error('Berat maksimal harus lebih besar dari minimal');
+    return { min, max };
+  }
+
+  const single = Number(trimmed);
+  if (Number.isNaN(single)) {
+    throw new Error('Format berat tidak valid (contoh: "300" atau "250-300")');
+  }
+  return { min: single, max: single };
+}
+
+/**
  * Generates a unique SKU (Stock Keeping Unit) for a livestock animal.
  * Pattern: MF-{sequence}{typeCode}-{grade}
  * Example: generateSku("KAMBING", "A", 2) → "MF-002K-A"

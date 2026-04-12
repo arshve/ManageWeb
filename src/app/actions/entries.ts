@@ -197,10 +197,15 @@ export async function updateEntry(id: string, formData: FormData) {
   const hpp = hargaModal !== null ? hargaModal + (resellerCut ?? 0) : null;
   const profit = hpp !== null ? hargaJual - hpp : null;
 
-  // buktiTransfer: use submitted URLs if any provided, otherwise keep existing
+  // buktiTransfer: use submitted URLs, or [] if explicitly cleared, or keep existing
   const submittedBukti = formData.getAll('buktiTransfer') as string[];
+  const buktiTransferCleared = formData.get('buktiTransferCleared') === 'true';
   const buktiTransfer =
-    submittedBukti.length > 0 ? submittedBukti : entry.buktiTransfer;
+    submittedBukti.length > 0
+      ? submittedBukti
+      : buktiTransferCleared
+        ? []
+        : entry.buktiTransfer;
 
   await prisma.entry.update({
     where: { id },

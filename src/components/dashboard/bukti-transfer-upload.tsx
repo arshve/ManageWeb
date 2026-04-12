@@ -1,16 +1,3 @@
-/**
- * BuktiTransferUpload — Upload up to 5 bukti transfer photos.
- *
- * Each photo:
- * - Shows a file picker slot
- * - Uploads to /api/upload?folder=transfers on selection
- * - Displays as a clickable text link (alt label) that opens a lightbox
- * - Can be individually removed
- *
- * The final array of uploaded URLs is passed up via onChange so the
- * parent form can include them in the FormData before submitting.
- */
-
 'use client';
 
 import { useState, useRef } from 'react';
@@ -23,25 +10,52 @@ const MAX_PHOTOS = 5;
 interface UploadedPhoto {
   url: string;
   label: string;
+  isNew: boolean; // true = just uploaded, not yet in DB
 }
 
 interface BuktiTransferUploadProps {
   /** Pre-existing URLs (edit mode) — component manages them alongside new uploads */
   initialUrls?: string[];
   onChange: (urls: string[]) => void;
+  /**
+   * Called with URLs to delete from storage after the parent successfully saves.
+   * Only existing (DB-saved) photos are deferred — new uploads are deleted immediately.
+   */
+  onPendingDeletes?: (urlsToDelete: string[]) => void;
+}
+
+async function deleteFromStorage(url: string) {
+  try {
+    const res = await fetch('/api/upload', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    });
+    if (!res.ok) console.warn('Failed to delete file from storage:', url);
+  } catch {
+    console.warn('Error deleting file from storage:', url);
+  }
 }
 
 export function BuktiTransferUpload({
   initialUrls = [],
   onChange,
+  onPendingDeletes,
 }: BuktiTransferUploadProps) {
   const [photos, setPhotos] = useState<UploadedPhoto[]>(
-    initialUrls.map((url, i) => ({ url, label: `Bukti Transfer ${i + 1}` })),
+    initialUrls.map((url, i) => ({
+      url,
+      label: `Bukti Transfer ${i + 1}`,
+      isNew: false,
+    })),
   );
   const [uploading, setUploading] = useState(false);
   const [removingUrl, setRemovingUrl] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // URLs of existing (DB-saved) photos the user removed — defer deletion until after save
+  const pendingDeletes = useRef<string[]>([]);
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -79,7 +93,7 @@ export function BuktiTransferUpload({
       const { url } = await res.json();
       const newPhotos = [
         ...photos,
-        { url, label: `Bukti Transfer ${photos.length + 1}` },
+        { url, label: `Bukti Transfer ${photos.length + 1}`, isNew: true },
       ];
       setPhotos(newPhotos);
       onChange(newPhotos.map((p) => p.url));
@@ -94,18 +108,16 @@ export function BuktiTransferUpload({
     const photo = photos[index];
     setRemovingUrl(photo.url);
 
-    try {
-      const res = await fetch('/api/upload', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: photo.url }),
-      });
-      if (!res.ok) console.warn('Failed to delete file:', photo.url);
-    } catch {
-      console.warn('Error deleting file:', photo.url);
-    } finally {
-      setRemovingUrl(null);
+    if (photo.isNew) {
+      // New upload not yet in DB — safe to delete from storage immediately
+      await deleteFromStorage(photo.url);
+    } else {
+      // Existing DB photo — defer deletion until after parent saves
+      pendingDeletes.current = [...pendingDeletes.current, photo.url];
+      onPendingDeletes?.(pendingDeletes.current);
     }
+
+    setRemovingUrl(null);
 
     const newPhotos = photos
       .filter((_, i) => i !== index)
@@ -116,13 +128,11 @@ export function BuktiTransferUpload({
 
   return (
     <div className="space-y-2">
-      {/* Uploaded photos list */}
       {photos.length > 0 && (
         <ul className="space-y-1.5">
           {photos.map((photo, index) => (
             <li key={photo.url} className="flex items-center gap-2 text-sm">
               <Paperclip className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-              {/* Clickable label — opens lightbox */}
               <button
                 type="button"
                 onClick={() => setPreviewUrl(photo.url)}
@@ -130,7 +140,6 @@ export function BuktiTransferUpload({
               >
                 {photo.label}
               </button>
-              {/* Remove button */}
               <button
                 type="button"
                 onClick={() => handleRemove(index)}
@@ -149,7 +158,6 @@ export function BuktiTransferUpload({
         </ul>
       )}
 
-      {/* Add photo button — hidden when max reached */}
       {photos.length < MAX_PHOTOS && (
         <button
           type="button"
@@ -172,7 +180,6 @@ export function BuktiTransferUpload({
         </button>
       )}
 
-      {/* Hidden file input */}
       <input
         ref={fileInputRef}
         type="file"
@@ -181,7 +188,6 @@ export function BuktiTransferUpload({
         onChange={handleFileChange}
       />
 
-      {/* Lightbox */}
       {previewUrl && (
         <div
           className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"

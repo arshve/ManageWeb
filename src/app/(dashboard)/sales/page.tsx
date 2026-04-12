@@ -47,6 +47,7 @@ export default async function SalesPage() {
     buyerAddress: entry.buyerAddress,
     buyerMaps: entry.buyerMaps,
     notes: entry.notes,
+    buktiTransfer: entry.buktiTransfer,
     isSent: entry.isSent,
     createdAt: entry.createdAt.toISOString(),
     livestock: {

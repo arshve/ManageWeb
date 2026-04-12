@@ -1,3 +1,10 @@
+/**
+ * LivestockPhoto — Thumbnail with lightbox preview for the admin livestock table.
+ *
+ * Shows a small 40x40 avatar-style thumbnail in the table row.
+ * Clicking it opens a centered lightbox overlay with the full image.
+ * Clicking the overlay or the X button closes it.
+ */
 'use client';
 
 import { useState } from 'react';

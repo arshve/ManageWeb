@@ -2,12 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { formatRupiah } from '@/lib/format';
 import { DashboardShell } from '@/components/dashboard/dashboard-shell';
 import { EntryTable } from '@/components/dashboard/entry-table';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Beef, ClipboardList, DollarSign, Users, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { buttonVariants } from '@/components/ui/button';
@@ -68,6 +63,7 @@ export default async function AdminDashboardPage() {
     buyerWa: entry.buyerWa,
     buyerAddress: entry.buyerAddress,
     buyerMaps: entry.buyerMaps,
+    buktiTransfer: entry.buktiTransfer,
     notes: entry.notes,
     isSent: entry.isSent,
     createdAt: entry.createdAt.toISOString(),
@@ -141,9 +137,7 @@ export default async function AdminDashboardPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>
-            Entry Penjualan
-          </CardTitle>
+          <CardTitle>Entry Penjualan</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <EntryTable entries={serialized} isAdmin={true} />

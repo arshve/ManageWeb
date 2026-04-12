@@ -18,7 +18,8 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -52,6 +53,8 @@ import {
 } from '@/app/actions/entries';
 import { toast } from 'sonner';
 import { formatRupiah, formatDateTime } from '@/lib/format';
+import { BuktiTransferUpload } from '@/components/dashboard/bukti-transfer-upload';
+import Image from 'next/image';
 
 export interface EntryData {
   id: string;
@@ -71,6 +74,7 @@ export interface EntryData {
   buyerAddress: string | null;
   buyerMaps: string | null;
   notes: string | null;
+  buktiTransfer: string[];
   isSent: boolean;
   createdAt: string;
   livestock: { sku: string; type: string; grade: string };
@@ -286,16 +290,14 @@ export function EntryTable({
                 </span>
               </th>
               {isAdmin && (
-                <>
-                  <th
-                    className="text-center p-3 font-medium cursor-pointer select-none hover:bg-muted/80"
-                    onClick={() => toggleSort('sales')}
-                  >
-                    <span className="inline-flex items-center gap-1">
-                      Sales <SortIcon field="sales" />
-                    </span>
-                  </th>
-                </>
+                <th
+                  className="text-center p-3 font-medium cursor-pointer select-none hover:bg-muted/80"
+                  onClick={() => toggleSort('sales')}
+                >
+                  <span className="inline-flex items-center gap-1">
+                    Sales <SortIcon field="sales" />
+                  </span>
+                </th>
               )}
               <th
                 className="text-center p-3 font-medium cursor-pointer select-none hover:bg-muted/80"
@@ -364,6 +366,94 @@ export function EntryTable({
   );
 }
 
+function HoverBuktiTransfer({
+  buktiTransfer,
+  paymentStatus,
+}: {
+  buktiTransfer: string[];
+  paymentStatus: string;
+}) {
+  const [show, setShow] = useState(false);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+  const badgeRef = useRef<HTMLDivElement>(null);
+
+  function handleClick() {
+    if (buktiTransfer.length === 0) return;
+    if (!show && badgeRef.current) {
+      const rect = badgeRef.current.getBoundingClientRect();
+      setPos({
+        top: rect.top + window.scrollY - 8,
+        left: rect.left + rect.width / 2,
+      });
+    }
+    setShow((v) => !v);
+  }
+
+  return (
+    <>
+      <div ref={badgeRef} className="inline-block">
+        <Badge
+          variant={
+            paymentStatus === 'LUNAS'
+              ? 'default'
+              : paymentStatus === 'DP'
+                ? 'secondary'
+                : 'outline'
+          }
+          onClick={handleClick}
+          className={buktiTransfer.length > 0 ? 'cursor-pointer' : ''}
+        >
+          {paymentStatus === 'BELUM_BAYAR' ? 'Belum' : paymentStatus}
+          {buktiTransfer.length > 0 && (
+            <span className="ml-1 opacity-60 text-[10px]">
+              ({buktiTransfer.length})
+            </span>
+          )}
+        </Badge>
+      </div>
+
+      {/* Backdrop — clicking outside closes the popover */}
+      {show && (
+        <div
+          className="fixed inset-0 z-[9998]"
+          onClick={() => setShow(false)}
+        />
+      )}
+
+      {/* Fixed-position popover */}
+      {show && (
+        <div
+          className="fixed z-[9999] -translate-x-1/2 -translate-y-full"
+          style={{ top: pos.top, left: pos.left }}
+        >
+          <div className="bg-popover border rounded-lg shadow-xl p-2 space-y-1 w-52 mb-2">
+            <div className="flex items-center justify-between px-1 pb-1 border-b">
+              <p className="text-xs font-medium text-muted-foreground">
+                Bukti Transfer ({buktiTransfer.length})
+              </p>
+              <button
+                type="button"
+                onClick={() => setShow(false)}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+            {buktiTransfer.map((url, i) => (
+              <BuktiPreviewItem
+                key={url}
+                url={url}
+                label={`Bukti Transfer ${i + 1}`}
+              />
+            ))}
+          </div>
+          <div className="w-2 h-2 bg-popover border-b border-r rotate-45 mx-auto -mt-1" />
+        </div>
+      )}
+    </>
+  );
+}
+
 function EntryRow({
   entry,
   isAdmin,
@@ -396,6 +486,11 @@ function EntryRow({
     notes: entry.notes ?? '',
   });
 
+  // Single source of truth for bukti transfer — initialised from DB, updated by component
+  const [buktiTransferUrls, setBuktiTransferUrls] = useState<string[]>(
+    entry.buktiTransfer ?? [],
+  );
+
   function update(field: string, value: string | boolean) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
@@ -417,6 +512,12 @@ function EntryRow({
       formData.set('paymentStatus', form.paymentStatus);
       formData.set('isSent', form.isSent.toString());
       formData.set('notes', form.notes);
+      // Always send the full current array (even if empty = cleared all)
+      buktiTransferUrls.forEach((url) => formData.append('buktiTransfer', url));
+      // Send a sentinel so updateEntry knows we explicitly submitted an empty array
+      if (buktiTransferUrls.length === 0) {
+        formData.set('buktiTransferCleared', 'true');
+      }
 
       const result = await updateEntry(entry.id, formData);
       if ('error' in result) {
@@ -472,11 +573,7 @@ function EntryRow({
             </div>
           )}
         </td>
-        {isAdmin && (
-          <>
-            <td className="p-3">{entry.sales.name}</td>
-          </>
-        )}
+        {isAdmin && <td className="p-3">{entry.sales.name}</td>}
         <td className="p-3 text-center">{formatRupiah(entry.hargaJual)}</td>
         <td className="p-3 text-center">
           {entry.resellerCut ? formatRupiah(entry.resellerCut) : '-'}
@@ -502,19 +599,10 @@ function EntryRow({
           </>
         )}
         <td className="p-3 text-center">
-          <Badge
-            variant={
-              entry.paymentStatus === 'LUNAS'
-                ? 'default'
-                : entry.paymentStatus === 'DP'
-                  ? 'secondary'
-                  : 'outline'
-            }
-          >
-            {entry.paymentStatus === 'BELUM_BAYAR'
-              ? 'Belum'
-              : entry.paymentStatus}
-          </Badge>
+          <HoverBuktiTransfer
+            buktiTransfer={entry.buktiTransfer}
+            paymentStatus={entry.paymentStatus}
+          />
         </td>
         <td className="p-3 text-center">
           {entry.isSent ? (
@@ -721,17 +809,15 @@ function EntryRow({
                 />
               </div>
               {isAdmin && (
-                <>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Sudah Dikirim</Label>
-                    <div className="pt-1">
-                      <Switch
-                        checked={form.isSent}
-                        onCheckedChange={(val) => update('isSent', val)}
-                      />
-                    </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Sudah Dikirim</Label>
+                  <div className="pt-1">
+                    <Switch
+                      checked={form.isSent}
+                      onCheckedChange={(val) => update('isSent', val)}
+                    />
                   </div>
-                </>
+                </div>
               )}
               <div className="space-y-1">
                 <Label className="text-xs">Alamat</Label>
@@ -752,10 +838,90 @@ function EntryRow({
                   className="text-sm"
                 />
               </div>
+
+              {/* Bukti Transfer — single unified component handles existing + new */}
+              <div className="col-span-2 md:col-span-4 space-y-1">
+                <Label className="text-xs">Bukti Transfer</Label>
+                <BuktiTransferUpload
+                  key={entry.id + '-bukti'}
+                  initialUrls={entry.buktiTransfer ?? []}
+                  onChange={setBuktiTransferUrls}
+                />
+              </div>
             </div>
           </td>
         </tr>
       )}
+    </>
+  );
+}
+
+/**
+ * BuktiPreviewItem — Single row in the payment status hover popover.
+ * Shows a thumbnail + label. Clicking opens a fullscreen lightbox.
+ */
+function BuktiPreviewItem({ url, label }: { url: string; label: string }) {
+  const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  // Ensure portal target is available (client-side only)
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const lightbox =
+    mounted && open
+      ? createPortal(
+          <div
+            className="fixed inset-0 z-[99999] bg-black/70 flex items-center justify-center p-4"
+            onClick={() => setOpen(false)}
+          >
+            <div
+              className="relative max-w-lg w-full rounded-lg overflow-hidden shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Image
+                src={url}
+                alt={label}
+                width={640}
+                height={480}
+                sizes="(max-width: 640px) 100vw, 640px"
+                className="w-full h-auto object-contain"
+              />
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="absolute top-2 right-2 bg-black/50 hover:bg-black/80 text-white rounded-full p-1 transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>,
+          document.body,
+        )
+      : null;
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="flex items-center gap-2 w-full rounded hover:bg-muted px-1 py-1 transition-colors text-left"
+      >
+        <div className="relative w-8 h-8 rounded overflow-hidden flex-shrink-0 bg-muted">
+          <Image
+            src={url}
+            alt={label}
+            fill
+            sizes="32px"
+            className="object-cover"
+          />
+        </div>
+        <span className="text-xs text-primary underline underline-offset-2 truncate">
+          {label}
+        </span>
+      </button>
+      {lightbox}
     </>
   );
 }

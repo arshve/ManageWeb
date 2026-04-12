@@ -17,9 +17,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DashboardShell } from '@/components/dashboard/dashboard-shell';
 import { createEntry } from '@/app/actions/entries';
 import { toast } from 'sonner';
-import Image from 'next/image';
 import { Beef } from 'lucide-react';
 import { LivestockPhoto } from '@/components/dashboard/livestock-photo';
+import { BuktiTransferUpload } from '@/components/dashboard/bukti-transfer-upload';
 
 interface AvailableLivestock {
   id: string;
@@ -34,6 +34,7 @@ interface AvailableLivestock {
 export default function NewEntryPage() {
   const [livestock, setLivestock] = useState<AvailableLivestock[]>([]);
   const [selectedId, setSelectedId] = useState('');
+  const [buktiTransferUrls, setBuktiTransferUrls] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
@@ -52,8 +53,11 @@ export default function NewEntryPage() {
       return;
     }
     formData.set('livestockId', selectedId);
-    setLoading(true);
 
+    // Append each bukti transfer URL as a separate FormData entry
+    buktiTransferUrls.forEach((url) => formData.append('buktiTransfer', url));
+
+    setLoading(true);
     const result = await createEntry(formData);
     if ('error' in result) {
       toast.error(result.error);
@@ -213,6 +217,10 @@ export default function NewEntryPage() {
                   <SelectItem value="LUNAS">Lunas</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Bukti Transfer</Label>
+              <BuktiTransferUpload onChange={setBuktiTransferUrls} />
             </div>
           </CardContent>
         </Card>

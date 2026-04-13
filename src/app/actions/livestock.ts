@@ -13,6 +13,7 @@
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
+import { logAudit } from '@/lib/audit';
 import type {
   AnimalType,
   AnimalGrade,
@@ -28,7 +29,7 @@ import type {
  * @returns { success }
  */
 export async function createLivestock(formData: FormData) {
-  await requireRole('ADMIN', 'MANAGE');
+  const actor = await requireRole('ADMIN', 'MANAGE');
 
   const type = formData.get('type') as AnimalType;
   const gradeRaw = formData.get('grade') as string | null;
@@ -53,7 +54,17 @@ export async function createLivestock(formData: FormData) {
     notes: (formData.get('notes') as string) || null,
   };
 
-  await prisma.livestock.create({ data });
+  const created = await prisma.livestock.create({ data });
+
+  await logAudit({
+    actor,
+    action: 'CREATE',
+    entity: 'Livestock',
+    entityId: created.id,
+    label: `${created.sku} — ${created.type}${created.grade ? ' ' + created.grade : ''}`,
+    after: created,
+  });
+
   revalidatePath('/admin/livestock');
   revalidatePath('/manage');
   return { success: true };
@@ -68,7 +79,10 @@ export async function createLivestock(formData: FormData) {
  * @returns { success }
  */
 export async function updateLivestock(id: string, formData: FormData) {
-  await requireRole('ADMIN', 'MANAGE');
+  const actor = await requireRole('ADMIN', 'MANAGE');
+
+  const before = await prisma.livestock.findUnique({ where: { id } });
+  if (!before) return { error: 'Hewan tidak ditemukan' };
 
   const type = formData.get('type') as AnimalType;
   const gradeRaw = formData.get('grade') as string | null;
@@ -92,7 +106,18 @@ export async function updateLivestock(id: string, formData: FormData) {
     notes: (formData.get('notes') as string) || null,
   };
 
-  await prisma.livestock.update({ where: { id }, data });
+  const updated = await prisma.livestock.update({ where: { id }, data });
+
+  await logAudit({
+    actor,
+    action: 'UPDATE',
+    entity: 'Livestock',
+    entityId: id,
+    label: `${updated.sku} — ${updated.type}${updated.grade ? ' ' + updated.grade : ''}`,
+    before,
+    after: updated,
+  });
+
   revalidatePath('/admin/livestock');
   revalidatePath('/manage');
   return { success: true };
@@ -107,8 +132,22 @@ export async function updateLivestock(id: string, formData: FormData) {
  * @returns { success }
  */
 export async function deleteLivestock(id: string) {
-  await requireRole('ADMIN', 'MANAGE');
+  const actor = await requireRole('ADMIN', 'MANAGE');
+
+  const before = await prisma.livestock.findUnique({ where: { id } });
+  if (!before) return { error: 'Hewan tidak ditemukan' };
+
   await prisma.livestock.delete({ where: { id } });
+
+  await logAudit({
+    actor,
+    action: 'DELETE',
+    entity: 'Livestock',
+    entityId: id,
+    label: `${before.sku} — ${before.type}${before.grade ? ' ' + before.grade : ''}`,
+    before,
+  });
+
   revalidatePath('/admin/livestock');
   revalidatePath('/manage');
   return { success: true };

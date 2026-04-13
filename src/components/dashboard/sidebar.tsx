@@ -28,6 +28,7 @@ import {
   Menu,
   X,
   ChevronLeft,
+  History,
 } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -44,6 +45,7 @@ const adminLinks = [
   { href: '/admin/livestock', label: 'Hewan', icon: Beef },
   { href: '/admin/users', label: 'Kelola User', icon: Users },
   { href: '/admin/pricing', label: 'Harga', icon: DollarSign },
+  { href: '/admin/logs', label: 'Log Aktivitas', icon: History },
 ];
 
 const salesLinks = [

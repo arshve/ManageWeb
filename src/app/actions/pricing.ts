@@ -14,6 +14,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
+import { logAudit } from "@/lib/audit";
 import type { AnimalType, AnimalGrade } from "@/generated/prisma/client";
 
 /**
@@ -26,17 +27,31 @@ import type { AnimalType, AnimalGrade } from "@/generated/prisma/client";
  * @returns { success }
  */
 export async function upsertPricing(formData: FormData) {
-  await requireRole("ADMIN");
+  const actor = await requireRole("ADMIN");
 
   const animalType = formData.get("animalType") as AnimalType;
   const grade = formData.get("grade") as AnimalGrade;
   const hargaBeli = Number(formData.get("hargaBeli"));
   const hargaJual = Number(formData.get("hargaJual"));
 
-  await prisma.pricing.upsert({
+  const before = await prisma.pricing.findUnique({
+    where: { animalType_grade: { animalType, grade } },
+  });
+
+  const upserted = await prisma.pricing.upsert({
     where: { animalType_grade: { animalType, grade } },
     create: { animalType, grade, hargaBeli, hargaJual },
     update: { hargaBeli, hargaJual },
+  });
+
+  await logAudit({
+    actor,
+    action: before ? "UPDATE" : "CREATE",
+    entity: "Pricing",
+    entityId: upserted.id,
+    label: `${animalType} ${grade}`,
+    before: before ?? undefined,
+    after: upserted,
   });
 
   revalidatePath("/admin/pricing");
@@ -50,9 +65,22 @@ export async function upsertPricing(formData: FormData) {
  * @returns { success }
  */
 export async function deletePricing(id: string) {
-  await requireRole("ADMIN");
+  const actor = await requireRole("ADMIN");
+
+  const before = await prisma.pricing.findUnique({ where: { id } });
+  if (!before) return { error: "Harga tidak ditemukan" };
 
   await prisma.pricing.delete({ where: { id } });
+
+  await logAudit({
+    actor,
+    action: "DELETE",
+    entity: "Pricing",
+    entityId: id,
+    label: `${before.animalType} ${before.grade}`,
+    before,
+  });
+
   revalidatePath("/admin/pricing");
   return { success: true };
 }

@@ -16,6 +16,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { hashSync } from "bcryptjs";
+import { logAudit } from "@/lib/audit";
 
 /**
  * Creates a new user account. Admin-only.
@@ -26,7 +27,7 @@ import { hashSync } from "bcryptjs";
  * @returns { success } or { error: "Username sudah terdaftar" }
  */
 export async function createUser(formData: FormData) {
-  await requireRole("ADMIN");
+  const actor = await requireRole("ADMIN");
 
   const username = formData.get("username") as string;
   const password = formData.get("password") as string;
@@ -40,7 +41,7 @@ export async function createUser(formData: FormData) {
     return { error: "Username sudah terdaftar" };
   }
 
-  await prisma.profile.create({
+  const created = await prisma.profile.create({
     data: {
       username,
       password: hashSync(password, 10), // Hash password before storing
@@ -48,6 +49,15 @@ export async function createUser(formData: FormData) {
       phone,
       role,
     },
+  });
+
+  await logAudit({
+    actor,
+    action: "CREATE",
+    entity: "Profile",
+    entityId: created.id,
+    label: `${created.username} — ${created.name}`,
+    after: created,
   });
 
   revalidatePath("/admin/users");
@@ -64,7 +74,10 @@ export async function createUser(formData: FormData) {
  * @returns { success }
  */
 export async function updateUser(id: string, formData: FormData) {
-  await requireRole("ADMIN");
+  const actor = await requireRole("ADMIN");
+
+  const before = await prisma.profile.findUnique({ where: { id } });
+  if (!before) return { error: "User tidak ditemukan" };
 
   const name = formData.get("name") as string;
   const phone = (formData.get("phone") as string) || null;
@@ -79,9 +92,19 @@ export async function updateUser(id: string, formData: FormData) {
     data.password = hashSync(newPassword, 10);
   }
 
-  await prisma.profile.update({
+  const updated = await prisma.profile.update({
     where: { id },
     data,
+  });
+
+  await logAudit({
+    actor,
+    action: "UPDATE",
+    entity: "Profile",
+    entityId: id,
+    label: `${updated.username} — ${updated.name}`,
+    before,
+    after: { ...updated, passwordChanged: Boolean(data.password) },
   });
 
   revalidatePath("/admin/users");
@@ -98,11 +121,24 @@ export async function updateUser(id: string, formData: FormData) {
  * @returns { success }
  */
 export async function toggleUserActive(id: string, isActive: boolean) {
-  await requireRole("ADMIN");
+  const actor = await requireRole("ADMIN");
+
+  const before = await prisma.profile.findUnique({ where: { id } });
+  if (!before) return { error: "User tidak ditemukan" };
 
   await prisma.profile.update({
     where: { id },
     data: { isActive },
+  });
+
+  await logAudit({
+    actor,
+    action: "UPDATE",
+    entity: "Profile",
+    entityId: id,
+    label: `${before.username} — ${isActive ? 'aktif' : 'nonaktif'}`,
+    before: { isActive: before.isActive },
+    after: { isActive },
   });
 
   revalidatePath("/admin/users");

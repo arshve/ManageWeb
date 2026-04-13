@@ -17,6 +17,7 @@ import { requireAuth, requireRole } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
 import { generateInvoiceNo } from '@/lib/format';
 import { supabaseAdmin } from '@/lib/supabase';
+import { logAudit } from '@/lib/audit';
 import type { AnimalType, AnimalGrade } from '@/generated/prisma/client';
 
 /**
@@ -129,6 +130,15 @@ export async function createEntry(formData: FormData) {
     },
   });
 
+  await logAudit({
+    actor: profile,
+    action: 'CREATE',
+    entity: 'Entry',
+    entityId: entry.id,
+    label: `${entry.invoiceNo} — ${entry.buyerName}`,
+    after: entry,
+  });
+
   revalidatePath('/sales');
   revalidatePath('/admin');
   return { success: true, entryId: entry.id };
@@ -152,7 +162,7 @@ export async function approveEntry(id: string) {
   const entry = await prisma.entry.findUnique({ where: { id } });
   if (!entry) return { error: 'Entry tidak ditemukan' };
 
-  await prisma.$transaction([
+  const [updated] = await prisma.$transaction([
     prisma.entry.update({
       where: { id },
       data: {
@@ -166,6 +176,16 @@ export async function approveEntry(id: string) {
       data: { isSold: true },
     }),
   ]);
+
+  await logAudit({
+    actor: admin,
+    action: 'UPDATE',
+    entity: 'Entry',
+    entityId: id,
+    label: `${entry.invoiceNo} — approve`,
+    before: { status: entry.status },
+    after: { status: updated.status, approvedBy: admin.id },
+  });
 
   revalidatePath('/admin');
   revalidatePath('/sales');
@@ -182,11 +202,24 @@ export async function approveEntry(id: string) {
  * @returns { success } or { error }
  */
 export async function rejectEntry(id: string) {
-  await requireRole('ADMIN');
+  const admin = await requireRole('ADMIN');
+
+  const entry = await prisma.entry.findUnique({ where: { id } });
+  if (!entry) return { error: 'Entry tidak ditemukan' };
 
   await prisma.entry.update({
     where: { id },
     data: { status: 'REJECTED' },
+  });
+
+  await logAudit({
+    actor: admin,
+    action: 'UPDATE',
+    entity: 'Entry',
+    entityId: id,
+    label: `${entry.invoiceNo} — reject`,
+    before: { status: entry.status },
+    after: { status: 'REJECTED' },
   });
 
   revalidatePath('/admin');
@@ -234,7 +267,7 @@ export async function updateEntry(id: string, formData: FormData) {
         ? []
         : entry.buktiTransfer;
 
-  await prisma.entry.update({
+  const updated = await prisma.entry.update({
     where: { id },
     data: {
       hargaJual,
@@ -258,6 +291,16 @@ export async function updateEntry(id: string, formData: FormData) {
       isSent: formData.get('isSent') === 'true',
       buktiTransfer,
     },
+  });
+
+  await logAudit({
+    actor: profile,
+    action: 'UPDATE',
+    entity: 'Entry',
+    entityId: id,
+    label: `${entry.invoiceNo} — ${entry.buyerName}`,
+    before: entry,
+    after: updated,
   });
 
   // Delete removed photos from storage (diff between old and new URL list)
@@ -294,6 +337,15 @@ export async function deleteEntry(id: string) {
       data: { isSold: false },
     }),
   ]);
+
+  await logAudit({
+    actor: profile,
+    action: 'DELETE',
+    entity: 'Entry',
+    entityId: id,
+    label: `${entry.invoiceNo} — ${entry.buyerName}`,
+    before: entry,
+  });
 
   // Delete all bukti transfer photos from storage
   await deleteStorageFiles(entry.buktiTransfer);

@@ -39,6 +39,7 @@ export default async function AdminEntriesPage() {
       sku: entry.livestock.sku,
       type: entry.livestock.type,
       grade: entry.livestock.grade,
+      tag: entry.livestock.tag,
     },
     sales: {
       name: entry.sales.name,

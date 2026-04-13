@@ -54,6 +54,7 @@ export default async function SalesPage() {
       sku: entry.livestock.sku,
       type: entry.livestock.type,
       grade: entry.livestock.grade,
+      tag: entry.livestock.tag,
     },
     sales: {
       name: entry.sales.name,
@@ -72,7 +73,7 @@ export default async function SalesPage() {
       }
     >
       {/* Earnings Summary */}
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-3 mb-6">
+      <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 mb-6 [&>*:last-child:nth-child(odd)]:col-span-2 [&>*:last-child:nth-child(odd)]:sm:col-span-1">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">

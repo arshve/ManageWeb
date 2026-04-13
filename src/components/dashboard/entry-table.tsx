@@ -40,10 +40,14 @@ import {
   Pencil,
   Save,
   XCircle,
+  CheckCircle2,
+  Clock,
+  Truck,
   Search,
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  ChevronDown,
 } from 'lucide-react';
 import {
   updateEntry,
@@ -77,7 +81,12 @@ export interface EntryData {
   buktiTransfer: string[];
   isSent: boolean;
   createdAt: string;
-  livestock: { sku: string; type: string; grade: string | null };
+  livestock: {
+    sku: string;
+    type: string;
+    grade: string | null;
+    tag: string | null;
+  };
   sales: { name: string };
 }
 
@@ -268,7 +277,7 @@ export function EntryTable({
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="hidden md:block overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b bg-muted/50">
@@ -322,8 +331,8 @@ export function EntryTable({
                 </>
               )}
               <th className="text-center p-3 font-medium">Bayar</th>
-              <th className="text-center p-3 font-medium">Kirim</th>
-              <th className="text-center p-3 font-medium">Status</th>
+              <th className="text-center p-3 font-medium w-12">Kirim</th>
+              <th className="text-center p-3 font-medium w-12">Status</th>
               <th
                 className="text-center p-3 font-medium cursor-pointer select-none hover:bg-muted/80"
                 onClick={() => toggleSort('createdAt')}
@@ -361,6 +370,28 @@ export function EntryTable({
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Mobile card list */}
+      <div className="md:hidden p-3 space-y-3">
+        {filtered.map((entry) => (
+          <MobileEntryCard
+            key={entry.id}
+            entry={entry}
+            isAdmin={isAdmin}
+            isEditing={editingId === entry.id}
+            onEdit={() => setEditingId(entry.id)}
+            onCancel={() => setEditingId(null)}
+            onSaved={() => setEditingId(null)}
+          />
+        ))}
+        {filtered.length === 0 && (
+          <div className="p-8 text-center text-muted-foreground text-sm">
+            {entries.length === 0
+              ? 'Belum ada entry penjualan.'
+              : 'Tidak ada entry yang cocok dengan filter.'}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -454,21 +485,7 @@ function HoverBuktiTransfer({
   );
 }
 
-function EntryRow({
-  entry,
-  isAdmin,
-  isEditing,
-  onEdit,
-  onCancel,
-  onSaved,
-}: {
-  entry: EntryData;
-  isAdmin: boolean;
-  isEditing: boolean;
-  onEdit: () => void;
-  onCancel: () => void;
-  onSaved: () => void;
-}) {
+function useEntryRow(entry: EntryData, onSaved: () => void) {
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     buyerName: entry.buyerName,
@@ -485,8 +502,6 @@ function EntryRow({
     isSent: entry.isSent,
     notes: entry.notes ?? '',
   });
-
-  // Single source of truth for bukti transfer — initialised from DB, updated by component
   const [buktiTransferUrls, setBuktiTransferUrls] = useState<string[]>(
     entry.buktiTransfer ?? [],
   );
@@ -512,9 +527,7 @@ function EntryRow({
       formData.set('paymentStatus', form.paymentStatus);
       formData.set('isSent', form.isSent.toString());
       formData.set('notes', form.notes);
-      // Always send the full current array (even if empty = cleared all)
       buktiTransferUrls.forEach((url) => formData.append('buktiTransfer', url));
-      // Send a sentinel so updateEntry knows we explicitly submitted an empty array
       if (buktiTransferUrls.length === 0) {
         formData.set('buktiTransferCleared', 'true');
       }
@@ -551,6 +564,212 @@ function EntryRow({
     if ('error' in result) toast.error(String(result.error));
     else toast.success('Entry dihapus');
   }
+
+  return {
+    form,
+    update,
+    loading,
+    buktiTransferUrls,
+    setBuktiTransferUrls,
+    handleSave,
+    handleApprove,
+    handleReject,
+    handleDelete,
+  };
+}
+
+function EntryEditFields({
+  entry,
+  isAdmin,
+  form,
+  update,
+  setBuktiTransferUrls,
+}: {
+  entry: EntryData;
+  isAdmin: boolean;
+  form: ReturnType<typeof useEntryRow>['form'];
+  update: ReturnType<typeof useEntryRow>['update'];
+  setBuktiTransferUrls: ReturnType<typeof useEntryRow>['setBuktiTransferUrls'];
+}) {
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {/* Buyer */}
+      <div className="space-y-1">
+        <Label className="text-xs">Nama Pembeli</Label>
+        <Input
+          value={form.buyerName}
+          onChange={(e) => update('buyerName', e.target.value)}
+          className="h-8 text-sm"
+        />
+      </div>
+      <div className="space-y-1">
+        <Label className="text-xs">Telepon</Label>
+        <Input
+          value={form.buyerPhone}
+          onChange={(e) => update('buyerPhone', e.target.value)}
+          className="h-8 text-sm"
+        />
+      </div>
+      <div className="space-y-1">
+        <Label className="text-xs">WhatsApp</Label>
+        <Input
+          value={form.buyerWa}
+          onChange={(e) => update('buyerWa', e.target.value)}
+          className="h-8 text-sm"
+        />
+      </div>
+      <div className="space-y-1">
+        <Label className="text-xs">Google Maps</Label>
+        <Input
+          value={form.buyerMaps}
+          onChange={(e) => update('buyerMaps', e.target.value)}
+          className="h-8 text-sm"
+        />
+      </div>
+
+      {/* Pricing */}
+      <div className="space-y-1">
+        <Label className="text-xs">Harga Jual</Label>
+        <Input
+          type="number"
+          value={form.hargaJual}
+          onChange={(e) => update('hargaJual', e.target.value)}
+          className="h-8 text-sm"
+        />
+      </div>
+      {isAdmin && (
+        <>
+          <div className="space-y-1">
+            <Label className="text-xs">Harga Modal</Label>
+            <Input
+              type="number"
+              value={form.hargaModal}
+              onChange={(e) => update('hargaModal', e.target.value)}
+              className="h-8 text-sm"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Reseller Cut</Label>
+            <Input
+              type="number"
+              value={form.resellerCut}
+              onChange={(e) => update('resellerCut', e.target.value)}
+              className="h-8 text-sm"
+            />
+          </div>
+        </>
+      )}
+
+      {/* Payment */}
+      <div className="space-y-1">
+        <Label className="text-xs">DP</Label>
+        <Input
+          type="number"
+          value={form.dp}
+          onChange={(e) => update('dp', e.target.value)}
+          className="h-8 text-sm"
+        />
+      </div>
+      <div className="space-y-1">
+        <Label className="text-xs">Total Dibayar</Label>
+        <Input
+          type="number"
+          value={form.totalBayar}
+          onChange={(e) => update('totalBayar', e.target.value)}
+          className="h-8 text-sm"
+        />
+      </div>
+      {isAdmin && (
+        <div className="space-y-1">
+          <Label className="text-xs">Sudah Dikirim</Label>
+          <div className="pt-1">
+            <Switch
+              checked={form.isSent}
+              onCheckedChange={(val) => update('isSent', val)}
+            />
+          </div>
+        </div>
+      )}
+      <div className="space-y-1">
+        <Label className="text-xs">Alamat</Label>
+        <Input
+          value={form.buyerAddress}
+          onChange={(e) => update('buyerAddress', e.target.value)}
+          className="h-8 text-sm"
+        />
+      </div>
+
+      {/* Status Bayar + Bukti Transfer */}
+      <div className="col-span-2 md:col-span-4">
+        <div className="flex flex-wrap items-end gap-4">
+          <div className="space-y-1 w-[180px]">
+            <Label className="text-xs">Status Bayar</Label>
+            <Select
+              value={form.paymentStatus}
+              onValueChange={(val) =>
+                update('paymentStatus', val ?? form.paymentStatus)
+              }
+            >
+              <SelectTrigger className="h-8 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="BELUM_BAYAR">Belum Bayar</SelectItem>
+                <SelectItem value="DP">DP</SelectItem>
+                <SelectItem value="LUNAS">Lunas</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1 flex-1 min-w-[200px]">
+            <Label className="text-xs">Bukti Transfer</Label>
+            <BuktiTransferUpload
+              key={entry.id + '-bukti'}
+              initialUrls={entry.buktiTransfer ?? []}
+              onChange={setBuktiTransferUrls}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Notes - full width */}
+      <div className="col-span-2 md:col-span-4 space-y-1">
+        <Label className="text-xs">Catatan</Label>
+        <Textarea
+          value={form.notes}
+          onChange={(e) => update('notes', e.target.value)}
+          rows={2}
+          className="text-sm"
+        />
+      </div>
+    </div>
+  );
+}
+
+function EntryRow({
+  entry,
+  isAdmin,
+  isEditing,
+  onEdit,
+  onCancel,
+  onSaved,
+}: {
+  entry: EntryData;
+  isAdmin: boolean;
+  isEditing: boolean;
+  onEdit: () => void;
+  onCancel: () => void;
+  onSaved: () => void;
+}) {
+  const {
+    form,
+    update,
+    loading,
+    setBuktiTransferUrls,
+    handleSave,
+    handleApprove,
+    handleReject,
+    handleDelete,
+  } = useEntryRow(entry, onSaved);
 
   return (
     <>
@@ -606,24 +825,10 @@ function EntryRow({
           />
         </td>
         <td className="p-3 text-center">
-          {entry.isSent ? (
-            <Badge variant="default">Ya</Badge>
-          ) : (
-            <Badge variant="outline">Belum</Badge>
-          )}
+          <KirimIcon isSent={entry.isSent} />
         </td>
         <td className="p-3 text-center">
-          <Badge
-            variant={
-              entry.status === 'APPROVED'
-                ? 'default'
-                : entry.status === 'PENDING'
-                  ? 'secondary'
-                  : 'destructive'
-            }
-          >
-            {entry.status}
-          </Badge>
+          <StatusIcon status={entry.status} />
         </td>
         <td className="p-3 text-xs text-muted-foreground whitespace-nowrap text-center">
           {formatDateTime(new Date(entry.createdAt))}
@@ -704,160 +909,317 @@ function EntryRow({
       {isEditing && (
         <tr className="border-b bg-muted/20">
           <td colSpan={isAdmin ? 13 : 10} className="p-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {/* Buyer */}
-              <div className="space-y-1">
-                <Label className="text-xs">Nama Pembeli</Label>
-                <Input
-                  value={form.buyerName}
-                  onChange={(e) => update('buyerName', e.target.value)}
-                  className="h-8 text-sm"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Telepon</Label>
-                <Input
-                  value={form.buyerPhone}
-                  onChange={(e) => update('buyerPhone', e.target.value)}
-                  className="h-8 text-sm"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">WhatsApp</Label>
-                <Input
-                  value={form.buyerWa}
-                  onChange={(e) => update('buyerWa', e.target.value)}
-                  className="h-8 text-sm"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Google Maps</Label>
-                <Input
-                  value={form.buyerMaps}
-                  onChange={(e) => update('buyerMaps', e.target.value)}
-                  className="h-8 text-sm"
-                />
-              </div>
-
-              {/* Pricing */}
-              <div className="space-y-1">
-                <Label className="text-xs">Harga Jual</Label>
-                <Input
-                  type="number"
-                  value={form.hargaJual}
-                  onChange={(e) => update('hargaJual', e.target.value)}
-                  className="h-8 text-sm"
-                />
-              </div>
-              {isAdmin && (
-                <>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Harga Modal</Label>
-                    <Input
-                      type="number"
-                      value={form.hargaModal}
-                      onChange={(e) => update('hargaModal', e.target.value)}
-                      className="h-8 text-sm"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Reseller Cut</Label>
-                    <Input
-                      type="number"
-                      value={form.resellerCut}
-                      onChange={(e) => update('resellerCut', e.target.value)}
-                      className="h-8 text-sm"
-                    />
-                  </div>
-                </>
-              )}
-
-              {/* Payment */}
-              <div className="space-y-1">
-                <Label className="text-xs">DP</Label>
-                <Input
-                  type="number"
-                  value={form.dp}
-                  onChange={(e) => update('dp', e.target.value)}
-                  className="h-8 text-sm"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Total Dibayar</Label>
-                <Input
-                  type="number"
-                  value={form.totalBayar}
-                  onChange={(e) => update('totalBayar', e.target.value)}
-                  className="h-8 text-sm"
-                />
-              </div>
-              {isAdmin && (
-                <div className="space-y-1">
-                  <Label className="text-xs">Sudah Dikirim</Label>
-                  <div className="pt-1">
-                    <Switch
-                      checked={form.isSent}
-                      onCheckedChange={(val) => update('isSent', val)}
-                    />
-                  </div>
-                </div>
-              )}
-              <div className="space-y-1">
-                <Label className="text-xs">Alamat</Label>
-                <Input
-                  value={form.buyerAddress}
-                  onChange={(e) => update('buyerAddress', e.target.value)}
-                  className="h-8 text-sm"
-                />
-              </div>
-
-              {/* Status Bayar + Bukti Transfer — combined row so they sit side by side */}
-              <div className="col-span-2 md:col-span-4">
-                <div className="flex flex-wrap items-end gap-4">
-                  <div className="space-y-1 w-[180px]">
-                    <Label className="text-xs">Status Bayar</Label>
-                    <Select
-                      value={form.paymentStatus}
-                      onValueChange={(val) =>
-                        update('paymentStatus', val ?? form.paymentStatus)
-                      }
-                    >
-                      <SelectTrigger className="h-8 text-sm">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="BELUM_BAYAR">Belum Bayar</SelectItem>
-                        <SelectItem value="DP">DP</SelectItem>
-                        <SelectItem value="LUNAS">Lunas</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1 flex-1 min-w-[200px]">
-                    <Label className="text-xs">Bukti Transfer</Label>
-                    <BuktiTransferUpload
-                      key={entry.id + '-bukti'}
-                      initialUrls={entry.buktiTransfer ?? []}
-                      onChange={setBuktiTransferUrls}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Notes - full width */}
-              <div className="col-span-2 md:col-span-4 space-y-1">
-                <Label className="text-xs">Catatan</Label>
-                <Textarea
-                  value={form.notes}
-                  onChange={(e) => update('notes', e.target.value)}
-                  rows={2}
-                  className="text-sm"
-                />
-              </div>
-            </div>
+            <EntryEditFields
+              entry={entry}
+              isAdmin={isAdmin}
+              form={form}
+              update={update}
+              setBuktiTransferUrls={setBuktiTransferUrls}
+            />
           </td>
         </tr>
       )}
     </>
+  );
+}
+
+function MobileEntryCard({
+  entry,
+  isAdmin,
+  isEditing,
+  onEdit,
+  onCancel,
+  onSaved,
+}: {
+  entry: EntryData;
+  isAdmin: boolean;
+  isEditing: boolean;
+  onEdit: () => void;
+  onCancel: () => void;
+  onSaved: () => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const {
+    form,
+    update,
+    loading,
+    setBuktiTransferUrls,
+    handleSave,
+    handleApprove,
+    handleReject,
+    handleDelete,
+  } = useEntryRow(entry, onSaved);
+
+  const open = expanded || isEditing;
+
+  return (
+    <div className="rounded-lg border bg-card shadow-sm overflow-hidden">
+      {/* Header — tap to toggle */}
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full flex items-center gap-2 p-3 text-left hover:bg-muted/30 transition-colors"
+      >
+        <div className="flex-1 min-w-0 text-sm truncate">
+          <span className="font-medium">{entry.buyerName}</span>
+          <span className="mx-2 text-muted-foreground">|</span>
+          <span className="font-medium">
+            {entry.livestock.type}
+            {entry.livestock.grade ? ' ' + entry.livestock.grade : ''}
+          </span>
+          <span className="text-muted-foreground text-xs ml-1">
+            ({entry.livestock.tag ?? entry.livestock.sku})
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <StatusIcon status={entry.status} />
+          <KirimIcon isSent={entry.isSent} />
+        </div>
+        <ChevronDown
+          className={`h-4 w-4 text-muted-foreground shrink-0 transition-transform ${
+            open ? 'rotate-180' : ''
+          }`}
+        />
+      </button>
+
+      {/* Body */}
+      {open && (
+        <div className="border-t">
+          {isEditing ? (
+            <div className="p-3 space-y-3">
+              <EntryEditFields
+                entry={entry}
+                isAdmin={isAdmin}
+                form={form}
+                update={update}
+                setBuktiTransferUrls={setBuktiTransferUrls}
+              />
+              <div className="flex gap-2 pt-2 border-t">
+                <Button
+                  size="sm"
+                  className="flex-1"
+                  onClick={handleSave}
+                  disabled={loading}
+                >
+                  <Save className="h-3.5 w-3.5 mr-1" />
+                  Simpan
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="flex-1"
+                  onClick={onCancel}
+                  disabled={loading}
+                >
+                  <XCircle className="h-3.5 w-3.5 mr-1" />
+                  Batal
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <dl className="divide-y text-sm">
+                <CardRow
+                  label="Hewan"
+                  value={
+                    <>
+                      {entry.livestock.type}
+                      {entry.livestock.grade ? ' ' + entry.livestock.grade : ''}
+                      <span className="text-muted-foreground text-xs ml-1">
+                        ({entry.livestock.sku})
+                      </span>
+                    </>
+                  }
+                />
+                <CardRow
+                  label="Pembeli"
+                  value={
+                    <>
+                      {entry.buyerName}
+                      {entry.buyerPhone && (
+                        <div className="text-muted-foreground text-xs">
+                          {entry.buyerPhone}
+                        </div>
+                      )}
+                    </>
+                  }
+                />
+                {isAdmin && <CardRow label="Sales" value={entry.sales.name} />}
+                <CardRow
+                  label="Harga Jual"
+                  value={formatRupiah(entry.hargaJual)}
+                />
+                <CardRow
+                  label="Sales Cut"
+                  value={
+                    entry.resellerCut ? formatRupiah(entry.resellerCut) : '-'
+                  }
+                />
+                {isAdmin && (
+                  <>
+                    <CardRow
+                      label="Modal"
+                      value={
+                        entry.hargaModal ? formatRupiah(entry.hargaModal) : '-'
+                      }
+                    />
+                    <CardRow
+                      label="Profit"
+                      value={
+                        entry.profit ? (
+                          <span
+                            className={
+                              entry.profit >= 0
+                                ? 'text-primary'
+                                : 'text-destructive'
+                            }
+                          >
+                            {formatRupiah(entry.profit)}
+                          </span>
+                        ) : (
+                          '-'
+                        )
+                      }
+                    />
+                  </>
+                )}
+                <CardRow
+                  label="Bayar"
+                  value={
+                    <HoverBuktiTransfer
+                      buktiTransfer={entry.buktiTransfer}
+                      paymentStatus={entry.paymentStatus}
+                    />
+                  }
+                />
+                <CardRow
+                  label="Tanggal"
+                  value={
+                    <span className="text-muted-foreground text-xs">
+                      {formatDateTime(new Date(entry.createdAt))}
+                    </span>
+                  }
+                />
+                {entry.notes && (
+                  <CardRow
+                    label="Catatan"
+                    value={
+                      <span className="text-muted-foreground text-xs whitespace-pre-wrap">
+                        {entry.notes}
+                      </span>
+                    }
+                  />
+                )}
+              </dl>
+
+              {/* Action bar */}
+              <div className="flex items-center justify-end gap-1 p-2 border-t bg-muted/20">
+                {isAdmin && entry.status === 'PENDING' && (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-primary"
+                      onClick={handleApprove}
+                      title="Setujui"
+                    >
+                      <Check className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive"
+                      onClick={handleReject}
+                      title="Tolak"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </>
+                )}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={onEdit}
+                  title="Edit"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-destructive"
+                  onClick={handleDelete}
+                  title="Hapus"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CardRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-start gap-3 px-3 py-2">
+      <dt className="text-muted-foreground text-xs w-24 flex-shrink-0 pt-0.5">
+        {label}
+      </dt>
+      <dd className="flex-1 text-sm min-w-0">{value}</dd>
+    </div>
+  );
+}
+
+function IconTooltip({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <span
+      aria-label={label}
+      className="relative inline-flex group/tip align-middle"
+    >
+      {children}
+      <span
+        role="tooltip"
+        className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1 whitespace-nowrap rounded bg-popover text-popover-foreground border shadow-sm px-2 py-0.5 text-[10px] opacity-0 group-hover/tip:opacity-100 transition-opacity z-50"
+      >
+        {label}
+      </span>
+    </span>
+  );
+}
+
+function KirimIcon({ isSent }: { isSent: boolean }) {
+  return (
+    <IconTooltip label={isSent ? 'Sudah dikirim' : 'Belum dikirim'}>
+      <Truck
+        className={`h-4 w-4 ${
+          isSent ? 'text-primary' : 'text-muted-foreground/40'
+        }`}
+      />
+    </IconTooltip>
+  );
+}
+
+function StatusIcon({ status }: { status: string }) {
+  const { Icon, label, className } =
+    status === 'APPROVED'
+      ? { Icon: CheckCircle2, label: 'Disetujui', className: 'text-primary' }
+      : status === 'PENDING'
+        ? { Icon: Clock, label: 'Menunggu', className: 'text-yellow-600' }
+        : { Icon: XCircle, label: 'Ditolak', className: 'text-destructive' };
+  return (
+    <IconTooltip label={label}>
+      <Icon className={`h-4 w-4 ${className}`} />
+    </IconTooltip>
   );
 }
 

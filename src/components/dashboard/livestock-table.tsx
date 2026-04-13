@@ -71,7 +71,7 @@ export async function LivestockTable() {
       }
     >
       {/* Stat cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6 [&>*:last-child:nth-child(odd)]:col-span-2 [&>*:last-child:nth-child(odd)]:sm:col-span-1">
         {stats.map((s) => (
           <Card key={s.type}>
             <CardHeader className="pb-2">

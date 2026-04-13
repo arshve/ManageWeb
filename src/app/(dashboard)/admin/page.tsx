@@ -71,6 +71,7 @@ export default async function AdminDashboardPage() {
       sku: entry.livestock.sku,
       type: entry.livestock.type,
       grade: entry.livestock.grade,
+      tag: entry.livestock.tag,
     },
     sales: {
       name: entry.sales.name,
@@ -118,7 +119,7 @@ export default async function AdminDashboardPage() {
         </Link>
       }
     >
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 mb-6">
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4 mb-6">
         {stats.map((stat) => (
           <Card key={stat.title}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">

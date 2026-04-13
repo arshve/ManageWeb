@@ -257,53 +257,46 @@ function MobileLivestockCard({ item }: { item: LivestockItem }) {
         isUnhealthy ? 'bg-muted/60 text-muted-foreground' : 'bg-card'
       }`}
     >
-      {/* Header — tap to toggle */}
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        className="w-full flex items-center gap-2 p-3 text-left hover:bg-muted/30 transition-colors"
-      >
-        <div className="flex-1 min-w-0 text-sm truncate">
-          <span className="font-medium">
-            {typeLabel}
-            {item.grade ? ' ' + item.grade : ''}
-          </span>
-          <span className="text-muted-foreground text-xs ml-1">
-            ({item.tag || item.sku})
-          </span>
-        </div>
-        {item.isSold ? (
-          <Badge variant="secondary" className="text-[10px]">
-            Terjual
-          </Badge>
-        ) : (
-          <Badge className="bg-primary/10 text-primary hover:bg-primary/10 text-[10px]">
-            Tersedia
-          </Badge>
-        )}
-        <ChevronDown
-          className={`h-4 w-4 text-muted-foreground shrink-0 transition-transform ${
-            expanded ? 'rotate-180' : ''
-          }`}
+      {/* Header — photo opens lightbox, rest toggles expand */}
+      <div className="flex items-center gap-3 p-3 hover:bg-muted/30 transition-colors">
+        <LivestockPhoto
+          photoUrl={item.photoUrl}
+          alt={`${item.type} ${item.grade ?? ''} - ${item.sku}`}
         />
-      </button>
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="flex-1 min-w-0 flex items-center gap-2 text-left"
+        >
+          <div className="flex-1 min-w-0 text-sm truncate">
+            <span className="font-medium">{item.tag || item.sku}</span>
+            <span className="mx-2 text-muted-foreground">|</span>
+            <span className="font-medium">
+              {typeLabel}
+              {item.grade ? ' ' + item.grade : ''}
+            </span>
+          </div>
+          {item.isSold ? (
+            <Badge variant="secondary" className="text-[10px]">
+              Terjual
+            </Badge>
+          ) : (
+            <Badge className="bg-primary/10 text-primary hover:bg-primary/10 text-[10px]">
+              Tersedia
+            </Badge>
+          )}
+          <ChevronDown
+            className={`h-4 w-4 text-muted-foreground shrink-0 transition-transform ${
+              expanded ? 'rotate-180' : ''
+            }`}
+          />
+        </button>
+      </div>
 
       {/* Body */}
       {expanded && (
         <div className="border-t">
           <dl className="divide-y text-sm">
-            <div className="flex items-start gap-3 px-3 py-3">
-              <dt className="text-muted-foreground text-xs w-24 flex-shrink-0 pt-0.5">
-                Foto
-              </dt>
-              <dd className="flex-1">
-                <LivestockPhoto
-                  photoUrl={item.photoUrl}
-                  alt={`${item.type} ${item.grade ?? ''} - ${item.sku}`}
-                  thumbnailClassName="w-16 h-16"
-                />
-              </dd>
-            </div>
             <LivestockCardRow
               label="SKU"
               value={<span className="font-mono text-xs">{item.sku}</span>}

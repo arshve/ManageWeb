@@ -25,7 +25,7 @@ export function DashboardShell({
 }: DashboardShellProps) {
   return (
     <div className="flex-1 p-4 md:p-6 lg:p-8 overflow-auto">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 pl-12 md:pl-0">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
           {description && (

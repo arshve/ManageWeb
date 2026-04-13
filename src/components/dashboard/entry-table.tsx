@@ -59,6 +59,7 @@ import { toast } from 'sonner';
 import { formatRupiah, formatDateTime } from '@/lib/format';
 import { BuktiTransferUpload } from '@/components/dashboard/bukti-transfer-upload';
 import { PdfMenu } from '@/components/dashboard/pdf-menu';
+import { LivestockPhotoLink } from '@/components/dashboard/livestock-photo-link';
 import Image from 'next/image';
 
 export interface EntryData {
@@ -83,12 +84,23 @@ export interface EntryData {
   isSent: boolean;
   createdAt: string;
   livestock: {
+    id: string;
     sku: string;
     type: string;
     grade: string | null;
     tag: string | null;
+    photoUrl: string | null;
+    condition: string;
   };
   sales: { name: string };
+}
+
+export interface AvailableLivestock {
+  id: string;
+  sku: string;
+  type: string;
+  grade: string | null;
+  tag: string | null;
 }
 
 type SortField =
@@ -103,9 +115,11 @@ type SortDir = 'asc' | 'desc';
 export function EntryTable({
   entries,
   isAdmin = false,
+  availableLivestock = [],
 }: {
   entries: EntryData[];
   isAdmin?: boolean;
+  availableLivestock?: AvailableLivestock[];
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -355,6 +369,7 @@ export function EntryTable({
                 onEdit={() => setEditingId(entry.id)}
                 onCancel={() => setEditingId(null)}
                 onSaved={() => setEditingId(null)}
+                availableLivestock={availableLivestock}
               />
             ))}
             {filtered.length === 0 && (
@@ -384,6 +399,7 @@ export function EntryTable({
             onEdit={() => setEditingId(entry.id)}
             onCancel={() => setEditingId(null)}
             onSaved={() => setEditingId(null)}
+            availableLivestock={availableLivestock}
           />
         ))}
         {filtered.length === 0 && (
@@ -506,6 +522,7 @@ function useEntryRow(entry: EntryData, onSaved: () => void) {
   const [buktiTransferUrls, setBuktiTransferUrls] = useState<string[]>(
     entry.buktiTransfer ?? [],
   );
+  const [newLivestockId, setNewLivestockId] = useState<string>('');
 
   function update(field: string, value: string | boolean) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -528,6 +545,9 @@ function useEntryRow(entry: EntryData, onSaved: () => void) {
       formData.set('paymentStatus', form.paymentStatus);
       formData.set('isSent', form.isSent.toString());
       formData.set('notes', form.notes);
+      if (newLivestockId) {
+        formData.set('livestockId', newLivestockId);
+      }
       buktiTransferUrls.forEach((url) => formData.append('buktiTransfer', url));
       if (buktiTransferUrls.length === 0) {
         formData.set('buktiTransferCleared', 'true');
@@ -572,6 +592,8 @@ function useEntryRow(entry: EntryData, onSaved: () => void) {
     loading,
     buktiTransferUrls,
     setBuktiTransferUrls,
+    newLivestockId,
+    setNewLivestockId,
     handleSave,
     handleApprove,
     handleReject,
@@ -585,15 +607,62 @@ function EntryEditFields({
   form,
   update,
   setBuktiTransferUrls,
+  availableLivestock,
+  newLivestockId,
+  setNewLivestockId,
 }: {
   entry: EntryData;
   isAdmin: boolean;
   form: ReturnType<typeof useEntryRow>['form'];
   update: ReturnType<typeof useEntryRow>['update'];
   setBuktiTransferUrls: ReturnType<typeof useEntryRow>['setBuktiTransferUrls'];
+  availableLivestock: AvailableLivestock[];
+  newLivestockId: string;
+  setNewLivestockId: (id: string) => void;
 }) {
+  const isMati = entry.livestock.condition === 'MATI';
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {isMati && (
+        <div className="col-span-2 md:col-span-4 space-y-1 p-3 rounded-md border border-destructive/40 bg-destructive/5">
+          <Label className="text-xs text-destructive">
+            Hewan saat ini berkondisi MATI — pilih pengganti
+          </Label>
+          <Select
+            value={newLivestockId || '__none__'}
+            onValueChange={(val) =>
+              setNewLivestockId(val === '__none__' ? '' : (val ?? ''))
+            }
+          >
+            <SelectTrigger className="h-8 text-sm">
+              <SelectValue placeholder="Pilih hewan pengganti" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">
+                Tetap — tidak diganti
+              </SelectItem>
+              {availableLivestock.map((l) => {
+                const typeLabel =
+                  l.type.charAt(0) + l.type.slice(1).toLowerCase();
+                const label = [
+                  l.tag ?? l.sku,
+                  typeLabel + (l.grade ? ' ' + l.grade : ''),
+                ].join(' — ');
+                return (
+                  <SelectItem key={l.id} value={l.id}>
+                    {label}
+                  </SelectItem>
+                );
+              })}
+              {availableLivestock.length === 0 && (
+                <SelectItem value="__empty__" disabled>
+                  Tidak ada hewan tersedia
+                </SelectItem>
+              )}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
       {/* Buyer */}
       <div className="space-y-1">
         <Label className="text-xs">Nama Pembeli</Label>
@@ -753,6 +822,7 @@ function EntryRow({
   onEdit,
   onCancel,
   onSaved,
+  availableLivestock,
 }: {
   entry: EntryData;
   isAdmin: boolean;
@@ -760,30 +830,43 @@ function EntryRow({
   onEdit: () => void;
   onCancel: () => void;
   onSaved: () => void;
+  availableLivestock: AvailableLivestock[];
 }) {
   const {
     form,
     update,
     loading,
     setBuktiTransferUrls,
+    newLivestockId,
+    setNewLivestockId,
     handleSave,
     handleApprove,
     handleReject,
     handleDelete,
   } = useEntryRow(entry, onSaved);
 
+  const isMati = entry.livestock.condition === 'MATI';
+  const rowClass = isMati
+    ? 'bg-zinc-300 text-zinc-800 hover:bg-zinc-400/70 dark:bg-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-600'
+    : isEditing
+      ? 'bg-muted/30'
+      : '';
+
   return (
     <>
       {/* Main row */}
-      <tr
-        className={`border-b last:border-0 ${isEditing ? 'bg-muted/30' : ''}`}
-      >
+      <tr className={`border-b last:border-0 transition-colors ${rowClass}`}>
         <td className="p-3 font-mono text-xs">{entry.invoiceNo}</td>
         <td className="p-3">
           {entry.livestock.type}
           {entry.livestock.grade ? ' ' + entry.livestock.grade : ''}
           <div className="text-xs text-muted-foreground">
-            {entry.livestock.sku}
+            <LivestockPhotoLink
+              photoUrl={entry.livestock.photoUrl}
+              alt={`${entry.livestock.type} ${entry.livestock.grade ?? ''} - ${entry.livestock.sku}`}
+            >
+              {entry.livestock.tag ?? entry.livestock.sku}
+            </LivestockPhotoLink>
           </div>
         </td>
         <td className="p-3">
@@ -920,6 +1003,9 @@ function EntryRow({
               form={form}
               update={update}
               setBuktiTransferUrls={setBuktiTransferUrls}
+              availableLivestock={availableLivestock}
+              newLivestockId={newLivestockId}
+              setNewLivestockId={setNewLivestockId}
             />
           </td>
         </tr>
@@ -935,6 +1021,7 @@ function MobileEntryCard({
   onEdit,
   onCancel,
   onSaved,
+  availableLivestock,
 }: {
   entry: EntryData;
   isAdmin: boolean;
@@ -942,6 +1029,7 @@ function MobileEntryCard({
   onEdit: () => void;
   onCancel: () => void;
   onSaved: () => void;
+  availableLivestock: AvailableLivestock[];
 }) {
   const [expanded, setExpanded] = useState(false);
   const {
@@ -949,6 +1037,8 @@ function MobileEntryCard({
     update,
     loading,
     setBuktiTransferUrls,
+    newLivestockId,
+    setNewLivestockId,
     handleSave,
     handleApprove,
     handleReject,
@@ -956,14 +1046,27 @@ function MobileEntryCard({
   } = useEntryRow(entry, onSaved);
 
   const open = expanded || isEditing;
+  const isMati = entry.livestock.condition === 'MATI';
+  const cardClass = isMati
+    ? 'bg-zinc-300 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-200'
+    : 'bg-card';
 
   return (
-    <div className="rounded-lg border bg-card shadow-sm overflow-hidden">
+    <div
+      className={`rounded-lg border shadow-sm overflow-hidden ${cardClass}`}
+    >
       {/* Header — tap to toggle */}
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => setExpanded((v) => !v)}
-        className="w-full flex items-center gap-2 p-3 text-left hover:bg-muted/30 transition-colors"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setExpanded((v) => !v);
+          }
+        }}
+        className="w-full flex items-center gap-2 p-3 text-left hover:bg-muted/30 transition-colors cursor-pointer"
       >
         <div className="flex-1 min-w-0 text-sm truncate">
           <span className="font-medium">{entry.buyerName}</span>
@@ -972,9 +1075,13 @@ function MobileEntryCard({
             {entry.livestock.type}
             {entry.livestock.grade ? ' ' + entry.livestock.grade : ''}
           </span>
-          <span className="text-muted-foreground text-xs ml-1">
+          <LivestockPhotoLink
+            photoUrl={entry.livestock.photoUrl}
+            alt={`${entry.livestock.type} ${entry.livestock.grade ?? ''} - ${entry.livestock.sku}`}
+            className="text-muted-foreground text-xs ml-1"
+          >
             ({entry.livestock.tag ?? entry.livestock.sku})
-          </span>
+          </LivestockPhotoLink>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
           <StatusIcon status={entry.status} />
@@ -985,7 +1092,7 @@ function MobileEntryCard({
             open ? 'rotate-180' : ''
           }`}
         />
-      </button>
+      </div>
 
       {/* Body */}
       {open && (
@@ -998,6 +1105,9 @@ function MobileEntryCard({
                 form={form}
                 update={update}
                 setBuktiTransferUrls={setBuktiTransferUrls}
+                availableLivestock={availableLivestock}
+                newLivestockId={newLivestockId}
+                setNewLivestockId={setNewLivestockId}
               />
               <div className="flex gap-2 pt-2 border-t">
                 <Button
@@ -1030,9 +1140,13 @@ function MobileEntryCard({
                     <>
                       {entry.livestock.type}
                       {entry.livestock.grade ? ' ' + entry.livestock.grade : ''}
-                      <span className="text-muted-foreground text-xs ml-1">
-                        ({entry.livestock.sku})
-                      </span>
+                      <LivestockPhotoLink
+                        photoUrl={entry.livestock.photoUrl}
+                        alt={`${entry.livestock.type} ${entry.livestock.grade ?? ''} - ${entry.livestock.sku}`}
+                        className="text-muted-foreground text-xs ml-1"
+                      >
+                        ({entry.livestock.tag ?? entry.livestock.sku})
+                      </LivestockPhotoLink>
                     </>
                   }
                 />

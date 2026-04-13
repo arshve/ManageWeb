@@ -4,13 +4,30 @@ import { EntryTable } from '@/components/dashboard/entry-table';
 import { Card, CardContent } from '@/components/ui/card';
 
 export default async function AdminEntriesPage() {
-  const entries = await prisma.entry.findMany({
-    orderBy: { createdAt: 'desc' },
-    include: {
-      livestock: true,
-      sales: { select: { name: true } },
-    },
-  });
+  const [entries, availableLivestock] = await Promise.all([
+    prisma.entry.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: {
+        livestock: true,
+        sales: { select: { name: true } },
+      },
+    }),
+    prisma.livestock.findMany({
+      where: {
+        isSold: false,
+        entry: null,
+        condition: { not: 'MATI' },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        sku: true,
+        type: true,
+        grade: true,
+        tag: true,
+      },
+    }),
+  ]);
 
   const pending = entries.filter((e) => e.status === 'PENDING').length;
 
@@ -36,10 +53,13 @@ export default async function AdminEntriesPage() {
     isSent: entry.isSent,
     createdAt: entry.createdAt.toISOString(),
     livestock: {
+      id: entry.livestock.id,
       sku: entry.livestock.sku,
       type: entry.livestock.type,
       grade: entry.livestock.grade,
       tag: entry.livestock.tag,
+      photoUrl: entry.livestock.photoUrl,
+      condition: entry.livestock.condition,
     },
     sales: {
       name: entry.sales.name,
@@ -53,7 +73,11 @@ export default async function AdminEntriesPage() {
     >
       <Card>
         <CardContent className="p-0">
-          <EntryTable entries={serialized} isAdmin={true} />
+          <EntryTable
+            entries={serialized}
+            isAdmin={true}
+            availableLivestock={availableLivestock}
+          />
         </CardContent>
       </Card>
     </DashboardShell>

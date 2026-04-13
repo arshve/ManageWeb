@@ -1,7 +1,14 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { ChevronDown } from 'lucide-react';
+import {
+  ChevronDown,
+  HeartPulse,
+  Thermometer,
+  Skull,
+  CircleCheck,
+  ShoppingBag,
+} from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { LivestockPhoto } from '@/components/dashboard/livestock-photo';
@@ -28,6 +35,45 @@ export interface LivestockItem {
   photoUrl: string | null;
   notes: string | null;
   isSold: boolean;
+  buyerName: string | null;
+  salesName: string | null;
+}
+
+function ConditionIcon({ condition }: { condition: string }) {
+  if (condition === 'SEHAT') {
+    return (
+      <span title="Sehat" className="inline-flex text-green-600">
+        <HeartPulse className="h-4 w-4" />
+      </span>
+    );
+  }
+  if (condition === 'SAKIT') {
+    return (
+      <span title="Sakit" className="inline-flex">
+        <Thermometer className="h-4 w-4" />
+      </span>
+    );
+  }
+  return (
+    <span title="Mati" className="inline-flex">
+      <Skull className="h-4 w-4" />
+    </span>
+  );
+}
+
+function StatusIcon({ isSold }: { isSold: boolean }) {
+  if (isSold) {
+    return (
+      <span title="Terjual" className="inline-flex text-yellow-600">
+        <ShoppingBag className="h-4 w-4" />
+      </span>
+    );
+  }
+  return (
+    <span title="Tersedia" className="inline-flex text-green-600">
+      <CircleCheck className="h-4 w-4" />
+    </span>
+  );
 }
 
 export function LivestockTableClient({
@@ -131,23 +177,28 @@ export function LivestockTableClient({
                   <th className="p-3 font-medium text-center">Grade</th>
                   <th className="p-3 font-medium text-right">Berat</th>
                   <th className="p-3 font-medium text-right">Harga</th>
-                  <th className="p-3 font-medium text-center">Kondisi</th>
-                  <th className="p-3 font-medium text-center">Status</th>
+                  <th className="p-3 font-medium text-center w-12">Kondisi</th>
+                  <th className="p-3 font-medium text-center w-12">Status</th>
+                  <th className="p-3 font-medium text-left">Pembeli</th>
+                  <th className="p-3 font-medium text-left">Sales</th>
                   <th className="p-3 font-medium text-center">Aksi</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((item) => {
-                  const isUnhealthy =
-                    item.condition === 'SAKIT' || item.condition === 'MATI';
+                  const isMati = item.condition === 'MATI';
+                  const rowClass = isMati
+                    ? 'bg-black text-white hover:bg-zinc-900'
+                    : item.condition === 'SAKIT'
+                      ? 'bg-zinc-300 text-zinc-800 hover:bg-zinc-400/70 dark:bg-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-600'
+                      : 'hover:bg-muted/30';
+                  const mutedClass = isMati
+                    ? 'text-white/70'
+                    : 'text-muted-foreground';
                   return (
                   <tr
                     key={item.id}
-                    className={`border-b last:border-0 transition-colors ${
-                      isUnhealthy
-                        ? 'bg-muted/60 text-muted-foreground hover:bg-muted/80'
-                        : 'hover:bg-muted/30'
-                    }`}
+                    className={`border-b last:border-0 transition-colors ${rowClass}`}
                   >
                     <td className="p-3">
                       <LivestockPhoto
@@ -158,7 +209,7 @@ export function LivestockTableClient({
                     <td className="p-3 font-mono text-xs whitespace-nowrap">
                       {item.sku}
                     </td>
-                    <td className="p-3 text-xs text-muted-foreground">
+                    <td className={`p-3 text-xs ${mutedClass}`}>
                       {item.tag || '—'}
                     </td>
                     <td className="p-3 whitespace-nowrap">
@@ -166,9 +217,16 @@ export function LivestockTableClient({
                     </td>
                     <td className="p-3 text-center">
                       {item.grade ? (
-                        <Badge variant="outline">{item.grade}</Badge>
+                        <Badge
+                          variant="outline"
+                          className={
+                            isMati ? 'border-white/40 text-white' : ''
+                          }
+                        >
+                          {item.grade}
+                        </Badge>
                       ) : (
-                        <span className="text-muted-foreground">—</span>
+                        <span className={mutedClass}>—</span>
                       )}
                     </td>
                     <td className="p-3 text-right tabular-nums whitespace-nowrap">
@@ -178,27 +236,16 @@ export function LivestockTableClient({
                       {item.hargaJual ? formatRupiah(item.hargaJual) : '—'}
                     </td>
                     <td className="p-3 text-center">
-                      <Badge
-                        variant={
-                          item.condition === 'SEHAT'
-                            ? 'default'
-                            : item.condition === 'SAKIT'
-                              ? 'secondary'
-                              : 'destructive'
-                        }
-                      >
-                        {item.condition.charAt(0) +
-                          item.condition.slice(1).toLowerCase()}
-                      </Badge>
+                      <ConditionIcon condition={item.condition} />
                     </td>
                     <td className="p-3 text-center">
-                      {item.isSold ? (
-                        <Badge variant="secondary">Terjual</Badge>
-                      ) : (
-                        <Badge className="bg-primary/10 text-primary hover:bg-primary/10">
-                          Tersedia
-                        </Badge>
-                      )}
+                      <StatusIcon isSold={item.isSold} />
+                    </td>
+                    <td className="p-3 text-xs whitespace-nowrap">
+                      {item.buyerName || <span className={mutedClass}>—</span>}
+                    </td>
+                    <td className="p-3 text-xs whitespace-nowrap">
+                      {item.salesName || <span className={mutedClass}>—</span>}
                     </td>
                     <td className="p-3">
                       <div className="flex items-center justify-center">
@@ -211,7 +258,7 @@ export function LivestockTableClient({
                 {filtered.length === 0 && (
                   <tr>
                     <td
-                      colSpan={10}
+                      colSpan={12}
                       className="p-8 text-center text-muted-foreground"
                     >
                       {livestock.length === 0
@@ -245,17 +292,19 @@ export function LivestockTableClient({
 
 function MobileLivestockCard({ item }: { item: LivestockItem }) {
   const [expanded, setExpanded] = useState(false);
-  const isUnhealthy = item.condition === 'SAKIT' || item.condition === 'MATI';
 
   const typeLabel = item.type.charAt(0) + item.type.slice(1).toLowerCase();
-  const conditionLabel =
-    item.condition.charAt(0) + item.condition.slice(1).toLowerCase();
+
+  const cardClass =
+    item.condition === 'MATI'
+      ? 'bg-black text-white'
+      : item.condition === 'SAKIT'
+        ? 'bg-zinc-300 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-200'
+        : 'bg-card';
 
   return (
     <div
-      className={`rounded-lg border shadow-sm overflow-hidden ${
-        isUnhealthy ? 'bg-muted/60 text-muted-foreground' : 'bg-card'
-      }`}
+      className={`rounded-lg border shadow-sm overflow-hidden ${cardClass}`}
     >
       {/* Header — photo opens lightbox, rest toggles expand */}
       <div className="flex items-center gap-3 p-3 hover:bg-muted/30 transition-colors">
@@ -276,15 +325,8 @@ function MobileLivestockCard({ item }: { item: LivestockItem }) {
               {item.grade ? ' ' + item.grade : ''}
             </span>
           </div>
-          {item.isSold ? (
-            <Badge variant="secondary" className="text-[10px]">
-              Terjual
-            </Badge>
-          ) : (
-            <Badge className="bg-primary/10 text-primary hover:bg-primary/10 text-[10px]">
-              Tersedia
-            </Badge>
-          )}
+          <ConditionIcon condition={item.condition} />
+          <StatusIcon isSold={item.isSold} />
           <ChevronDown
             className={`h-4 w-4 text-muted-foreground shrink-0 transition-transform ${
               expanded ? 'rotate-180' : ''
@@ -324,17 +366,29 @@ function MobileLivestockCard({ item }: { item: LivestockItem }) {
             <LivestockCardRow
               label="Kondisi"
               value={
-                <Badge
-                  variant={
-                    item.condition === 'SEHAT'
-                      ? 'default'
-                      : item.condition === 'SAKIT'
-                        ? 'secondary'
-                        : 'destructive'
-                  }
-                >
-                  {conditionLabel}
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <ConditionIcon condition={item.condition} />
+                  <span>
+                    {item.condition.charAt(0) +
+                      item.condition.slice(1).toLowerCase()}
+                  </span>
+                </div>
+              }
+            />
+            <LivestockCardRow
+              label="Pembeli"
+              value={
+                item.buyerName || (
+                  <span className="text-muted-foreground">—</span>
+                )
+              }
+            />
+            <LivestockCardRow
+              label="Sales"
+              value={
+                item.salesName || (
+                  <span className="text-muted-foreground">—</span>
+                )
               }
             />
             {item.notes && (

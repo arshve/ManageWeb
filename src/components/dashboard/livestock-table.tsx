@@ -16,7 +16,16 @@ import { LivestockTableClient } from '@/components/dashboard/livestock-table-cli
 export async function LivestockTable() {
   const livestock = await prisma.livestock.findMany({
     orderBy: { createdAt: 'desc' },
-    include: { entry: { select: { id: true, status: true } } },
+    include: {
+      entry: {
+        select: {
+          id: true,
+          status: true,
+          buyerName: true,
+          sales: { select: { name: true } },
+        },
+      },
+    },
   });
 
   // Stat calculations
@@ -53,6 +62,8 @@ export async function LivestockTable() {
     photoUrl: item.photoUrl,
     notes: item.notes,
     isSold: item.isSold,
+    buyerName: item.entry?.buyerName ?? null,
+    salesName: item.entry?.sales?.name ?? null,
   }));
 
   return (

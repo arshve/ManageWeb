@@ -17,6 +17,7 @@ export default async function AdminDashboardPage() {
     totalSales,
     approvedEntries,
     allEntries,
+    availableLivestock,
   ] = await Promise.all([
     prisma.livestock.count(),
     prisma.livestock.count({ where: { isSold: true } }),
@@ -32,6 +33,21 @@ export default async function AdminDashboardPage() {
       include: {
         livestock: true,
         sales: { select: { name: true } },
+      },
+    }),
+    prisma.livestock.findMany({
+      where: {
+        isSold: false,
+        entry: null,
+        condition: { not: 'MATI' },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        sku: true,
+        type: true,
+        grade: true,
+        tag: true,
       },
     }),
   ]);
@@ -68,10 +84,13 @@ export default async function AdminDashboardPage() {
     isSent: entry.isSent,
     createdAt: entry.createdAt.toISOString(),
     livestock: {
+      id: entry.livestock.id,
       sku: entry.livestock.sku,
       type: entry.livestock.type,
       grade: entry.livestock.grade,
       tag: entry.livestock.tag,
+      photoUrl: entry.livestock.photoUrl,
+      condition: entry.livestock.condition,
     },
     sales: {
       name: entry.sales.name,
@@ -141,7 +160,11 @@ export default async function AdminDashboardPage() {
           <CardTitle>Entry Penjualan</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          <EntryTable entries={serialized} isAdmin={true} />
+          <EntryTable
+            entries={serialized}
+            isAdmin={true}
+            availableLivestock={availableLivestock}
+          />
         </CardContent>
       </Card>
     </DashboardShell>

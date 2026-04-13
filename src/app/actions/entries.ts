@@ -239,11 +239,47 @@ export async function rejectEntry(id: string) {
 export async function updateEntry(id: string, formData: FormData) {
   const profile = await requireAuth();
 
-  const entry = await prisma.entry.findUnique({ where: { id } });
+  const entry = await prisma.entry.findUnique({
+    where: { id },
+    include: { livestock: true },
+  });
   if (!entry) return { error: 'Entry tidak ditemukan' };
 
   if (profile.role !== 'ADMIN' && entry.salesId !== profile.id) {
     return { error: 'Anda tidak berhak mengubah entry ini' };
+  }
+
+  // Livestock swap: only allowed when the current livestock is MATI.
+  // Validate the new one is available, not already linked to another entry, and healthy.
+  const newLivestockIdRaw = formData.get('livestockId') as string | null;
+  const swapLivestockId =
+    newLivestockIdRaw && newLivestockIdRaw !== entry.livestockId
+      ? newLivestockIdRaw
+      : null;
+
+  let newLivestock: typeof entry.livestock | null = null;
+  if (swapLivestockId) {
+    if (entry.livestock.condition !== 'MATI') {
+      return { error: 'Hewan hanya bisa diganti jika kondisinya MATI' };
+    }
+
+    newLivestock = await prisma.livestock.findUnique({
+      where: { id: swapLivestockId },
+    });
+    if (!newLivestock) return { error: 'Hewan pengganti tidak ditemukan' };
+    if (newLivestock.condition === 'MATI') {
+      return { error: 'Hewan pengganti tidak boleh berkondisi MATI' };
+    }
+    if (newLivestock.isSold) {
+      return { error: 'Hewan pengganti sudah terjual' };
+    }
+
+    const conflict = await prisma.entry.findUnique({
+      where: { livestockId: swapLivestockId },
+    });
+    if (conflict) {
+      return { error: 'Hewan pengganti sudah memiliki entry lain' };
+    }
   }
 
   // Recalculate financials with updated values
@@ -267,31 +303,50 @@ export async function updateEntry(id: string, formData: FormData) {
         ? []
         : entry.buktiTransfer;
 
-  const updated = await prisma.entry.update({
-    where: { id },
-    data: {
-      hargaJual,
-      hargaModal,
-      resellerCut,
-      hpp,
-      profit,
-      dp: formData.get('dp') ? Number(formData.get('dp')) : null,
-      totalBayar: formData.get('totalBayar')
-        ? Number(formData.get('totalBayar'))
-        : null,
-      paymentStatus:
-        (formData.get('paymentStatus') as 'BELUM_BAYAR' | 'DP' | 'LUNAS') ||
-        entry.paymentStatus,
-      buyerName: (formData.get('buyerName') as string) || entry.buyerName,
-      buyerPhone: (formData.get('buyerPhone') as string) || null,
-      buyerWa: (formData.get('buyerWa') as string) || null,
-      buyerAddress: (formData.get('buyerAddress') as string) || null,
-      buyerMaps: (formData.get('buyerMaps') as string) || null,
-      notes: (formData.get('notes') as string) || null,
-      isSent: formData.get('isSent') === 'true',
-      buktiTransfer,
-    },
-  });
+  const entryData = {
+    hargaJual,
+    hargaModal,
+    resellerCut,
+    hpp,
+    profit,
+    dp: formData.get('dp') ? Number(formData.get('dp')) : null,
+    totalBayar: formData.get('totalBayar')
+      ? Number(formData.get('totalBayar'))
+      : null,
+    paymentStatus:
+      (formData.get('paymentStatus') as 'BELUM_BAYAR' | 'DP' | 'LUNAS') ||
+      entry.paymentStatus,
+    buyerName: (formData.get('buyerName') as string) || entry.buyerName,
+    buyerPhone: (formData.get('buyerPhone') as string) || null,
+    buyerWa: (formData.get('buyerWa') as string) || null,
+    buyerAddress: (formData.get('buyerAddress') as string) || null,
+    buyerMaps: (formData.get('buyerMaps') as string) || null,
+    notes: (formData.get('notes') as string) || null,
+    isSent: formData.get('isSent') === 'true',
+    buktiTransfer,
+    ...(swapLivestockId ? { livestockId: swapLivestockId } : {}),
+  };
+
+  const updated = await (swapLivestockId
+    ? prisma.$transaction(async (tx) => {
+        const u = await tx.entry.update({
+          where: { id },
+          data: entryData,
+        });
+        // If the entry is APPROVED, transfer the "sold" flag to the new livestock.
+        if (entry.status === 'APPROVED') {
+          await tx.livestock.update({
+            where: { id: entry.livestockId },
+            data: { isSold: false },
+          });
+          await tx.livestock.update({
+            where: { id: swapLivestockId },
+            data: { isSold: true },
+          });
+        }
+        return u;
+      })
+    : prisma.entry.update({ where: { id }, data: entryData }));
 
   await logAudit({
     actor: profile,
@@ -309,6 +364,7 @@ export async function updateEntry(id: string, formData: FormData) {
 
   revalidatePath('/admin');
   revalidatePath('/sales');
+  revalidatePath('/catalogue');
   return { success: true };
 }
 

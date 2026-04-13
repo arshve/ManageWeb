@@ -11,14 +11,31 @@ import { EntryTable } from '@/components/dashboard/entry-table';
 export default async function SalesPage() {
   const profile = await requireAuth();
 
-  const entries = await prisma.entry.findMany({
-    where: { salesId: profile.id },
-    orderBy: { createdAt: 'desc' },
-    include: {
-      livestock: true,
-      sales: { select: { name: true } }, // Included sales name for EntryTable
-    },
-  });
+  const [entries, availableLivestock] = await Promise.all([
+    prisma.entry.findMany({
+      where: { salesId: profile.id },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        livestock: true,
+        sales: { select: { name: true } },
+      },
+    }),
+    prisma.livestock.findMany({
+      where: {
+        isSold: false,
+        entry: null,
+        condition: { not: 'MATI' },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        sku: true,
+        type: true,
+        grade: true,
+        tag: true,
+      },
+    }),
+  ]);
 
   const approved = entries.filter((e) => e.status === 'APPROVED');
   const pending = entries.filter((e) => e.status === 'PENDING');
@@ -51,10 +68,13 @@ export default async function SalesPage() {
     isSent: entry.isSent,
     createdAt: entry.createdAt.toISOString(),
     livestock: {
+      id: entry.livestock.id,
       sku: entry.livestock.sku,
       type: entry.livestock.type,
       grade: entry.livestock.grade,
       tag: entry.livestock.tag,
+      photoUrl: entry.livestock.photoUrl,
+      condition: entry.livestock.condition,
     },
     sales: {
       name: entry.sales.name,
@@ -128,7 +148,11 @@ export default async function SalesPage() {
           <CardTitle>Entry Saya</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          <EntryTable entries={serialized} isAdmin={false} />
+          <EntryTable
+            entries={serialized}
+            isAdmin={false}
+            availableLivestock={availableLivestock}
+          />
         </CardContent>
       </Card>
     </DashboardShell>

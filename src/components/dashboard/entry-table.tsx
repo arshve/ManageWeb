@@ -58,6 +58,7 @@ import {
 import { toast } from 'sonner';
 import { formatRupiah, formatDateTime } from '@/lib/format';
 import { BuktiTransferUpload } from '@/components/dashboard/bukti-transfer-upload';
+import { PdfMenu } from '@/components/dashboard/pdf-menu';
 import Image from 'next/image';
 
 export interface EntryData {
@@ -890,6 +891,10 @@ function EntryRow({
                 >
                   <Pencil className="h-3.5 w-3.5" />
                 </Button>
+                {entry.status === 'APPROVED' &&
+                  entry.buktiTransfer.length > 0 && (
+                    <PdfMenu entryId={entry.id} />
+                  )}
                 <Button
                   variant="ghost"
                   size="icon"
@@ -1145,6 +1150,10 @@ function MobileEntryCard({
                 >
                   <Pencil className="h-3.5 w-3.5" />
                 </Button>
+                {entry.status === 'APPROVED' &&
+                  entry.buktiTransfer.length > 0 && (
+                    <PdfMenu entryId={entry.id} />
+                  )}
                 <Button
                   variant="ghost"
                   size="icon"

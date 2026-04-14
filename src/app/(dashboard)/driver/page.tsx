@@ -63,11 +63,7 @@ export default async function DriverPage({
   today.setUTCHours(0, 0, 0, 0);
   const isToday = dateStr === today.toISOString().slice(0, 10);
 
-  const defaultDepot = getDefaultDepot();
-  const depotForMap =
-    defaultDepot.lat === 0 && defaultDepot.lng === 0
-      ? { lat: -6.2745691, lng: 106.7770679 }
-      : defaultDepot;
+  const depotForMap = getDefaultDepot();
 
   const mapStops: MapStop[] = deliveries
     .filter((d) => d.entry.buyerLat != null && d.entry.buyerLng != null)

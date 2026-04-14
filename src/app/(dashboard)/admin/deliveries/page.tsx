@@ -2,11 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { DashboardShell } from '@/components/dashboard/dashboard-shell';
 import { DeliveriesAdminView } from '@/components/admin/deliveries-admin-view';
 import { DriverTracker } from '@/components/admin/driver-tracker';
-import {
-  DeliveryMap,
-  type MapStop,
-  type MapDriver,
-} from '@/components/admin/delivery-map-loader';
+import type { MapStop, MapDriver } from '@/components/admin/delivery-map-loader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getDefaultDepot } from '@/lib/delivery/depot';
 
@@ -140,10 +136,6 @@ export default async function AdminDeliveriesPage({
     }));
 
   const defaultDepot = getDefaultDepot();
-  const depotForMap =
-    defaultDepot.lat === 0 && defaultDepot.lng === 0
-      ? { lat: -6.2745691, lng: 106.7770679 }
-      : defaultDepot;
   const defaultStart = `${defaultDepot.lat},${defaultDepot.lng}`;
 
   return (
@@ -151,39 +143,25 @@ export default async function AdminDeliveriesPage({
       title="Delivery"
       description={`Jadwal & rute pengiriman — ${dateStr}`}
     >
-      <div className="space-y-6">
-        <Card>
+      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+        <DeliveriesAdminView
+          dateStr={dateStr}
+          scheduled={scheduled}
+          unscheduled={unscheduled}
+          drivers={driversForView}
+          defaultStart={defaultStart}
+          initialDepot={defaultDepot}
+          mapStops={mapStops}
+          mapDrivers={driversForMap}
+        />
+        <Card className="h-fit">
           <CardHeader>
-            <CardTitle className="text-base">
-              Peta Rute & Driver (live)
-            </CardTitle>
+            <CardTitle className="text-base">Lokasi Driver</CardTitle>
           </CardHeader>
           <CardContent>
-            <DeliveryMap
-              depot={depotForMap}
-              stops={mapStops}
-              drivers={driversForMap}
-            />
+            <DriverTracker initial={driversForMap} />
           </CardContent>
         </Card>
-
-        <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-          <DeliveriesAdminView
-            dateStr={dateStr}
-            scheduled={scheduled}
-            unscheduled={unscheduled}
-            drivers={driversForView}
-            defaultStart={defaultStart}
-          />
-          <Card className="h-fit">
-            <CardHeader>
-              <CardTitle className="text-base">Lokasi Driver</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <DriverTracker initial={driversForMap} />
-            </CardContent>
-          </Card>
-        </div>
       </div>
     </DashboardShell>
   );

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   MapContainer,
   TileLayer,
@@ -153,6 +153,55 @@ export function DeliveryMap({
     return { driverGroups: groups, driverIndexMap: indexMap };
   }, [stops]);
 
+  const routeCacheRef = useRef<Record<string, [number, number][]>>({});
+  const [routeVersion, setRouteVersion] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    const handle = setTimeout(async () => {
+      const tasks: Array<{ cacheKey: string; coordsStr: string }> = [];
+      for (const [key, list] of driverGroups.entries()) {
+        if (key === '__unassigned__' || list.length === 0) continue;
+        const coordsStr = [
+          `${depot.lng},${depot.lat}`,
+          ...list.map((s) => `${s.lng},${s.lat}`),
+        ].join(';');
+        const cacheKey = `${key}|${coordsStr}`;
+        if (routeCacheRef.current[cacheKey]) continue;
+        tasks.push({ cacheKey, coordsStr });
+      }
+      if (tasks.length === 0) return;
+
+      let updated = false;
+      for (const { cacheKey, coordsStr } of tasks) {
+        if (cancelled) return;
+        try {
+          const url = `https://router.project-osrm.org/route/v1/driving/${coordsStr}?overview=full&geometries=geojson`;
+          const res = await fetch(url);
+          if (!res.ok) continue;
+          const data = await res.json();
+          if (data.code !== 'Ok' || !data.routes?.[0]) continue;
+          const coords = data.routes[0].geometry.coordinates as [
+            number,
+            number,
+          ][];
+          routeCacheRef.current[cacheKey] = coords.map(([lng, lat]) => [
+            lat,
+            lng,
+          ]);
+          updated = true;
+        } catch {
+          // fall back to straight line
+        }
+      }
+      if (!cancelled && updated) setRouteVersion((v) => v + 1);
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
+  }, [depot.lat, depot.lng, driverGroups]);
+
   const allPoints = useMemo<[number, number][]>(() => {
     const pts: [number, number][] = [[depot.lat, depot.lng]];
     for (const s of stops) pts.push([s.lat, s.lng]);
@@ -189,7 +238,15 @@ export function DeliveryMap({
         {Array.from(driverGroups.entries()).map(([key, list]) => {
           const idx = driverIndexMap.get(key) ?? 0;
           const color = colorFor(key === '__unassigned__' ? null : key, idx);
-          const linePoints: [number, number][] = [
+          const coordsStr = [
+            `${depot.lng},${depot.lat}`,
+            ...list.map((s) => `${s.lng},${s.lat}`),
+          ].join(';');
+          const cacheKey = `${key}|${coordsStr}`;
+          void routeVersion;
+          const linePoints: [number, number][] = routeCacheRef.current[
+            cacheKey
+          ] ?? [
             [depot.lat, depot.lng],
             ...list.map((s) => [s.lat, s.lng] as [number, number]),
           ];

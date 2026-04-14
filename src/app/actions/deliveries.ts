@@ -288,6 +288,7 @@ export async function generateRoutes(
   return {
     success: true as const,
     buckets: routes.map((r) => r.map((p) => p.id)),
+    depot: { lat: depot.lat, lng: depot.lng },
   };
 }
 

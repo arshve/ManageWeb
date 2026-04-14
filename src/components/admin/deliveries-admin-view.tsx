@@ -25,6 +25,21 @@ import {
 } from '@/app/actions/deliveries';
 import { setDriverAvailability } from '@/app/actions/drivers';
 import { navigationUrl } from '@/lib/delivery/maps';
+import {
+  DeliveryMap,
+  type MapStop,
+  type MapDriver,
+} from '@/components/admin/delivery-map-loader';
+
+function parseLatLngClient(input: string): { lat: number; lng: number } | null {
+  const m = input.trim().match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/);
+  if (!m) return null;
+  const lat = Number(m[1]);
+  const lng = Number(m[2]);
+  if (!isFinite(lat) || !isFinite(lng)) return null;
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+  return { lat, lng };
+}
 
 type ScheduledEntry = {
   id: string;
@@ -67,12 +82,18 @@ export function DeliveriesAdminView({
   unscheduled,
   drivers,
   defaultStart,
+  initialDepot,
+  mapStops,
+  mapDrivers,
 }: {
   dateStr: string;
   scheduled: ScheduledEntry[];
   unscheduled: UnscheduledEntry[];
   drivers: Driver[];
   defaultStart: string;
+  initialDepot: { lat: number; lng: number };
+  mapStops: MapStop[];
+  mapDrivers: MapDriver[];
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -82,6 +103,16 @@ export function DeliveriesAdminView({
   const [buckets, setBuckets] = useState<string[][] | null>(null);
   const [bucketDrivers, setBucketDrivers] = useState<Record<number, string>>({});
   const [startInput, setStartInput] = useState(defaultStart);
+  const [mapDepot, setMapDepot] = useState<{ lat: number; lng: number }>(() => {
+    const parsed = parseLatLngClient(defaultStart);
+    return parsed ?? initialDepot;
+  });
+
+  function updateStartInput(next: string) {
+    setStartInput(next);
+    const parsed = parseLatLngClient(next);
+    if (parsed) setMapDepot(parsed);
+  }
 
   const availableDrivers = drivers.filter((d) => d.isAvailable);
   const driverCount = availableDrivers.length;
@@ -169,6 +200,7 @@ export function DeliveriesAdminView({
       }
       setBuckets(r.buckets);
       setBucketDrivers({});
+      if (r.depot) setMapDepot(r.depot);
       toast.success(`${r.buckets.length} rute dibuat`);
       refresh();
     });
@@ -240,6 +272,21 @@ export function DeliveriesAdminView({
 
   return (
     <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">
+            Peta Rute & Driver (live)
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <DeliveryMap
+            depot={mapDepot}
+            stops={mapStops}
+            drivers={mapDrivers}
+          />
+        </CardContent>
+      </Card>
+
       <Card>
         <CardContent className="p-4 flex flex-wrap items-center gap-2">
           <Button
@@ -402,7 +449,7 @@ export function DeliveriesAdminView({
             <Input
               placeholder="lat,lng atau Google Maps URL"
               value={startInput}
-              onChange={(e) => setStartInput(e.target.value)}
+              onChange={(e) => updateStartInput(e.target.value)}
               className="h-8 text-xs"
             />
           </div>
@@ -447,7 +494,14 @@ export function DeliveriesAdminView({
                     }
                   >
                     <SelectTrigger className="h-8 w-[200px] text-xs ml-auto">
-                      <SelectValue placeholder="Pilih driver" />
+                      <SelectValue placeholder="Pilih driver">
+                        {(value: string | null) =>
+                          value
+                            ? (availableDrivers.find((d) => d.id === value)
+                                ?.name ?? value)
+                            : 'Pilih driver'
+                        }
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       {availableDrivers.map((d) => (

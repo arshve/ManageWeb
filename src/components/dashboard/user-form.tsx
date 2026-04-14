@@ -161,6 +161,7 @@ export function UserForm({ user, trigger }: UserFormProps) {
                   <SelectItem value="ADMIN">Admin</SelectItem>
                   <SelectItem value="SALES">Sales</SelectItem>
                   <SelectItem value="MANAGE">Manage</SelectItem>
+                  <SelectItem value="DRIVER">Driver</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -29,13 +29,14 @@ import {
   X,
   ChevronLeft,
   History,
+  Truck,
 } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 
 interface SidebarProps {
-  role: 'ADMIN' | 'SALES' | 'MANAGE';
+  role: 'ADMIN' | 'SALES' | 'MANAGE' | 'DRIVER';
   userName: string;
 }
 
@@ -43,6 +44,7 @@ interface SidebarProps {
 const adminLinks = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/livestock', label: 'Hewan', icon: Beef },
+  { href: '/admin/deliveries', label: 'Delivery', icon: Truck },
   { href: '/admin/users', label: 'Kelola User', icon: Users },
   { href: '/admin/pricing', label: 'Harga', icon: DollarSign },
   { href: '/admin/logs', label: 'Log Aktivitas', icon: History },
@@ -55,6 +57,10 @@ const salesLinks = [
 
 const manageLinks = [{ href: '/manage', label: 'Katalog', icon: Beef }];
 
+const driverLinks = [
+  { href: '/driver', label: 'Rute Hari Ini', icon: Truck },
+];
+
 export function Sidebar({ role, userName }: SidebarProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false); // Mobile menu state
@@ -64,7 +70,9 @@ export function Sidebar({ role, userName }: SidebarProps) {
       ? adminLinks
       : role === 'MANAGE'
         ? manageLinks
-        : salesLinks;
+        : role === 'DRIVER'
+          ? driverLinks
+          : salesLinks;
 
   /**
    * Handles logout: calls the logout API to clear the session cookie,

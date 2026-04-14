@@ -33,7 +33,7 @@ export async function createUser(formData: FormData) {
   const password = formData.get("password") as string;
   const name = formData.get("name") as string;
   const phone = (formData.get("phone") as string) || null;
-  const role = (formData.get("role") as "ADMIN" | "SALES") || "SALES";
+  const role = (formData.get("role") as "ADMIN" | "SALES" | "MANAGE" | "DRIVER") || "SALES";
 
   // Check for duplicate username
   const existing = await prisma.profile.findUnique({ where: { username } });

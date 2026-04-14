@@ -7,7 +7,13 @@ type Actor = { id: string; name: string } | null;
 type LogInput = {
   actor: Actor;
   action: AuditAction;
-  entity: 'Entry' | 'Livestock' | 'Profile' | 'Pricing';
+  entity:
+    | 'Entry'
+    | 'Livestock'
+    | 'Profile'
+    | 'Pricing'
+    | 'Delivery'
+    | 'DriverAvailability';
   entityId: string;
   label?: string | null;
   before?: unknown;

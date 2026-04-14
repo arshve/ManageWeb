@@ -1,12 +1,16 @@
 import Link from 'next/link';
 import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { getProfile, dashboardUrlForRole } from '@/lib/auth';
 
-export default function PublicLayout({
+export default async function PublicLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const profile = await getProfile();
+  const dashboardHref = profile ? dashboardUrlForRole(profile.role) : '/login';
+  const masukLabel = profile ? 'Dashboard' : 'Masuk';
   return (
     <>
       {/* Header — clean, minimal, Squarespace-style */}
@@ -44,13 +48,13 @@ export default function PublicLayout({
             </Link>
           </nav>
           <Link
-            href="/login"
+            href={dashboardHref}
             className={cn(
               buttonVariants({ size: 'sm' }),
               'rounded-full px-5',
             )}
           >
-            Masuk
+            {masukLabel}
           </Link>
         </div>
       </header>
@@ -108,7 +112,7 @@ export default function PublicLayout({
                 Katalog
               </Link>
               <Link
-                href="/login"
+                href={dashboardHref}
                 className="hover:opacity-100 transition-opacity"
               >
                 Dashboard

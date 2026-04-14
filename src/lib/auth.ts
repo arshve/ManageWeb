@@ -49,3 +49,16 @@ export async function requireRole(...roles: Role[]) {
   if (!roles.includes(profile.role)) redirect('/unauthorized');
   return profile;
 }
+
+export function dashboardUrlForRole(role: Role | string): string {
+  switch (role) {
+    case 'ADMIN':
+      return '/admin';
+    case 'MANAGE':
+      return '/manage';
+    case 'DRIVER':
+      return '/driver';
+    default:
+      return '/sales';
+  }
+}

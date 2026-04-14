@@ -14,6 +14,15 @@ enum Role {
   ADMIN
   SALES
   MANAGE
+  DRIVER
+}
+
+enum DeliveryStatus {
+  PENDING
+  ASSIGNED
+  ON_DELIVERY
+  DELIVERED
+  FAILED
 }
 
 enum AnimalType {
@@ -49,34 +58,40 @@ enum PaymentStatus {
 }
 
 model Profile {
-  id        String   @id @default(cuid())
-  username  String   @unique
-  password  String
-  name      String
-  role      Role     @default(SALES)
-  phone     String?
-  isActive  Boolean  @default(true)
-  entries   Entry[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String               @id @default(cuid())
+  username       String               @unique
+  password       String
+  name           String
+  role           Role                 @default(SALES)
+  phone          String?
+  isActive       Boolean              @default(true)
+  entries        Entry[]
+  vehiclePlate   String?
+  lastLat        Float?
+  lastLng        Float?
+  lastLocationAt DateTime?
+  deliveries     Delivery[]
+  availability   DriverAvailability[]
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
 }
 
 model Livestock {
-  id         String          @id @default(cuid())
-  sku        String          @unique
-  type       AnimalType
-  grade      AnimalGrade?
-  condition  AnimalCondition @default(SEHAT)
-  weightMin  Float?
-  weightMax  Float?
-  hargaJual  Float?
-  tag        String?
-  photoUrl   String?
-  notes      String?
-  isSold     Boolean         @default(false)
-  entry      Entry?
-  createdAt  DateTime        @default(now())
-  updatedAt  DateTime        @updatedAt
+  id        String          @id @default(cuid())
+  sku       String          @unique
+  type      AnimalType
+  grade     AnimalGrade?
+  condition AnimalCondition @default(SEHAT)
+  weightMin Float?
+  weightMax Float?
+  hargaJual Float?
+  tag       String?
+  photoUrl  String?
+  notes     String?
+  isSold    Boolean         @default(false)
+  entry     Entry?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
 }
 
 model Entry {
@@ -100,13 +115,61 @@ model Entry {
   buyerWa       String?
   buyerAddress  String?
   buyerMaps     String?
+  buyerLat      Float?
+  buyerLng      Float?
   notes         String?
   buktiTransfer String[]      @default([])
   isSent        Boolean       @default(false)
   approvedAt    DateTime?
   approvedBy    String?
+  deliveryDate  DateTime?     @db.Date
+  delivery      Delivery?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
+
+  @@index([deliveryDate])
+}
+
+model Delivery {
+  id          String         @id @default(cuid())
+  entryId     String         @unique
+  entry       Entry          @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  driverId    String?
+  driver      Profile?       @relation(fields: [driverId], references: [id])
+  sequence    Int?
+  status      DeliveryStatus @default(PENDING)
+  deliveredAt DateTime?
+  notes       String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([driverId, sequence])
+  @@index([status])
+}
+
+model DriverAvailability {
+  id        String   @id @default(cuid())
+  driverId  String
+  driver    Profile  @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  date      DateTime @db.Date
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@unique([driverId, date])
+  @@index([date])
+}
+
+model GeocodeCache {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  lat       Float
+  lng       Float
+  source    String
+  hitCount  Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([key])
 }
 
 model Pricing {

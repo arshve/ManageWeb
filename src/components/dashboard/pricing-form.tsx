@@ -15,7 +15,7 @@
 
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { RupiahInput } from "@/components/ui/rupiah-input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -124,10 +124,9 @@ export function PricingForm({ pricing, trigger }: PricingFormProps) {
 
           <div className="space-y-2">
             <Label>Harga Beli (Modal)</Label>
-            <Input
-              type="number"
+            <RupiahInput
               value={hargaBeli}
-              onChange={(e) => setHargaBeli(e.target.value)}
+              onValueChange={setHargaBeli}
               placeholder="2500000"
               required
             />
@@ -135,10 +134,9 @@ export function PricingForm({ pricing, trigger }: PricingFormProps) {
 
           <div className="space-y-2">
             <Label>Harga Jual</Label>
-            <Input
-              type="number"
+            <RupiahInput
               value={hargaJual}
-              onChange={(e) => setHargaJual(e.target.value)}
+              onValueChange={setHargaJual}
               placeholder="3500000"
               required
             />

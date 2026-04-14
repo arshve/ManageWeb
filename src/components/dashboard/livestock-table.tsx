@@ -2,7 +2,7 @@
  * LivestockTable — Shared server component for livestock management.
  *
  * Fetches data, computes stats, renders stat cards + the filterable client table.
- * Used by both /admin/livestock and /manage pages.
+ * Used by /admin/livestock, /manage, and /sales/catalogue (read-only) pages.
  */
 
 import { prisma } from '@/lib/prisma';
@@ -13,7 +13,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus } from 'lucide-react';
 import { LivestockTableClient } from '@/components/dashboard/livestock-table-client';
 
-export async function LivestockTable() {
+export async function LivestockTable({
+  readOnly = false,
+}: {
+  readOnly?: boolean;
+} = {}) {
   const livestock = await prisma.livestock.findMany({
     orderBy: { createdAt: 'desc' },
     include: {
@@ -23,6 +27,12 @@ export async function LivestockTable() {
           status: true,
           buyerName: true,
           sales: { select: { name: true } },
+          delivery: {
+            select: {
+              status: true,
+              driver: { select: { name: true } },
+            },
+          },
         },
       },
     },
@@ -64,21 +74,25 @@ export async function LivestockTable() {
     isSold: item.isSold,
     buyerName: item.entry?.buyerName ?? null,
     salesName: item.entry?.sales?.name ?? null,
+    driverName: item.entry?.delivery?.driver?.name ?? null,
+    deliveryStatus: item.entry?.delivery?.status ?? null,
   }));
 
   return (
     <DashboardShell
-      title="Kelola Hewan"
+      title={readOnly ? 'Katalog Hewan' : 'Kelola Hewan'}
       description={`${livestock.length} hewan terdaftar, ${totalSold} terjual`}
       actions={
-        <LivestockForm
-          trigger={
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Tambah Hewan
-            </Button>
-          }
-        />
+        readOnly ? undefined : (
+          <LivestockForm
+            trigger={
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Tambah Hewan
+              </Button>
+            }
+          />
+        )
       }
     >
       {/* Stat cards */}
@@ -104,7 +118,7 @@ export async function LivestockTable() {
       </div>
 
       {/* Filterable table */}
-      <LivestockTableClient livestock={serialized} />
+      <LivestockTableClient livestock={serialized} readOnly={readOnly} />
     </DashboardShell>
   );
 }

@@ -33,6 +33,12 @@ export default async function AdminDashboardPage() {
       include: {
         livestock: true,
         sales: { select: { name: true } },
+        delivery: {
+          select: {
+            status: true,
+            driver: { select: { name: true } },
+          },
+        },
       },
     }),
     prisma.livestock.findMany({
@@ -83,6 +89,12 @@ export default async function AdminDashboardPage() {
     notes: entry.notes,
     isSent: entry.isSent,
     createdAt: entry.createdAt.toISOString(),
+    delivery: entry.delivery
+      ? {
+          status: entry.delivery.status,
+          driverName: entry.delivery.driver?.name ?? null,
+        }
+      : null,
     livestock: {
       id: entry.livestock.id,
       sku: entry.livestock.sku,

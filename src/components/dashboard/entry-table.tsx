@@ -22,6 +22,7 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { RupiahInput } from '@/components/ui/rupiah-input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
@@ -43,6 +44,7 @@ import {
   CheckCircle2,
   Clock,
   Truck,
+  Route,
   Search,
   ArrowUpDown,
   ArrowUp,
@@ -83,6 +85,10 @@ export interface EntryData {
   buktiTransfer: string[];
   isSent: boolean;
   createdAt: string;
+  delivery: {
+    status: string;
+    driverName: string | null;
+  } | null;
   livestock: {
     id: string;
     sku: string;
@@ -346,7 +352,7 @@ export function EntryTable({
                 </>
               )}
               <th className="text-center p-3 font-medium">Bayar</th>
-              <th className="text-center p-3 font-medium w-12">Kirim</th>
+              <th className="text-center p-3 font-medium w-24">Kirim</th>
               <th className="text-center p-3 font-medium w-12">Status</th>
               <th
                 className="text-center p-3 font-medium cursor-pointer select-none hover:bg-muted/80"
@@ -700,10 +706,9 @@ function EntryEditFields({
       {/* Pricing */}
       <div className="space-y-1">
         <Label className="text-xs">Harga Jual</Label>
-        <Input
-          type="number"
+        <RupiahInput
           value={form.hargaJual}
-          onChange={(e) => update('hargaJual', e.target.value)}
+          onValueChange={(v) => update('hargaJual', v)}
           className="h-8 text-sm"
         />
       </div>
@@ -711,19 +716,17 @@ function EntryEditFields({
         <>
           <div className="space-y-1">
             <Label className="text-xs">Harga Modal</Label>
-            <Input
-              type="number"
+            <RupiahInput
               value={form.hargaModal}
-              onChange={(e) => update('hargaModal', e.target.value)}
+              onValueChange={(v) => update('hargaModal', v)}
               className="h-8 text-sm"
             />
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Reseller Cut</Label>
-            <Input
-              type="number"
+            <RupiahInput
               value={form.resellerCut}
-              onChange={(e) => update('resellerCut', e.target.value)}
+              onValueChange={(v) => update('resellerCut', v)}
               className="h-8 text-sm"
             />
           </div>
@@ -733,19 +736,17 @@ function EntryEditFields({
       {/* Payment */}
       <div className="space-y-1">
         <Label className="text-xs">DP</Label>
-        <Input
-          type="number"
+        <RupiahInput
           value={form.dp}
-          onChange={(e) => update('dp', e.target.value)}
+          onValueChange={(v) => update('dp', v)}
           className="h-8 text-sm"
         />
       </div>
       <div className="space-y-1">
         <Label className="text-xs">Total Dibayar</Label>
-        <Input
-          type="number"
+        <RupiahInput
           value={form.totalBayar}
-          onChange={(e) => update('totalBayar', e.target.value)}
+          onValueChange={(v) => update('totalBayar', v)}
           className="h-8 text-sm"
         />
       </div>
@@ -909,7 +910,7 @@ function EntryRow({
           />
         </td>
         <td className="p-3 text-center">
-          <KirimIcon isSent={entry.isSent} />
+          <KirimCell isSent={entry.isSent} delivery={entry.delivery} />
         </td>
         <td className="p-3 text-center">
           <StatusIcon status={entry.status} />
@@ -1086,6 +1087,7 @@ function MobileEntryCard({
         <div className="flex items-center gap-1.5 shrink-0">
           <StatusIcon status={entry.status} />
           <KirimIcon isSent={entry.isSent} />
+          <DeliveryIcon delivery={entry.delivery} />
         </div>
         <ChevronDown
           className={`h-4 w-4 text-muted-foreground shrink-0 transition-transform ${
@@ -1329,6 +1331,49 @@ function KirimIcon({ isSent }: { isSent: boolean }) {
         }`}
       />
     </IconTooltip>
+  );
+}
+
+function DeliveryIcon({
+  delivery,
+}: {
+  delivery: { status: string; driverName: string | null } | null;
+}) {
+  const assigned = !!(delivery && delivery.driverName);
+  const label = assigned
+    ? `Rute: ${delivery!.driverName} (${delivery!.status})`
+    : delivery
+      ? 'Belum di-assign driver'
+      : 'Belum masuk rute';
+  const iconClass = `h-4 w-4 ${
+    assigned ? 'text-yellow-500' : 'text-muted-foreground/40'
+  }`;
+  return (
+    <IconTooltip label={label}>
+      <Route className={iconClass} />
+    </IconTooltip>
+  );
+}
+
+function KirimCell({
+  isSent,
+  delivery,
+}: {
+  isSent: boolean;
+  delivery: { status: string; driverName: string | null } | null;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-0.5">
+      <div className="flex items-center gap-1.5">
+        <KirimIcon isSent={isSent} />
+        <DeliveryIcon delivery={delivery} />
+      </div>
+      {delivery?.driverName && (
+        <span className="text-[10px] leading-tight text-muted-foreground max-w-[90px] truncate">
+          {delivery.driverName}
+        </span>
+      )}
+    </div>
   );
 }
 

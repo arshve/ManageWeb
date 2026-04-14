@@ -37,6 +37,8 @@ export interface LivestockItem {
   isSold: boolean;
   buyerName: string | null;
   salesName: string | null;
+  driverName: string | null;
+  deliveryStatus: string | null;
 }
 
 function ConditionIcon({ condition }: { condition: string }) {
@@ -78,8 +80,10 @@ function StatusIcon({ isSold }: { isSold: boolean }) {
 
 export function LivestockTableClient({
   livestock,
+  readOnly = false,
 }: {
   livestock: LivestockItem[];
+  readOnly?: boolean;
 }) {
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -181,7 +185,10 @@ export function LivestockTableClient({
                   <th className="p-3 font-medium text-center w-12">Status</th>
                   <th className="p-3 font-medium text-left">Pembeli</th>
                   <th className="p-3 font-medium text-left">Sales</th>
-                  <th className="p-3 font-medium text-center">Aksi</th>
+                  <th className="p-3 font-medium text-left">Pengiriman</th>
+                  {!readOnly && (
+                    <th className="p-3 font-medium text-center">Aksi</th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -247,18 +254,39 @@ export function LivestockTableClient({
                     <td className="p-3 text-xs whitespace-nowrap">
                       {item.salesName || <span className={mutedClass}>—</span>}
                     </td>
-                    <td className="p-3">
-                      <div className="flex items-center justify-center">
-                        <LivestockActions livestock={item} />
-                      </div>
+                    <td className="p-3 text-xs whitespace-nowrap">
+                      {item.deliveryStatus ? (
+                        <div className="flex items-center gap-1.5">
+                          <span>{item.driverName ?? '—'}</span>
+                          <Badge
+                            variant="outline"
+                            className={
+                              isMati
+                                ? 'border-white/40 text-white text-[10px]'
+                                : 'text-[10px]'
+                            }
+                          >
+                            {item.deliveryStatus}
+                          </Badge>
+                        </div>
+                      ) : (
+                        <span className={mutedClass}>—</span>
+                      )}
                     </td>
+                    {!readOnly && (
+                      <td className="p-3">
+                        <div className="flex items-center justify-center">
+                          <LivestockActions livestock={item} />
+                        </div>
+                      </td>
+                    )}
                   </tr>
                   );
                 })}
                 {filtered.length === 0 && (
                   <tr>
                     <td
-                      colSpan={12}
+                      colSpan={readOnly ? 12 : 13}
                       className="p-8 text-center text-muted-foreground"
                     >
                       {livestock.length === 0
@@ -274,7 +302,11 @@ export function LivestockTableClient({
           {/* Mobile card list */}
           <div className="md:hidden p-3 space-y-3">
             {filtered.map((item) => (
-              <MobileLivestockCard key={item.id} item={item} />
+              <MobileLivestockCard
+                key={item.id}
+                item={item}
+                readOnly={readOnly}
+              />
             ))}
             {filtered.length === 0 && (
               <div className="p-8 text-center text-muted-foreground text-sm">
@@ -290,7 +322,13 @@ export function LivestockTableClient({
   );
 }
 
-function MobileLivestockCard({ item }: { item: LivestockItem }) {
+function MobileLivestockCard({
+  item,
+  readOnly,
+}: {
+  item: LivestockItem;
+  readOnly: boolean;
+}) {
   const [expanded, setExpanded] = useState(false);
 
   const typeLabel = item.type.charAt(0) + item.type.slice(1).toLowerCase();
@@ -391,6 +429,21 @@ function MobileLivestockCard({ item }: { item: LivestockItem }) {
                 )
               }
             />
+            <LivestockCardRow
+              label="Pengiriman"
+              value={
+                item.deliveryStatus ? (
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span>{item.driverName ?? '—'}</span>
+                    <Badge variant="outline" className="text-[10px]">
+                      {item.deliveryStatus}
+                    </Badge>
+                  </div>
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                )
+              }
+            />
             {item.notes && (
               <LivestockCardRow
                 label="Catatan"
@@ -404,9 +457,11 @@ function MobileLivestockCard({ item }: { item: LivestockItem }) {
           </dl>
 
           {/* Action bar */}
-          <div className="flex items-center justify-end gap-1 p-2 border-t bg-muted/20">
-            <LivestockActions livestock={item} />
-          </div>
+          {!readOnly && (
+            <div className="flex items-center justify-end gap-1 p-2 border-t bg-muted/20">
+              <LivestockActions livestock={item} />
+            </div>
+          )}
         </div>
       )}
     </div>

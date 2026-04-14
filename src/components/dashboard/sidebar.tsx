@@ -53,6 +53,8 @@ const adminLinks = [
 const salesLinks = [
   { href: '/sales', label: 'Entry Saya', icon: ClipboardList },
   { href: '/sales/new', label: 'Tambah Entry', icon: Beef },
+  { href: '/sales/catalogue', label: 'Katalog', icon: Beef },
+  { href: '/sales/deliveries', label: 'Delivery', icon: Truck },
 ];
 
 const manageLinks = [{ href: '/manage', label: 'Katalog', icon: Beef }];

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { RupiahInput } from '@/components/ui/rupiah-input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -189,10 +190,9 @@ export default function NewEntryPage() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="hargaJual">Harga Jual *</Label>
-              <Input
+              <RupiahInput
                 id="hargaJual"
                 name="hargaJual"
-                type="number"
                 required
                 placeholder="3500000"
               />
@@ -200,14 +200,13 @@ export default function NewEntryPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="dp">DP (Uang Muka)</Label>
-                <Input id="dp" name="dp" type="number" placeholder="1000000" />
+                <RupiahInput id="dp" name="dp" placeholder="1000000" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="totalBayar">Total Dibayar</Label>
-                <Input
+                <RupiahInput
                   id="totalBayar"
                   name="totalBayar"
-                  type="number"
                   placeholder="3500000"
                 />
               </div>

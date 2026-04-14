@@ -393,14 +393,20 @@ export async function markDelivered(deliveryId: string, notes?: string) {
   if ('error' in result) return result;
   const { profile, delivery } = result;
 
-  const updated = await prisma.delivery.update({
-    where: { id: deliveryId },
-    data: {
-      status: 'DELIVERED',
-      deliveredAt: new Date(),
-      notes: notes ?? delivery.notes,
-    },
-  });
+  const [updated] = await prisma.$transaction([
+    prisma.delivery.update({
+      where: { id: deliveryId },
+      data: {
+        status: 'DELIVERED',
+        deliveredAt: new Date(),
+        notes: notes ?? delivery.notes,
+      },
+    }),
+    prisma.entry.update({
+      where: { id: delivery.entryId },
+      data: { isSent: true },
+    }),
+  ]);
 
   await logAudit({
     actor: profile,
@@ -414,6 +420,8 @@ export async function markDelivered(deliveryId: string, notes?: string) {
 
   revalidatePath('/driver');
   revalidatePath('/admin/deliveries');
+  revalidatePath('/admin/entries');
+  revalidatePath('/sales');
   return { success: true };
 }
 

@@ -14,6 +14,7 @@
 import React, { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { RupiahInput } from '@/components/ui/rupiah-input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -299,11 +300,10 @@ export function LivestockForm({ livestock, trigger }: LivestockFormProps) {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="hargaJual">Harga Jual</Label>
-                <Input
+                <RupiahInput
                   id="hargaJual"
-                  type="number"
                   value={hargaJual}
-                  onChange={(e) => setHargaJual(e.target.value)}
+                  onValueChange={setHargaJual}
                   placeholder="3500000"
                 />
               </div>

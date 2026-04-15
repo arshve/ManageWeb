@@ -1,6 +1,4 @@
-# Millenials Farm - Qurban Livestock Management
-
-Web app for **PT. Millenials Farm Abadi** (Tangerang Selatan). Manages qurban livestock, sales entries, payment tracking, delivery routing, and a public catalogue.
+# Qurban Livestock Management
 
 ## Default Accounts
 
@@ -9,15 +7,17 @@ Web app for **PT. Millenials Farm Abadi** (Tangerang Selatan). Manages qurban li
 | `admin`  | `admin`  | ADMIN  | Full dashboard, users, livestock, pricing, deliveries     |
 | `manage` | `manage` | MANAGE | Livestock CRUD only (warehouse staff)                     |
 | `sales`  | `sales`  | SALES  | Create/view own entries, read-only catalogue + deliveries |
-| `driver` | `driver` | DRIVER | Own delivery route for the day, mark delivered/failed    |
+| `driver` | `driver` | DRIVER | Own delivery route for the day, mark delivered/failed     |
 
 ## Features
 
 ### Public Pages
+
 - **Landing** (`/`) — Hero, features, animal types
 - **Catalogue** (`/catalogue`) — Public livestock listing with photos, labels, prices
 
 ### Admin (`/admin`)
+
 - **Dashboard** — Stats: livestock, entries, revenue, profit
 - **Hewan** (`/admin/livestock`) — Livestock CRUD (type, grade, condition, weight, tags, photos)
 - **Entry Penjualan** (`/admin/entries`) — All sale entries, inline edit, approve/reject
@@ -27,27 +27,32 @@ Web app for **PT. Millenials Farm Abadi** (Tangerang Selatan). Manages qurban li
 - **Logs** (`/admin/logs`) — Audit log of admin actions
 
 ### Manage (`/manage`)
+
 - Read/write livestock only. No pricing, no entries, no users.
 
 ### Sales (`/sales`)
+
 - **Entry Saya** — Own entries + earnings summary (komisi, total jual, pending)
 - **Tambah Entry** (`/sales/new`) — New sale: pick animal, buyer info, payment
 - **Katalog** (`/sales/catalogue`) — Read-only livestock browser with driver/delivery status
 - **Delivery** (`/sales/deliveries`) — Read-only route list + map per day
 
 ### Driver (`/driver`)
+
 - Daily route view. Clickable animal photo, tag, pembeli, alamat, sales name
 - "Mulai Rute" → flips stops to ON_DELIVERY
 - Per-stop: mark **Terkirim** (auto-sets `isSent`) or **Gagal** with reason
 - Live location ping (Supabase realtime) while on route
 
 ### Entry Approval Flow
+
 1. Sales creates entry → **PENDING**
 2. Admin approves → **APPROVED**, livestock marked sold
 3. Admin rejects → **REJECTED**, livestock released
 4. Admin can edit anything (buyer, pricing, payment, delivery)
 
 ### Delivery / Routing
+
 - Admin assigns `deliveryDate` on approved entries → creates `Delivery` rows (PENDING)
 - Driver availability per day (`DriverAvailability`)
 - **Generate routes**: split stops across N drivers, solve TSP from depot per bucket (`src/lib/delivery/{split,tsp,depot}.ts`)
@@ -57,6 +62,7 @@ Web app for **PT. Millenials Farm Abadi** (Tangerang Selatan). Manages qurban li
 - Bulk tools: Reset Routes, Clear Schedule, Backfill Coordinates
 
 ### Other Features
+
 - JWT session auth (httpOnly cookies, 7-day expiry, HS256)
 - Password hashing with bcryptjs
 - PDF invoice + kwitansi via `@react-pdf/renderer`
@@ -69,36 +75,40 @@ Web app for **PT. Millenials Farm Abadi** (Tangerang Selatan). Manages qurban li
 ## Tech Stack
 
 ### Frontend
-| Tech           | Version | Purpose                                |
-| -------------- | ------- | -------------------------------------- |
-| React          | 19.2    | UI                                     |
-| Next.js        | 16.2    | App Router, Server Actions, `proxy.ts` |
-| Tailwind CSS   | 4       | Styling (oklch)                        |
-| Base UI React  | 1.3     | Headless primitives (shadcn-style)     |
-| Leaflet        | 1.9     | Delivery map                           |
-| react-leaflet  | 5.0     | React bindings for Leaflet             |
-| Lucide React   | 1.7     | Icons                                  |
-| Recharts       | 3.8     | Dashboard charts                       |
-| Sonner         | 2.0     | Toast                                  |
-| next-themes    | 0.4     | Dark mode                              |
+
+| Tech          | Version | Purpose                                |
+| ------------- | ------- | -------------------------------------- |
+| React         | 19.2    | UI                                     |
+| Next.js       | 16.2    | App Router, Server Actions, `proxy.ts` |
+| Tailwind CSS  | 4       | Styling (oklch)                        |
+| Base UI React | 1.3     | Headless primitives (shadcn-style)     |
+| Leaflet       | 1.9     | Delivery map                           |
+| react-leaflet | 5.0     | React bindings for Leaflet             |
+| Lucide React  | 1.7     | Icons                                  |
+| Recharts      | 3.8     | Dashboard charts                       |
+| Sonner        | 2.0     | Toast                                  |
+| next-themes   | 0.4     | Dark mode                              |
 
 ### Backend
-| Tech                 | Version | Purpose                             |
-| -------------------- | ------- | ----------------------------------- |
-| PostgreSQL           | 17      | Database                            |
-| Prisma               | 6.19    | ORM + migrations                    |
-| jose                 | 6.2     | JWT signing (HS256)                 |
-| bcryptjs             | 3.0     | Password hash                       |
-| @react-pdf/renderer  | 4.4     | Invoice/kwitansi PDFs               |
-| @supabase/supabase-js| 2.10    | Realtime channel for driver location|
-| date-fns             | 4.1     | Date formatting                     |
+
+| Tech                  | Version | Purpose                              |
+| --------------------- | ------- | ------------------------------------ |
+| PostgreSQL            | 17      | Database                             |
+| Prisma                | 6.19    | ORM + migrations                     |
+| jose                  | 6.2     | JWT signing (HS256)                  |
+| bcryptjs              | 3.0     | Password hash                        |
+| @react-pdf/renderer   | 4.4     | Invoice/kwitansi PDFs                |
+| @supabase/supabase-js | 2.10    | Realtime channel for driver location |
+| date-fns              | 4.1     | Date formatting                      |
 
 ### Tooling
+
 TypeScript 5 · ESLint 9 · Turbopack (dev) · `tsx` (seed script)
 
 ## Getting Started
 
 ### Prerequisites
+
 - Node.js 18+
 - PostgreSQL 15+ (`brew install postgresql@17`)
 - Supabase project (free tier) — only used for realtime driver location. Can skip if you don't need live tracking.

@@ -51,8 +51,15 @@ export default async function DriverPage({
           buyerMaps: true,
           buyerLat: true,
           buyerLng: true,
+          sales: { select: { name: true } },
           livestock: {
-            select: { sku: true, tag: true, type: true, grade: true },
+            select: {
+              sku: true,
+              tag: true,
+              type: true,
+              grade: true,
+              photoUrl: true,
+            },
           },
         },
       },
@@ -119,13 +126,13 @@ export default async function DriverPage({
           deliveredAt: d.deliveredAt?.toISOString() ?? null,
           notes: d.notes,
           entry: {
-            invoiceNo: d.entry.invoiceNo,
             buyerName: d.entry.buyerName,
             buyerPhone: d.entry.buyerPhone,
             buyerAddress: d.entry.buyerAddress,
             buyerMaps: d.entry.buyerMaps,
             buyerLat: d.entry.buyerLat,
             buyerLng: d.entry.buyerLng,
+            salesName: d.entry.sales.name,
             livestock: d.entry.livestock,
           },
         }))}

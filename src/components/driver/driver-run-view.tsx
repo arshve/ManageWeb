@@ -14,6 +14,7 @@ import {
   markFailed,
 } from '@/app/actions/deliveries';
 import { navigationUrl } from '@/lib/delivery/maps';
+import { LivestockPhoto } from '@/components/dashboard/livestock-photo';
 
 type Stop = {
   id: string;
@@ -22,18 +23,19 @@ type Stop = {
   deliveredAt: string | null;
   notes: string | null;
   entry: {
-    invoiceNo: string;
     buyerName: string;
     buyerPhone: string | null;
     buyerAddress: string | null;
     buyerMaps: string | null;
     buyerLat: number | null;
     buyerLng: number | null;
+    salesName: string;
     livestock: {
       sku: string;
       tag: string | null;
       type: string;
       grade: string | null;
+      photoUrl: string | null;
     };
   };
 };
@@ -175,42 +177,65 @@ function StopCard({
     setBusy(false);
   }
 
+  const tagLabel = stop.entry.livestock.tag ?? stop.entry.livestock.sku;
+  const typeLabel =
+    stop.entry.livestock.type +
+    (stop.entry.livestock.grade ? ' ' + stop.entry.livestock.grade : '');
+
   return (
     <Card className={isCurrent ? 'border-primary' : ''}>
-      <CardContent className="p-4 space-y-2">
-        <div className="flex items-center justify-between">
-          <div className="font-medium">
-            #{stop.sequence + 1} · {stop.entry.buyerName}
+      <CardContent className="p-4 space-y-3">
+        <div className="flex items-start gap-3">
+          <div className="flex flex-col items-center gap-1 shrink-0">
+            <span className="text-xs font-mono text-muted-foreground">
+              #{stop.sequence + 1}
+            </span>
+            <LivestockPhoto
+              photoUrl={stop.entry.livestock.photoUrl}
+              alt={`${typeLabel} - ${tagLabel}`}
+              thumbnailClassName="w-16 h-16 sm:w-20 sm:h-20"
+            />
+            <span className="text-[10px] font-mono text-muted-foreground truncate max-w-[5rem]">
+              {tagLabel}
+            </span>
           </div>
-          <StatusBadge status={stop.status} />
-        </div>
-        <div className="text-xs text-muted-foreground">
-          {stop.entry.invoiceNo} · {stop.entry.livestock.type}
-          {stop.entry.livestock.grade ? ' ' + stop.entry.livestock.grade : ''} (
-          {stop.entry.livestock.tag ?? stop.entry.livestock.sku})
-        </div>
-        {stop.entry.buyerAddress && (
-          <div className="text-sm">{stop.entry.buyerAddress}</div>
-        )}
-        <div className="flex flex-wrap gap-2 text-sm">
-          {mapsHref && (
-            <a
-              href={mapsHref}
-              target="_blank"
-              rel="noreferrer"
-              className="text-primary underline"
-            >
-              Buka Maps
-            </a>
-          )}
-          {stop.entry.buyerPhone && (
-            <a
-              href={`tel:${stop.entry.buyerPhone}`}
-              className="text-primary underline"
-            >
-              {stop.entry.buyerPhone}
-            </a>
-          )}
+          <div className="flex-1 min-w-0 space-y-1">
+            <div className="flex items-start justify-between gap-2">
+              <div className="font-medium text-base truncate">
+                {stop.entry.buyerName}
+              </div>
+              <StatusBadge status={stop.status} />
+            </div>
+            <div className="text-xs text-muted-foreground">{typeLabel}</div>
+            <div className="text-xs text-muted-foreground">
+              Sales: {stop.entry.salesName}
+            </div>
+            {stop.entry.buyerAddress && (
+              <div className="text-sm text-foreground/90 whitespace-pre-wrap break-words">
+                {stop.entry.buyerAddress}
+              </div>
+            )}
+            <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm pt-1">
+              {mapsHref && (
+                <a
+                  href={mapsHref}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-primary underline"
+                >
+                  Buka Maps
+                </a>
+              )}
+              {stop.entry.buyerPhone && (
+                <a
+                  href={`tel:${stop.entry.buyerPhone}`}
+                  className="text-primary underline"
+                >
+                  {stop.entry.buyerPhone}
+                </a>
+              )}
+            </div>
+          </div>
         </div>
 
         {!done && isCurrent && !readOnly && (

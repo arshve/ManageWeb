@@ -1,88 +1,109 @@
 # Millenials Farm - Qurban Livestock Management
 
-A web application for **PT. Millenials Farm Abadi** (Tangerang Selatan) to manage qurban livestock data entry, sales tracking, and catalogue display.
+Web app for **PT. Millenials Farm Abadi** (Tangerang Selatan). Manages qurban livestock, sales entries, payment tracking, delivery routing, and a public catalogue.
 
 ## Default Accounts
 
-| Username | Password | Role  | Access                                    |
-| -------- | -------- | ----- | ----------------------------------------- |
-| `admin`  | `admin`  | ADMIN | Full dashboard, manage users/livestock/pricing |
-| `sales`  | `sales`  | SALES | Create entries, view own entries           |
+| Username | Password | Role   | Access                                                    |
+| -------- | -------- | ------ | --------------------------------------------------------- |
+| `admin`  | `admin`  | ADMIN  | Full dashboard, users, livestock, pricing, deliveries     |
+| `manage` | `manage` | MANAGE | Livestock CRUD only (warehouse staff)                     |
+| `sales`  | `sales`  | SALES  | Create/view own entries, read-only catalogue + deliveries |
+| `driver` | `driver` | DRIVER | Own delivery route for the day, mark delivered/failed    |
 
 ## Features
 
 ### Public Pages
-- **Landing Page** (`/`) — Informational page about Millenials Farm with hero, features, and animal types
-- **Catalogue** (`/catalogue`) — Public-facing catalogue of available livestock with photos, labels, and prices
+- **Landing** (`/`) — Hero, features, animal types
+- **Catalogue** (`/catalogue`) — Public livestock listing with photos, labels, prices
 
-### Admin Dashboard (`/admin`)
-- **Dashboard** — Stats overview: total livestock, entries, revenue, profit
-- **Hewan** (`/admin/livestock`) — CRUD for livestock animals (type, grade, condition, weight, tags, photos)
-- **Entry Penjualan** (`/admin/entries`) — View all sale entries with inline editing, approve/reject pending entries
-- **Kelola User** (`/admin/users`) — Create/edit/deactivate user accounts, assign roles
-- **Harga** (`/admin/pricing`) — Set buy/sell prices per animal type and grade
+### Admin (`/admin`)
+- **Dashboard** — Stats: livestock, entries, revenue, profit
+- **Hewan** (`/admin/livestock`) — Livestock CRUD (type, grade, condition, weight, tags, photos)
+- **Entry Penjualan** (`/admin/entries`) — All sale entries, inline edit, approve/reject
+- **Deliveries** (`/admin/deliveries`) — Schedule dates, generate routes (TSP per driver), assign drivers, live map
+- **Harga** (`/admin/pricing`) — Buy/sell prices per type and grade
+- **Kelola User** (`/admin/users`) — User accounts, roles, driver vehicle info
+- **Logs** (`/admin/logs`) — Audit log of admin actions
 
-### Sales Dashboard (`/sales`)
-- **Entry Saya** (`/sales`) — View own entries with earnings summary (total commission, sales, pending)
-- **Tambah Entry** (`/sales/new`) — Create a new sale entry: select available animal, fill buyer info, payment details
+### Manage (`/manage`)
+- Read/write livestock only. No pricing, no entries, no users.
+
+### Sales (`/sales`)
+- **Entry Saya** — Own entries + earnings summary (komisi, total jual, pending)
+- **Tambah Entry** (`/sales/new`) — New sale: pick animal, buyer info, payment
+- **Katalog** (`/sales/catalogue`) — Read-only livestock browser with driver/delivery status
+- **Delivery** (`/sales/deliveries`) — Read-only route list + map per day
+
+### Driver (`/driver`)
+- Daily route view. Clickable animal photo, tag, pembeli, alamat, sales name
+- "Mulai Rute" → flips stops to ON_DELIVERY
+- Per-stop: mark **Terkirim** (auto-sets `isSent`) or **Gagal** with reason
+- Live location ping (Supabase realtime) while on route
 
 ### Entry Approval Flow
-1. Sales person creates an entry → status: **PENDING**
-2. Admin reviews and approves → status: **APPROVED**, livestock marked as sold
-3. Or admin rejects → status: **REJECTED**, livestock remains available
-4. Admin can also edit any entry (buyer info, pricing, payment, delivery status)
+1. Sales creates entry → **PENDING**
+2. Admin approves → **APPROVED**, livestock marked sold
+3. Admin rejects → **REJECTED**, livestock released
+4. Admin can edit anything (buyer, pricing, payment, delivery)
 
-### Role-Based Access
-- **Admin**: Full CRUD on everything, can see profit/cost/margin fields, manage users
-- **Sales**: Can only create entries and view their own entries. Hidden fields: profit, buy price, cost margin
+### Delivery / Routing
+- Admin assigns `deliveryDate` on approved entries → creates `Delivery` rows (PENDING)
+- Driver availability per day (`DriverAvailability`)
+- **Generate routes**: split stops across N drivers, solve TSP from depot per bucket (`src/lib/delivery/{split,tsp,depot}.ts`)
+- Depot from `FARM_LAT`/`FARM_LNG` env or manual input (lat,lng or Google Maps URL)
+- Geocoding: Maps URL parse → `GeocodeCache` → Google Geocoding API (optional key)
+- Live map with Leaflet + OSRM routing, driver position from Supabase realtime
+- Bulk tools: Reset Routes, Clear Schedule, Backfill Coordinates
 
 ### Other Features
-- JWT session authentication (httpOnly cookies, 7-day expiry)
+- JWT session auth (httpOnly cookies, 7-day expiry, HS256)
 - Password hashing with bcryptjs
-- File upload for livestock photos (stored in `public/uploads/`)
+- PDF invoice + kwitansi via `@react-pdf/renderer`
+- Bukti transfer upload (multi-image per entry)
 - Payslip API (`/api/payslip`) for sales commission reports
-- Mobile-first responsive design
-- Dark mode support
+- Audit log on sensitive actions
+- Rupiah-formatted currency inputs (live formatting)
+- Mobile-first responsive design + dark mode
 
 ## Tech Stack
 
 ### Frontend
-| Technology      | Version | Purpose                           |
-| --------------- | ------- | --------------------------------- |
-| React           | 19.2    | UI library                        |
-| Next.js         | 16.2    | Full-stack framework (App Router) |
-| Tailwind CSS    | 4       | Utility-first styling (oklch)     |
-| shadcn/ui       | 4       | UI components (Base UI, not Radix)|
-| Lucide React    | 1.7     | Icons                             |
-| Recharts        | 3.8     | Dashboard charts                  |
-| Sonner          | 2.0     | Toast notifications               |
-| next-themes     | 0.4     | Dark mode toggle                  |
+| Tech           | Version | Purpose                                |
+| -------------- | ------- | -------------------------------------- |
+| React          | 19.2    | UI                                     |
+| Next.js        | 16.2    | App Router, Server Actions, `proxy.ts` |
+| Tailwind CSS   | 4       | Styling (oklch)                        |
+| Base UI React  | 1.3     | Headless primitives (shadcn-style)     |
+| Leaflet        | 1.9     | Delivery map                           |
+| react-leaflet  | 5.0     | React bindings for Leaflet             |
+| Lucide React   | 1.7     | Icons                                  |
+| Recharts       | 3.8     | Dashboard charts                       |
+| Sonner         | 2.0     | Toast                                  |
+| next-themes    | 0.4     | Dark mode                              |
 
 ### Backend
-| Technology      | Version | Purpose                           |
-| --------------- | ------- | --------------------------------- |
-| Next.js API     | 16.2    | API routes + Server Actions       |
-| PostgreSQL      | 17      | Database                          |
-| Prisma          | 6.19    | ORM + migrations                  |
-| jose            | 6.2     | JWT signing/verification (HS256)  |
-| bcryptjs        | 3.0     | Password hashing                  |
+| Tech                 | Version | Purpose                             |
+| -------------------- | ------- | ----------------------------------- |
+| PostgreSQL           | 17      | Database                            |
+| Prisma               | 6.19    | ORM + migrations                    |
+| jose                 | 6.2     | JWT signing (HS256)                 |
+| bcryptjs             | 3.0     | Password hash                       |
+| @react-pdf/renderer  | 4.4     | Invoice/kwitansi PDFs               |
+| @supabase/supabase-js| 2.10    | Realtime channel for driver location|
+| date-fns             | 4.1     | Date formatting                     |
 
 ### Tooling
-| Technology      | Version | Purpose                           |
-| --------------- | ------- | --------------------------------- |
-| TypeScript      | 5       | Type safety                       |
-| ESLint          | 9       | Linting                           |
-| Turbopack       | -       | Fast dev server bundler           |
-
-**No external services** — everything runs locally. No Supabase, no NextAuth, no cloud storage.
+TypeScript 5 · ESLint 9 · Turbopack (dev) · `tsx` (seed script)
 
 ## Getting Started
 
 ### Prerequisites
 - Node.js 18+
-- PostgreSQL 15+ (Homebrew: `brew install postgresql@17`)
+- PostgreSQL 15+ (`brew install postgresql@17`)
+- Supabase project (free tier) — only used for realtime driver location. Can skip if you don't need live tracking.
 
-### 1. Clone and Install
+### 1. Clone + Install
 
 ```bash
 git clone <repo-url>
@@ -90,49 +111,58 @@ cd millenials-farm
 npm install
 ```
 
-### 2. Set Up Environment
+### 2. Environment
 
-Create a `.env` file:
+Create `.env`:
 
 ```env
+# Database
 DATABASE_URL="postgresql://YOUR_USERNAME@localhost:5432/millenials_farm"
 DIRECT_URL="postgresql://YOUR_USERNAME@localhost:5432/millenials_farm"
+
+# Auth
 SESSION_SECRET="your-secret-key-change-in-production"
+
+# Farm depot (required for route generation; falls back to manual input otherwise)
+FARM_LAT="-6.3078445"
+FARM_LNG="106.6943313"
+
+# Optional: Google Geocoding API (for address → coords backfill)
+GOOGLE_MAPS_API_KEY=""
+
+# Optional: Supabase realtime (driver live location)
+NEXT_PUBLIC_SUPABASE_URL=""
+NEXT_PUBLIC_SUPABASE_ANON_KEY=""
+SUPABASE_SERVICE_ROLE_KEY=""
 ```
 
-### 3. Set Up Database
+### 3. Database
 
 ```bash
-# Create the database
 createdb millenials_farm
-
-# Push the schema to the database
 npx prisma db push
-
-# Generate Prisma client
 npx prisma generate
-
-# Seed with sample data (2 users, 15 livestock, 11 pricing, 5 entries)
-npx tsx prisma/seed.ts
+npx tsx prisma/seed.ts   # sample users, livestock, pricing, entries
 ```
 
-### 4. Run Development Server
+### 4. Run
 
 ```bash
 npm run dev
 ```
 
-Open http://localhost:3000 and login with `admin` / `admin`.
+Open http://localhost:3000 and login as `admin` / `admin`.
 
 ### Useful Commands
 
 ```bash
-npm run dev          # Start dev server with Turbopack
-npm run build        # Production build
-npm run start        # Start production server
-npx prisma studio    # Open database GUI at localhost:5555
-npx prisma db push   # Sync schema to database
-npx tsx prisma/seed.ts  # Re-seed sample data
+npm run dev               # Turbopack dev server
+npm run build             # Production build
+npm run start             # Production server
+npm run lint              # ESLint
+npx prisma studio         # DB GUI at :5555
+npx prisma db push        # Sync schema
+npx tsx prisma/seed.ts    # Re-seed
 ```
 
 ## Project Structure
@@ -140,34 +170,39 @@ npx tsx prisma/seed.ts  # Re-seed sample data
 ```
 src/
 ├── app/
-│   ├── (auth)/           # Login page, unauthorized page
+│   ├── (auth)/                # Login, unauthorized
 │   ├── (dashboard)/
-│   │   ├── admin/        # Admin pages (dashboard, livestock, entries, users, pricing)
-│   │   └── sales/        # Sales pages (my entries, new entry)
-│   ├── (public)/         # Landing page, catalogue
-│   ├── actions/          # Server Actions (entries, livestock, pricing, users)
-│   ├── api/              # API routes (auth, upload, livestock, payslip)
-│   └── layout.tsx        # Root layout
+│   │   ├── admin/             # Admin: dashboard, livestock, entries, deliveries, pricing, users, logs
+│   │   ├── manage/            # Warehouse: livestock only
+│   │   ├── sales/             # Sales: entries, catalogue, deliveries
+│   │   └── driver/            # Driver: daily route view
+│   ├── (public)/              # Landing, catalogue
+│   ├── actions/               # Server Actions: entries, livestock, pricing, users, deliveries, drivers
+│   ├── api/                   # auth, upload, livestock, entries, payslip, driver
+│   └── layout.tsx
 ├── components/
-│   ├── dashboard/        # Dashboard components (sidebar, forms, tables)
-│   └── ui/               # shadcn/ui components (button, card, input, etc.)
+│   ├── admin/                 # deliveries-admin-view, delivery-map, driver-tracker
+│   ├── dashboard/             # sidebar, forms, entry-table, livestock-table
+│   ├── driver/                # driver-run-view, location-pinger
+│   └── ui/                    # Base UI primitives (button, card, input, …)
 ├── lib/
-│   ├── auth.ts           # Server-side auth helpers (getProfile, requireAuth, requireRole)
-│   ├── auth-middleware.ts # Route protection (JWT verification in proxy)
-│   ├── format.ts         # Formatting utilities (Rupiah, dates, SKU, invoice)
-│   ├── prisma.ts         # Prisma client singleton
-│   ├── session.ts        # JWT session management (create, read, delete)
-│   └── utils.ts          # Tailwind className merger (cn)
-├── proxy.ts              # Next.js 16 proxy (replaces middleware.ts)
-└── generated/prisma/     # Auto-generated Prisma client (do not edit)
+│   ├── delivery/              # depot, geo, geocode, maps, split, tsp
+│   ├── auth.ts                # getProfile, requireAuth, requireRole
+│   ├── audit.ts               # Audit log writer
+│   ├── format.ts              # Rupiah, dates, SKU, invoice
+│   ├── prisma.ts              # Prisma singleton
+│   ├── session.ts             # JWT session
+│   └── supabase.ts            # Realtime client
+├── proxy.ts                   # Next.js 16 proxy (route protection)
+└── generated/prisma/          # Auto-generated Prisma client
 
 prisma/
-├── schema.prisma         # Database schema (models, enums, relations)
-└── seed.ts               # Sample data seeder
+├── schema.prisma
+└── seed.ts
 ```
 
 ## Database Schema
 
-4 models: **Profile** (users), **Livestock** (animals), **Entry** (sales), **Pricing** (price list).
+Models: **Profile** (users, with driver vehicle/location fields), **Livestock**, **Entry**, **Delivery**, **DriverAvailability**, **GeocodeCache**, **Pricing**, **AuditLog**.
 
-See `prisma/schema.prisma` for the full schema with all fields and relations.
+See `prisma/schema.prisma` for full schema.

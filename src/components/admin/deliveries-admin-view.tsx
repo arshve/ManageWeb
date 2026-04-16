@@ -101,7 +101,9 @@ export function DeliveriesAdminView({
     new Set(),
   );
   const [buckets, setBuckets] = useState<string[][] | null>(null);
-  const [bucketDrivers, setBucketDrivers] = useState<Record<number, string>>({});
+  const [bucketDrivers, setBucketDrivers] = useState<Record<number, string>>(
+    {},
+  );
   const [startInput, setStartInput] = useState(defaultStart);
   const [mapDepot, setMapDepot] = useState<{ lat: number; lng: number }>(() => {
     const parsed = parseLatLngClient(defaultStart);
@@ -243,7 +245,12 @@ export function DeliveriesAdminView({
   }
 
   function handleResetRoutes() {
-    if (!confirm(`Reset semua rute untuk ${dateStr}? Driver & urutan akan dikosongkan.`)) return;
+    if (
+      !confirm(
+        `Reset semua rute untuk ${dateStr}? Driver & urutan akan dikosongkan.`,
+      )
+    )
+      return;
     startTransition(async () => {
       const r = await resetRoutes(dateStr);
       if ('error' in r) toast.error(r.error);
@@ -257,7 +264,12 @@ export function DeliveriesAdminView({
   }
 
   function handleClearSchedule() {
-    if (!confirm(`Kosongkan jadwal ${dateStr}? Semua entry akan kembali ke "Belum Dijadwalkan".`)) return;
+    if (
+      !confirm(
+        `Kosongkan jadwal ${dateStr}? Semua entry akan kembali ke "Belum Dijadwalkan".`,
+      )
+    )
+      return;
     startTransition(async () => {
       const r = await clearSchedule(dateStr);
       if ('error' in r) toast.error(r.error);
@@ -274,16 +286,10 @@ export function DeliveriesAdminView({
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">
-            Peta Rute & Driver (live)
-          </CardTitle>
+          <CardTitle className="text-base">Peta Rute & Driver (live)</CardTitle>
         </CardHeader>
         <CardContent>
-          <DeliveryMap
-            depot={mapDepot}
-            stops={mapStops}
-            drivers={mapDrivers}
-          />
+          <DeliveryMap depot={mapDepot} stops={mapStops} drivers={mapDrivers} />
         </CardContent>
       </Card>
 
@@ -436,7 +442,9 @@ export function DeliveriesAdminView({
               <Button
                 size="sm"
                 onClick={handleGenerate}
-                disabled={pending || scheduled.length === 0 || driverCount === 0}
+                disabled={
+                  pending || scheduled.length === 0 || driverCount === 0
+                }
               >
                 Generate Rute ({driverCount} driver)
               </Button>

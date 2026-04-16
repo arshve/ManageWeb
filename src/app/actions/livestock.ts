@@ -18,6 +18,7 @@ import type {
   AnimalType,
   AnimalGrade,
   AnimalCondition,
+  Livestock,
 } from '@/generated/prisma/client';
 
 /**
@@ -151,4 +152,53 @@ export async function deleteLivestock(id: string) {
   revalidatePath('/admin/livestock');
   revalidatePath('/manage');
   return { success: true };
+}
+
+// ---------------------------------------------------------------------------
+// Public catalogue query — no auth required
+// ---------------------------------------------------------------------------
+
+/**
+ * Subset of Livestock fields exposed to the public catalogue.
+ * Deliberately excludes internal fields: notes, hargaBeli, isSold, etc.
+ */
+export type AvailableLivestock = Pick<
+  Livestock,
+  | 'id'
+  | 'sku'
+  | 'type'
+  | 'grade'
+  | 'condition'
+  | 'weightMin'
+  | 'weightMax'
+  | 'hargaJual'
+  | 'photoUrl'
+  | 'tag'
+  | 'createdAt'
+>;
+
+/**
+ * Returns all livestock that are unsold and in healthy condition,
+ * ordered newest-first. Used by the public /catalogue page.
+ *
+ * No authentication is required — this is intentionally a public query.
+ */
+export async function getAvailableLivestock(): Promise<AvailableLivestock[]> {
+  return prisma.livestock.findMany({
+    where: { isSold: false, condition: 'SEHAT' },
+    orderBy: { createdAt: 'desc' },
+    select: {
+      id: true,
+      sku: true,
+      type: true,
+      grade: true,
+      condition: true,
+      weightMin: true,
+      weightMax: true,
+      hargaJual: true,
+      photoUrl: true,
+      tag: true,
+      createdAt: true,
+    },
+  });
 }

@@ -16,6 +16,7 @@ import { supabase } from '@/lib/supabase';
 export type MapStop = {
   id: string;
   invoiceNo: string;
+  sku: string | undefined;
   buyerName: string;
   lat: number;
   lng: number;
@@ -76,11 +77,7 @@ function driverIcon(color: string, label: string): L.DivIcon {
   });
 }
 
-function FitBounds({
-  points,
-}: {
-  points: [number, number][];
-}) {
+function FitBounds({ points }: { points: [number, number][] }) {
   const map = useMap();
   useEffect(() => {
     if (points.length === 0) return;
@@ -206,7 +203,8 @@ export function DeliveryMap({
     const pts: [number, number][] = [[depot.lat, depot.lng]];
     for (const s of stops) pts.push([s.lat, s.lng]);
     for (const d of drivers) {
-      if (d.lastLat != null && d.lastLng != null) pts.push([d.lastLat, d.lastLng]);
+      if (d.lastLat != null && d.lastLng != null)
+        pts.push([d.lastLat, d.lastLng]);
     }
     return pts;
   }, [depot, stops, drivers]);
@@ -219,7 +217,7 @@ export function DeliveryMap({
         center={center}
         zoom={12}
         scrollWheelZoom
-        className="h-full w-full"
+        className="h-full w-full z-0"
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
@@ -267,7 +265,7 @@ export function DeliveryMap({
                   <Popup>
                     <strong>{s.buyerName}</strong>
                     <br />
-                    {s.invoiceNo}
+                    {s.sku}
                     <br />
                     <span style={{ color: '#64748b' }}>
                       {s.driverName ?? 'Belum di-assign'} · {s.status}

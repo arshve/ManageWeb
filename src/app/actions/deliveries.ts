@@ -30,10 +30,6 @@ function parseDateOnly(input: string): Date | null {
   return isNaN(d.getTime()) ? null : d;
 }
 
-/**
- * Bulk-assign a delivery date to a set of approved entries.
- * Creates (or keeps) a PENDING Delivery row for each so routing has something to work on.
- */
 export async function assignDeliveryDate(
   entryIds: string[],
   deliveryDate: string,
@@ -114,10 +110,6 @@ export async function unassignDeliveryDate(entryIds: string[]) {
   return { success: true as const, count: entryIds.length };
 }
 
-/**
- * Clear driver + sequence for a date, keeping entries scheduled.
- * Only affects PENDING/ASSIGNED deliveries — in-flight/done are untouched.
- */
 export async function resetRoutes(deliveryDate: string) {
   const admin = await requireRole('ADMIN');
   const date = parseDateOnly(deliveryDate);
@@ -144,10 +136,6 @@ export async function resetRoutes(deliveryDate: string) {
   return { success: true as const, count: result.count };
 }
 
-/**
- * Unschedule every PENDING/ASSIGNED entry for a date.
- * Bulk version of unassignDeliveryDate. Refuses if any delivery is in-flight/done.
- */
 export async function clearSchedule(deliveryDate: string) {
   const admin = await requireRole('ADMIN');
   const date = parseDateOnly(deliveryDate);
@@ -197,11 +185,6 @@ export async function clearSchedule(deliveryDate: string) {
   return { success: true as const, count: entryIds.length };
 }
 
-/**
- * Generate routes for a delivery date.
- * Splits scheduled entries across N driver buckets, runs TSP per bucket,
- * writes sequence onto Delivery rows. driverId is left for assignDriversToBuckets.
- */
 export async function generateRoutes(
   deliveryDate: string,
   driverCount: number,
@@ -221,14 +204,24 @@ export async function generateRoutes(
     } else {
       const resolved = await resolveLocation(trimmed);
       if (!resolved) {
-        return { error: 'Titik awal tidak bisa diparse (gunakan lat,lng atau Maps URL)' };
+        return {
+          error:
+            'Titik awal tidak bisa diparse (gunakan lat,lng atau Maps URL)',
+        };
       }
       depot = { id: 'DEPOT', lat: resolved.lat, lng: resolved.lng };
     }
   }
 
-  if (!isFinite(depot.lat) || !isFinite(depot.lng) || (depot.lat === 0 && depot.lng === 0)) {
-    return { error: 'Titik awal belum diset (tambahkan FARM_LAT/FARM_LNG atau isi input titik awal)' };
+  if (
+    !isFinite(depot.lat) ||
+    !isFinite(depot.lng) ||
+    (depot.lat === 0 && depot.lng === 0)
+  ) {
+    return {
+      error:
+        'Titik awal belum diset (tambahkan FARM_LAT/FARM_LNG atau isi input titik awal)',
+    };
   }
 
   const entries = await prisma.entry.findMany({
@@ -292,11 +285,6 @@ export async function generateRoutes(
   };
 }
 
-/**
- * Attach driver_id to a set of deliveries.
- * Input: array of { driverId, entryIds[] } — one entry per bucket from generateRoutes.
- * Sequences are already set; this only writes driverId and flips status to ASSIGNED.
- */
 export async function assignDriversToBuckets(
   deliveryDate: string,
   buckets: { driverId: string; entryIds: string[] }[],
@@ -305,16 +293,7 @@ export async function assignDriversToBuckets(
   const date = parseDateOnly(deliveryDate);
   if (!date) return { error: 'Tanggal tidak valid' };
 
-  const driverIds = buckets.map((b) => b.driverId);
-  const available = await prisma.driverAvailability.findMany({
-    where: { date, isActive: true, driverId: { in: driverIds } },
-    select: { driverId: true },
-  });
-  const availableSet = new Set(available.map((a) => a.driverId));
-  const missing = driverIds.filter((id) => !availableSet.has(id));
-  if (missing.length > 0) {
-    return { error: `Driver belum di-set available: ${missing.join(', ')}` };
-  }
+  // FIX: DriverAvailability query removed because drivers are available by default
 
   await prisma.$transaction(
     buckets.flatMap((b) =>
@@ -368,7 +347,6 @@ async function requireDriverOwnership(deliveryId: string) {
   return { profile, delivery } as const;
 }
 
-/** Driver taps "Mulai Rute" — flips all their ASSIGNED stops for the date to ON_DELIVERY. */
 export async function startDeliveryRun(deliveryDate: string) {
   const profile = await requireAuth();
   if (profile.role !== 'DRIVER') return { error: 'Hanya driver' };
@@ -450,11 +428,6 @@ export async function markFailed(deliveryId: string, reason: string) {
   return { success: true };
 }
 
-/**
- * Batch-backfill buyerLat/buyerLng for entries missing coords.
- * Uses URL parse → cache → Google (if GOOGLE_MAPS_API_KEY is set).
- * Idempotent — safe to re-run.
- */
 export async function backfillCoordinates(entryIds?: string[]) {
   await requireRole('ADMIN');
 

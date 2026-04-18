@@ -46,7 +46,6 @@ export function DriverTracker({ initial }: { initial: DriverLoc[] }) {
       supabase.removeChannel(channel);
     };
   }, []);
-
   return (
     <ul className="text-sm space-y-1 border rounded-lg p-3">
       {drivers.length === 0 && (
@@ -54,6 +53,7 @@ export function DriverTracker({ initial }: { initial: DriverLoc[] }) {
           Belum ada driver terdaftar.
         </li>
       )}
+
       {drivers.map((d) => (
         <li key={d.id} className="flex items-center gap-2">
           <span className="font-medium">{d.name}</span>

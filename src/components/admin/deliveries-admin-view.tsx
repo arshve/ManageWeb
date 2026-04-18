@@ -1,8 +1,9 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { supabase } from '@/lib/supabase';
 import {
   assignDeliveryDate,
   unassignDeliveryDate,
@@ -19,6 +20,7 @@ import {
   type MapStop,
   type MapDriver,
 } from '@/components/admin/delivery-map-loader';
+import clsx from 'clsx';
 
 // ─── zero-dep primitives ──────────────────────────────────────────────────────
 
@@ -91,7 +93,10 @@ function Badge({
 
 type ScheduledEntry = {
   id: string;
-  invoiceNo: string;
+  sku: string | undefined;
+  animalType?: string;
+  animalGrade?: string | null;
+  salesName?: string;
   buyerName: string;
   buyerAddress: string | null;
   buyerPhone: string | null;
@@ -107,19 +112,25 @@ type ScheduledEntry = {
     driver: { id: string; name: string } | null;
   } | null;
 };
+
 type UnscheduledEntry = {
   id: string;
-  invoiceNo: string;
+  sku: string | undefined;
   buyerName: string;
   buyerAddress: string | null;
   hasCoords: boolean;
 };
+
 type Driver = {
   id: string;
   name: string;
   phone: string | null;
   vehiclePlate: string | null;
   isAvailable: boolean;
+  isAssigned: boolean;
+  lastLat: number | null;
+  lastLng: number | null;
+  lastLocationAt: string | null;
 };
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -140,7 +151,7 @@ function initials(name: string) {
     .map((n) => n[0])
     .join('')
     .toUpperCase()
-    .slice(0, 2);
+    .slice(0, 1);
 }
 
 const STATUS_COLOR: Record<
@@ -194,8 +205,69 @@ export function DeliveriesAdminView({
     if (p) setMapDepot(p);
   }
 
-  const availableDrivers = drivers.filter((d) => d.isAvailable);
-  const driverCount = availableDrivers.length;
+  // ── Live driver locations via Supabase realtime ──
+  const [driverLocs, setDriverLocs] = useState<
+    Map<
+      string,
+      {
+        lastLat: number | null;
+        lastLng: number | null;
+        lastLocationAt: string | null;
+      }
+    >
+  >(
+    () =>
+      new Map(
+        drivers.map((d) => [
+          d.id,
+          {
+            lastLat: d.lastLat,
+            lastLng: d.lastLng,
+            lastLocationAt: d.lastLocationAt,
+          },
+        ]),
+      ),
+  );
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('driver-locations-admin')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'Profile' },
+        (payload) => {
+          const next = payload.new as {
+            id: string;
+            role: string;
+            lastLat: number | null;
+            lastLng: number | null;
+            lastLocationAt: string | null;
+          };
+          if (next.role !== 'DRIVER') return;
+          setDriverLocs((prev) => {
+            const map = new Map(prev);
+            map.set(next.id, {
+              lastLat: next.lastLat,
+              lastLng: next.lastLng,
+              lastLocationAt: next.lastLocationAt,
+            });
+            return map;
+          });
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const assignableDrivers = drivers.filter((d) => !d.isAssigned);
+  const driverCount = assignableDrivers.length;
+
+  const [customRouteCount, setCustomRouteCount] = useState<number | ''>('');
+  const activeRouteCount =
+    customRouteCount === '' ? Math.max(driverCount, 1) : customRouteCount;
+
   const deliveredCount = scheduled.filter(
     (e) => e.delivery?.status === 'DELIVERED',
   ).length;
@@ -272,12 +344,12 @@ export function DeliveriesAdminView({
   }
 
   function handleGenerate() {
-    if (!driverCount) {
-      toast.error('Tandai driver yang available dulu');
+    if (activeRouteCount < 1) {
+      toast.error('Jumlah rute minimal 1');
       return;
     }
     startTransition(async () => {
-      const r = await generateRoutes(dateStr, driverCount, startInput);
+      const r = await generateRoutes(dateStr, activeRouteCount, startInput);
       if ('error' in r) {
         toast.error(r.error);
         return;
@@ -438,7 +510,7 @@ export function DeliveriesAdminView({
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
           <h2 className="text-sm font-semibold text-gray-900">
-            Driver Available — {dateStr}
+            Status Driver — {dateStr}
           </h2>
           <span className="text-xs text-gray-400">
             {driverCount} dari {drivers.length} tersedia
@@ -453,12 +525,9 @@ export function DeliveriesAdminView({
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50">
-                  <th className="pl-5 py-2.5 w-12 text-left font-medium text-xs text-gray-500">
-                    Aktif
-                  </th>
-                  <th className={th}>Driver</th>
+                  <th className={cn(th, 'pl-5')}>Driver</th>
                   <th className={th}>Telepon</th>
-                  <th className={th}>Plat Kendaraan</th>
+                  <th className={th}>Lokasi (live)</th>
                   <th className={cn(th, 'pr-5')}>Status</th>
                 </tr>
               </thead>
@@ -466,26 +535,23 @@ export function DeliveriesAdminView({
                 {drivers.map((d) => (
                   <tr
                     key={d.id}
-                    onClick={() =>
-                      !pending && toggleDriverAvail(d.id, !d.isAvailable)
-                    }
-                    className="cursor-pointer hover:bg-gray-50 transition-colors"
+                    className={cn(
+                      'transition-colors',
+                      d.isAssigned
+                        ? 'bg-amber-50/40 cursor-not-allowed'
+                        : 'cursor-pointer hover:bg-gray-50',
+                    )}
                   >
-                    <td className="pl-5 py-3">
-                      <input
-                        type="checkbox"
-                        checked={d.isAvailable}
-                        disabled={pending}
-                        onChange={(e) =>
-                          toggleDriverAvail(d.id, e.target.checked)
-                        }
-                        onClick={(ev) => ev.stopPropagation()}
-                        className="h-4 w-4 rounded border-gray-300 accent-gray-800 cursor-pointer"
-                      />
-                    </td>
-                    <td className={td}>
+                    <td className={cn(td, 'pl-5')}>
                       <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 shrink-0 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-semibold select-none">
+                        <div
+                          className={cn(
+                            'w-7 h-7 shrink-0 rounded-full flex items-center justify-center text-xs font-semibold select-none',
+                            d.isAssigned
+                              ? 'bg-amber-100 text-amber-700'
+                              : 'bg-blue-100 text-blue-700',
+                          )}
+                        >
                           {initials(d.name)}
                         </div>
                         <span className="font-medium text-gray-900">
@@ -497,24 +563,42 @@ export function DeliveriesAdminView({
                       {d.phone ?? '—'}
                     </td>
                     <td className={td}>
-                      {d.vehiclePlate ? (
-                        <span className="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded">
-                          {d.vehiclePlate}
-                        </span>
-                      ) : (
-                        <span className="text-gray-400">—</span>
-                      )}
+                      {(() => {
+                        const loc = driverLocs.get(d.id);
+                        if (loc?.lastLat != null && loc?.lastLng != null) {
+                          return (
+                            <div className="flex flex-col gap-0.5">
+                              <span className="font-mono text-xs text-gray-700">
+                                {loc.lastLat.toFixed(5)},{' '}
+                                {loc.lastLng.toFixed(5)}
+                              </span>
+                              {loc.lastLocationAt && (
+                                <span className="text-xs text-gray-400">
+                                  {new Date(
+                                    loc.lastLocationAt,
+                                  ).toLocaleTimeString()}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        }
+                        return (
+                          <span className="text-xs text-gray-400">
+                            no signal
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className={cn(td, 'pr-5')}>
-                      {d.isAvailable ? (
-                        <Badge color="green">
-                          <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
-                          Tersedia
+                      {d.isAssigned ? (
+                        <Badge color="amber">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block" />
+                          On Delivery
                         </Badge>
                       ) : (
-                        <Badge color="gray">
-                          <span className="w-1.5 h-1.5 rounded-full bg-gray-400 inline-block" />
-                          Tidak tersedia
+                        <Badge color="blue">
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block" />
+                          Tersedia
                         </Badge>
                       )}
                     </td>
@@ -581,7 +665,7 @@ export function DeliveriesAdminView({
                       className="h-4 w-4 rounded border-gray-300 accent-gray-800 cursor-pointer"
                     />
                   </th>
-                  <th className={cn(th, 'w-40')}>Invoice</th>
+                  <th className={cn(th, 'w-40')}>SKU</th>
                   <th className={th}>Pembeli</th>
                   <th className={th}>Alamat</th>
                   <th className={cn(th, 'w-28 pr-5 text-center')}>Koordinat</th>
@@ -611,7 +695,7 @@ export function DeliveriesAdminView({
                     </td>
                     <td className={td}>
                       <span className="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded">
-                        {e.invoiceNo}
+                        {e.sku}
                       </span>
                     </td>
                     <td className={cn(td, 'font-medium text-gray-900')}>
@@ -663,12 +747,32 @@ export function DeliveriesAdminView({
               >
                 Reset Rute
               </Btn>
-              <Btn
-                onClick={handleGenerate}
-                disabled={pending || !scheduled.length || !driverCount}
-              >
-                Generate Rute ({driverCount} driver)
-              </Btn>
+
+              <div className="flex items-center gap-2 border border-gray-300 rounded-md p-1 pl-3 ml-2">
+                <label className="text-xs text-gray-500 font-medium">
+                  Bagi ke
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  value={customRouteCount}
+                  onChange={(e) =>
+                    setCustomRouteCount(
+                      e.target.value === '' ? '' : parseInt(e.target.value),
+                    )
+                  }
+                  placeholder={String(Math.max(driverCount, 1))}
+                  className="h-6 w-12 rounded bg-white px-1 text-xs text-center border focus:outline-none focus:ring-1"
+                />
+                <span className="text-xs text-gray-500 mr-2">rute</span>
+                <Btn
+                  onClick={handleGenerate}
+                  disabled={pending || !scheduled.length}
+                  className="py-1 px-3 h-6"
+                >
+                  Generate
+                </Btn>
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -724,7 +828,7 @@ export function DeliveriesAdminView({
                     className="ml-auto h-8 rounded-md border border-gray-300 bg-white px-2 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400"
                   >
                     <option value="">Pilih driver…</option>
-                    {availableDrivers.map((d) => (
+                    {assignableDrivers.map((d) => (
                       <option key={d.id} value={d.id}>
                         {d.name}
                       </option>
@@ -782,8 +886,9 @@ export function DeliveriesAdminView({
                     <thead>
                       <tr className="border-b border-gray-100 bg-gray-50/60">
                         <th className={cn(th, 'pl-4 w-10')}>#</th>
-                        <th className={cn(th, 'w-36')}>Invoice</th>
+                        <th className={cn(th, 'w-36')}>Hewan / SKU</th>
                         <th className={th}>Pembeli</th>
+                        <th className={th}>Sales</th>
                         <th className={th}>Alamat</th>
                         <th className={cn(th, 'w-28 text-center')}>Status</th>
                         <th className={cn(th, 'w-12 pr-4')}></th>
@@ -797,6 +902,7 @@ export function DeliveriesAdminView({
                           buyerLng: s.buyerLng,
                           buyerAddress: s.buyerAddress,
                         });
+
                         return (
                           <tr
                             key={s.id}
@@ -811,8 +917,15 @@ export function DeliveriesAdminView({
                               {(s.delivery?.sequence ?? 0) + 1}
                             </td>
                             <td className={td}>
-                              <span className="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded">
-                                {s.invoiceNo}
+                              <div className="font-medium text-gray-900 mb-0.5">
+                                {s.animalType
+                                  ? s.animalType.charAt(0) +
+                                    s.animalType.slice(1).toLowerCase()
+                                  : ''}
+                                {s.animalGrade ? ` ${s.animalGrade}` : ''}
+                              </div>
+                              <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">
+                                {s.sku}
                               </span>
                             </td>
                             <td className={td}>
@@ -824,6 +937,14 @@ export function DeliveriesAdminView({
                                   {s.buyerPhone}
                                 </span>
                               )}
+                            </td>
+                            <td
+                              className={cn(
+                                td,
+                                'text-xs text-gray-600 whitespace-nowrap',
+                              )}
+                            >
+                              {s.salesName ?? '—'}
                             </td>
                             <td
                               className={cn(

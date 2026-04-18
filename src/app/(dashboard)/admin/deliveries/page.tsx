@@ -2,7 +2,10 @@ import { prisma } from '@/lib/prisma';
 import { DashboardShell } from '@/components/dashboard/dashboard-shell';
 import { DeliveriesAdminView } from '@/components/admin/deliveries-admin-view';
 import { DriverTracker } from '@/components/admin/driver-tracker';
-import type { MapStop, MapDriver } from '@/components/admin/delivery-map-loader';
+import type {
+  MapStop,
+  MapDriver,
+} from '@/components/admin/delivery-map-loader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getDefaultDepot } from '@/lib/delivery/depot';
 
@@ -27,63 +30,104 @@ export default async function AdminDeliveriesPage({
   const date = parseDateParam(params.date);
   const dateStr = date.toISOString().slice(0, 10);
 
-  const [scheduledRaw, unscheduledRaw, drivers, availability] =
-    await Promise.all([
-      prisma.entry.findMany({
-        where: { deliveryDate: date, status: 'APPROVED' },
-        select: {
-          id: true,
-          invoiceNo: true,
-          buyerName: true,
-          buyerAddress: true,
-          buyerPhone: true,
-          buyerLat: true,
-          buyerLng: true,
-          buyerMaps: true,
-          delivery: {
-            select: {
-              id: true,
-              sequence: true,
-              status: true,
-              driverId: true,
-              deliveredAt: true,
-              driver: { select: { id: true, name: true } },
-            },
+  const [
+    scheduledRaw,
+    unscheduledRaw,
+    drivers,
+    availability,
+    assignedDeliveries,
+  ] = await Promise.all([
+    prisma.entry.findMany({
+      where: {
+        deliveryDate: date,
+        status: 'APPROVED',
+        buyerMaps: {
+          not: null,
+          notIn: [''],
+        },
+      },
+      select: {
+        id: true,
+        invoiceNo: true,
+        buyerName: true,
+        buyerAddress: true,
+        buyerPhone: true,
+        buyerLat: true,
+        buyerLng: true,
+        buyerMaps: true,
+        delivery: {
+          select: {
+            id: true,
+            sequence: true,
+            status: true,
+            driverId: true,
+            deliveredAt: true,
+            driver: { select: { id: true, name: true } },
           },
         },
-      }),
-      prisma.entry.findMany({
-        where: { deliveryDate: null, status: 'APPROVED' },
-        select: {
-          id: true,
-          invoiceNo: true,
-          buyerName: true,
-          buyerAddress: true,
-          buyerLat: true,
-          buyerLng: true,
+        livestock: {
+          select: {
+            id: true,
+            sku: true,
+            type: true, // Fetch jenis hewan
+            grade: true, // Fetch tipe/grade hewan
+          },
         },
-        orderBy: { createdAt: 'desc' },
-      }),
-      prisma.profile.findMany({
-        where: { role: 'DRIVER', isActive: true },
-        select: {
-          id: true,
-          name: true,
-          phone: true,
-          vehiclePlate: true,
-          lastLat: true,
-          lastLng: true,
-          lastLocationAt: true,
+        sales: {
+          select: {
+            name: true, // Fetch nama sales
+          },
         },
-        orderBy: { name: 'asc' },
-      }),
-      prisma.driverAvailability.findMany({
-        where: { date, isActive: true },
-        select: { driverId: true },
-      }),
-    ]);
+      },
+    }),
+    prisma.entry.findMany({
+      where: { deliveryDate: null, status: 'APPROVED' },
+      select: {
+        id: true,
+        invoiceNo: true,
+        buyerName: true,
+        buyerAddress: true,
+        livestock: {
+          select: {
+            id: true,
+            sku: true,
+          },
+        },
+        buyerLat: true,
+        buyerLng: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.profile.findMany({
+      where: { role: 'DRIVER', isActive: true },
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        vehiclePlate: true,
+        lastLat: true,
+        lastLng: true,
+        lastLocationAt: true,
+      },
+      orderBy: { name: 'asc' },
+    }),
+    prisma.driverAvailability.findMany({
+      where: { date, isActive: true },
+      select: { driverId: true },
+    }),
+    // Drivers who are actively assigned to a delivery on this date
+    prisma.delivery.findMany({
+      where: {
+        entry: { deliveryDate: date },
+        driverId: { not: null },
+        status: { notIn: ['DELIVERED', 'FAILED'] },
+      },
+      select: { driverId: true },
+    }),
+  ]);
 
   const availableIds = new Set(availability.map((a) => a.driverId));
+  const assignedIds = new Set(assignedDeliveries.map((d) => d.driverId!));
 
   const scheduled = scheduledRaw.map((e) => ({
     id: e.id,
@@ -91,6 +135,10 @@ export default async function AdminDeliveriesPage({
     buyerName: e.buyerName,
     buyerAddress: e.buyerAddress,
     buyerPhone: e.buyerPhone,
+    sku: e.livestock?.sku,
+    animalType: e.livestock?.type, // Map jenis hewan
+    animalGrade: e.livestock?.grade, // Map tipe/grade hewan
+    salesName: e.sales?.name, // Map nama sales
     buyerLat: e.buyerLat,
     buyerLng: e.buyerLng,
     buyerMaps: e.buyerMaps,
@@ -100,6 +148,7 @@ export default async function AdminDeliveriesPage({
   const unscheduled = unscheduledRaw.map((e) => ({
     id: e.id,
     invoiceNo: e.invoiceNo,
+    sku: e.livestock?.sku,
     buyerName: e.buyerName,
     buyerAddress: e.buyerAddress,
     hasCoords: e.buyerLat != null && e.buyerLng != null,
@@ -110,7 +159,11 @@ export default async function AdminDeliveriesPage({
     name: d.name,
     phone: d.phone,
     vehiclePlate: d.vehiclePlate,
-    isAvailable: availableIds.has(d.id),
+    isAvailable: !assignedIds.has(d.id),
+    isAssigned: assignedIds.has(d.id),
+    lastLat: d.lastLat,
+    lastLng: d.lastLng,
+    lastLocationAt: d.lastLocationAt?.toISOString() ?? null,
   }));
 
   const driversForMap: MapDriver[] = drivers.map((d) => ({
@@ -126,6 +179,7 @@ export default async function AdminDeliveriesPage({
     .map((e) => ({
       id: e.id,
       invoiceNo: e.invoiceNo,
+      sku: e.sku,
       buyerName: e.buyerName,
       lat: e.buyerLat!,
       lng: e.buyerLng!,
@@ -143,7 +197,7 @@ export default async function AdminDeliveriesPage({
       title="Delivery"
       description={`Jadwal & rute pengiriman — ${dateStr}`}
     >
-      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+      <div className="grid gap-6 ">
         <DeliveriesAdminView
           dateStr={dateStr}
           scheduled={scheduled}
@@ -154,14 +208,6 @@ export default async function AdminDeliveriesPage({
           mapStops={mapStops}
           mapDrivers={driversForMap}
         />
-        <Card className="h-fit">
-          <CardHeader>
-            <CardTitle className="text-base">Lokasi Driver</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <DriverTracker initial={driversForMap} />
-          </CardContent>
-        </Card>
       </div>
     </DashboardShell>
   );

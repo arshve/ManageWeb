@@ -78,6 +78,7 @@ export default async function DriverPage({
       id: d.entry.id,
       invoiceNo: d.entry.invoiceNo,
       buyerName: d.entry.buyerName,
+      sku: d.entry.livestock.sku,
       lat: d.entry.buyerLat!,
       lng: d.entry.buyerLng!,
       sequence: d.sequence,

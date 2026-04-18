@@ -78,9 +78,9 @@ export interface EntryData {
   paymentStatus: string;
   buyerName: string;
   buyerPhone: string | null;
-  buyerWa: string | null;
   buyerAddress: string | null;
   buyerMaps: string | null;
+  pengiriman: string | null;
   notes: string | null;
   buktiTransfer: string[];
   isSent: boolean;
@@ -513,7 +513,6 @@ function useEntryRow(entry: EntryData, onSaved: () => void) {
   const [form, setForm] = useState({
     buyerName: entry.buyerName,
     buyerPhone: entry.buyerPhone ?? '',
-    buyerWa: entry.buyerWa ?? '',
     buyerAddress: entry.buyerAddress ?? '',
     buyerMaps: entry.buyerMaps ?? '',
     hargaJual: entry.hargaJual.toString(),
@@ -522,6 +521,7 @@ function useEntryRow(entry: EntryData, onSaved: () => void) {
     dp: entry.dp?.toString() ?? '',
     totalBayar: entry.totalBayar?.toString() ?? '',
     paymentStatus: entry.paymentStatus,
+    pengiriman: entry.pengiriman ?? '',
     isSent: entry.isSent,
     notes: entry.notes ?? '',
   });
@@ -540,15 +540,19 @@ function useEntryRow(entry: EntryData, onSaved: () => void) {
       const formData = new FormData();
       formData.set('buyerName', form.buyerName);
       formData.set('buyerPhone', form.buyerPhone);
-      formData.set('buyerWa', form.buyerWa);
       formData.set('buyerAddress', form.buyerAddress);
       formData.set('buyerMaps', form.buyerMaps);
       formData.set('hargaJual', form.hargaJual);
       formData.set('hargaModal', form.hargaModal);
       formData.set('resellerCut', form.resellerCut);
-      formData.set('dp', form.dp);
-      formData.set('totalBayar', form.totalBayar);
       formData.set('paymentStatus', form.paymentStatus);
+      if (form.paymentStatus === 'DP') {
+        formData.set('dp', form.dp);
+      }
+      if (form.paymentStatus === 'LUNAS') {
+        formData.set('totalBayar', form.hargaJual);
+      }
+      formData.set('pengiriman', form.pengiriman);
       formData.set('isSent', form.isSent.toString());
       formData.set('notes', form.notes);
       if (newLivestockId) {
@@ -733,14 +737,6 @@ function EntryEditFields({
         />
       </div>
       <div className="space-y-1">
-        <Label className="text-xs">WhatsApp</Label>
-        <Input
-          value={form.buyerWa}
-          onChange={(e) => update('buyerWa', e.target.value)}
-          className="h-8 text-sm"
-        />
-      </div>
-      <div className="space-y-1">
         <Label className="text-xs">Google Maps</Label>
         <Input
           value={form.buyerMaps}
@@ -779,23 +775,17 @@ function EntryEditFields({
         </>
       )}
 
-      {/* Payment */}
-      <div className="space-y-1">
-        <Label className="text-xs">DP</Label>
-        <RupiahInput
-          value={form.dp}
-          onValueChange={(v) => update('dp', v)}
-          className="h-8 text-sm"
-        />
-      </div>
-      <div className="space-y-1">
-        <Label className="text-xs">Total Dibayar</Label>
-        <RupiahInput
-          value={form.totalBayar}
-          onValueChange={(v) => update('totalBayar', v)}
-          className="h-8 text-sm"
-        />
-      </div>
+      {/* Payment — DP only visible when paymentStatus = DP */}
+      {form.paymentStatus === 'DP' && (
+        <div className="space-y-1">
+          <Label className="text-xs">Jumlah DP</Label>
+          <RupiahInput
+            value={form.dp}
+            onValueChange={(v) => update('dp', v)}
+            className="h-8 text-sm"
+          />
+        </div>
+      )}
       {isAdmin && (
         <div className="space-y-1">
           <Label className="text-xs">Sudah Dikirim</Label>
@@ -816,11 +806,34 @@ function EntryEditFields({
         />
       </div>
 
+      {/* Pengiriman */}
+      <div className="space-y-1">
+        <Label className="text-xs">Pengiriman</Label>
+        <Select
+          value={form.pengiriman || '__none__'}
+          onValueChange={(val) =>
+            update('pengiriman', !val || val === '__none__' ? '' : val)
+          }
+        >
+          <SelectTrigger className="h-8 text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__none__">— Tidak ada —</SelectItem>
+            <SelectItem value="HARI_H">Hari H</SelectItem>
+            <SelectItem value="H_1">H-1</SelectItem>
+            <SelectItem value="H_2">H-2</SelectItem>
+            <SelectItem value="H_3">H-3</SelectItem>
+            <SelectItem value="TITIP_POTONG">Titip Potong</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
       {/* Status Bayar + Bukti Transfer */}
       <div className="col-span-2 md:col-span-4">
         <div className="flex flex-wrap items-end gap-4">
           <div className="space-y-1 w-[180px]">
-            <Label className="text-xs">Status Bayar</Label>
+            <Label className="text-xs">Pembayaran</Label>
             <Select
               value={form.paymentStatus}
               onValueChange={(val) =>

@@ -151,9 +151,10 @@ export async function createEntry(formData: FormData) {
       'BELUM_BAYAR',
     buyerName: formData.get('buyerName') as string,
     buyerPhone: (formData.get('buyerPhone') as string) || null,
-    buyerWa: (formData.get('buyerWa') as string) || null,
     buyerAddress: (formData.get('buyerAddress') as string) || null,
     buyerMaps: (formData.get('buyerMaps') as string) || null,
+    pengiriman:
+      (formData.get('pengiriman') as 'HARI_H' | 'H_1' | 'H_2' | 'H_3' | 'TITIP_POTONG') || null,
     notes: (formData.get('notes') as string) || null,
     buktiTransfer: formData.getAll('buktiTransfer') as string[],
     approvedAt,
@@ -364,9 +365,10 @@ export async function updateEntry(id: string, formData: FormData) {
       entry.paymentStatus,
     buyerName: (formData.get('buyerName') as string) || entry.buyerName,
     buyerPhone: (formData.get('buyerPhone') as string) || null,
-    buyerWa: (formData.get('buyerWa') as string) || null,
     buyerAddress: (formData.get('buyerAddress') as string) || null,
     buyerMaps: (formData.get('buyerMaps') as string) || null,
+    pengiriman:
+      (formData.get('pengiriman') as 'HARI_H' | 'H_1' | 'H_2' | 'H_3' | 'TITIP_POTONG') || null,
     notes: (formData.get('notes') as string) || null,
     isSent: formData.get('isSent') === 'true',
     buktiTransfer,

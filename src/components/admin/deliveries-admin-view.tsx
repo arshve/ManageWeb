@@ -20,68 +20,29 @@ import {
   type MapStop,
   type MapDriver,
 } from '@/components/admin/delivery-map-loader';
-import clsx from 'clsx';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
-// ─── zero-dep primitives ──────────────────────────────────────────────────────
+const badgeColors = {
+  gray: 'bg-gray-100 text-gray-600 border-gray-200',
+  green: 'bg-green-50 text-green-700 border-green-200',
+  amber: 'bg-amber-50 text-amber-700 border-amber-200',
+  red: 'bg-red-50 text-red-600 border-red-200',
+  blue: 'bg-blue-50 text-blue-700 border-blue-200',
+} as const;
 
-function cn(...c: (string | false | null | undefined)[]) {
-  return c.filter(Boolean).join(' ');
-}
-
-function Btn({
-  children,
-  onClick,
-  disabled,
-  variant = 'default',
-  className,
-  type = 'button',
-}: {
-  children: React.ReactNode;
-  onClick?: () => void;
-  disabled?: boolean;
-  variant?: 'default' | 'outline' | 'ghost';
-  className?: string;
-  type?: 'button' | 'submit';
-}) {
-  const base =
-    'inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 disabled:opacity-50 disabled:pointer-events-none';
-  const s = {
-    default: 'bg-gray-900 text-white hover:bg-gray-700 focus:ring-gray-500',
-    outline:
-      'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus:ring-gray-400',
-    ghost: 'text-gray-500 hover:bg-gray-100 hover:text-gray-800',
-  };
-  return (
-    <button
-      type={type}
-      onClick={onClick}
-      disabled={disabled}
-      className={cn(base, s[variant], className)}
-    >
-      {children}
-    </button>
-  );
-}
-
-function Badge({
+function ColorBadge({
   children,
   color = 'gray',
 }: {
   children: React.ReactNode;
-  color?: 'gray' | 'green' | 'amber' | 'red' | 'blue';
+  color?: keyof typeof badgeColors;
 }) {
-  const s = {
-    gray: 'bg-gray-100  text-gray-600  border-gray-200',
-    green: 'bg-green-50  text-green-700 border-green-200',
-    amber: 'bg-amber-50  text-amber-700 border-amber-200',
-    red: 'bg-red-50    text-red-600   border-red-200',
-    blue: 'bg-blue-50   text-blue-700  border-blue-200',
-  };
   return (
     <span
       className={cn(
         'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium',
-        s[color],
+        badgeColors[color],
       )}
     >
       {children}
@@ -488,18 +449,18 @@ export function DeliveriesAdminView({
       {/* ── Date nav ── */}
       <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
         <div className="flex flex-wrap items-center gap-2">
-          <Btn variant="outline" onClick={() => gotoDate(dateOffset(-1))}>
+          <Button size="sm"variant="outline" onClick={() => gotoDate(dateOffset(-1))}>
             ← Hari sebelum
-          </Btn>
+          </Button>
           <input
             type="date"
             value={dateStr}
             onChange={(e) => e.target.value && gotoDate(e.target.value)}
             className="h-8 rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400"
           />
-          <Btn variant="outline" onClick={() => gotoDate(dateOffset(1))}>
+          <Button size="sm"variant="outline" onClick={() => gotoDate(dateOffset(1))}>
             Hari sesudah →
-          </Btn>
+          </Button>
           <span className="ml-auto text-xs text-gray-400">
             {scheduled.length} dijadwalkan · {unscheduled.length} belum dijadwal
           </span>
@@ -591,15 +552,15 @@ export function DeliveriesAdminView({
                     </td>
                     <td className={cn(td, 'pr-5')}>
                       {d.isAssigned ? (
-                        <Badge color="amber">
+                        <ColorBadge color="amber">
                           <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block" />
                           On Delivery
-                        </Badge>
+                        </ColorBadge>
                       ) : (
-                        <Badge color="green">
+                        <ColorBadge color="green">
                           <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
                           Available
-                        </Badge>
+                        </ColorBadge>
                       )}
                     </td>
                   </tr>
@@ -620,16 +581,16 @@ export function DeliveriesAdminView({
             </span>
           </h2>
           <div className="flex flex-wrap gap-2">
-            <Btn variant="outline" onClick={handleBackfill} disabled={pending}>
+            <Button size="sm"variant="outline" onClick={handleBackfill} disabled={pending}>
               Backfill Coords
-            </Btn>
-            <Btn
+            </Button>
+            <Button size="sm"
               onClick={handleAssignDate}
               disabled={pending || !selectedUnscheduled.size}
             >
               Jadwalkan ke {dateStr}
               {selectedUnscheduled.size > 0 && ` (${selectedUnscheduled.size})`}
-            </Btn>
+            </Button>
           </div>
         </div>
 
@@ -712,9 +673,9 @@ export function DeliveriesAdminView({
                     </td>
                     <td className={cn(td, 'pr-5 text-center')}>
                       {e.hasCoords ? (
-                        <Badge color="green">📍 Ada</Badge>
+                        <ColorBadge color="green">📍 Ada</ColorBadge>
                       ) : (
-                        <Badge color="red">📍 Tidak ada</Badge>
+                        <ColorBadge color="red">📍 Tidak ada</ColorBadge>
                       )}
                     </td>
                   </tr>
@@ -733,20 +694,20 @@ export function DeliveriesAdminView({
               Rute — {dateStr}
             </h2>
             <div className="flex flex-wrap gap-2">
-              <Btn
+              <Button size="sm"
                 variant="outline"
                 onClick={handleClearSchedule}
                 disabled={pending || !scheduled.length}
               >
                 Kosongkan Jadwal
-              </Btn>
-              <Btn
+              </Button>
+              <Button size="sm"
                 variant="outline"
                 onClick={handleResetRoutes}
                 disabled={pending || !scheduled.length}
               >
                 Reset Rute
-              </Btn>
+              </Button>
 
               <div className="flex items-center gap-2 border border-gray-300 rounded-md p-1 pl-3 ml-2">
                 <label className="text-xs text-gray-500 font-medium">
@@ -765,13 +726,13 @@ export function DeliveriesAdminView({
                   className="h-6 w-12 rounded bg-white px-1 text-xs text-center border focus:outline-none focus:ring-1"
                 />
                 <span className="text-xs text-gray-500 mr-2">rute</span>
-                <Btn
+                <Button size="sm"
                   onClick={handleGenerate}
                   disabled={pending || !scheduled.length}
                   className="py-1 px-3 h-6"
                 >
                   Generate
-                </Btn>
+                </Button>
               </div>
             </div>
           </div>
@@ -798,12 +759,12 @@ export function DeliveriesAdminView({
                   Pilih driver untuk tiap rute
                 </p>
                 <div className="flex gap-2">
-                  <Btn variant="outline" onClick={() => setBuckets(null)}>
+                  <Button size="sm"variant="outline" onClick={() => setBuckets(null)}>
                     Batal
-                  </Btn>
-                  <Btn onClick={handleCommitDrivers} disabled={pending}>
+                  </Button>
+                  <Button size="sm"onClick={handleCommitDrivers} disabled={pending}>
                     Commit
-                  </Btn>
+                  </Button>
                 </div>
               </div>
               {buckets.map((entryIds, i) => (
@@ -870,14 +831,14 @@ export function DeliveriesAdminView({
                       {stops.length} stop
                     </span>
                   </div>
-                  <Btn
+                  <Button size="sm"
                     variant="ghost"
                     className="text-xs"
                     onClick={() => handleUnassign(stops.map((s) => s.id))}
                     disabled={pending}
                   >
                     Lepas dari jadwal
-                  </Btn>
+                  </Button>
                 </div>
 
                 {/* stops */}
@@ -956,14 +917,14 @@ export function DeliveriesAdminView({
                               {s.buyerAddress ?? '—'}
                             </td>
                             <td className={cn(td, 'text-center')}>
-                              <Badge
+                              <ColorBadge
                                 color={
                                   STATUS_COLOR[s.delivery?.status ?? ''] ??
                                   'gray'
                                 }
                               >
                                 {s.delivery?.status ?? 'PENDING'}
-                              </Badge>
+                              </ColorBadge>
                             </td>
                             <td className={cn(td, 'pr-4 text-right')}>
                               {href && (

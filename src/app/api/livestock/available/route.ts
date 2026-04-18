@@ -16,21 +16,26 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export async function GET() {
-  const livestock = await prisma.livestock.findMany({
-    where: { isSold: false, condition: 'SEHAT', entry: null },
-    orderBy: { createdAt: 'desc' },
-    select: {
-      id: true,
-      sku: true,
-      type: true,
-      grade: true,
-      hargaJual: true,
-      weightMin: true,
-      weightMax: true,
-      condition: true,
-      photoUrl: true,
-    },
-  });
+  try {
+    const livestock = await prisma.livestock.findMany({
+      where: { isSold: false, condition: 'SEHAT', entry: null },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        sku: true,
+        type: true,
+        grade: true,
+        hargaJual: true,
+        weightMin: true,
+        weightMax: true,
+        condition: true,
+        photoUrl: true,
+      },
+    });
 
-  return NextResponse.json(livestock);
+    return NextResponse.json(livestock);
+  } catch (err) {
+    console.error('[api/livestock/available]', err);
+    return NextResponse.json({ error: 'Gagal memuat data hewan' }, { status: 500 });
+  }
 }

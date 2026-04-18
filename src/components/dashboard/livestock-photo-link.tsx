@@ -1,8 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import Image from 'next/image';
-import { X } from 'lucide-react';
+import { useCallback, useState } from 'react';
+import { Lightbox } from '@/components/ui/lightbox';
 
 export function LivestockPhotoLink({
   photoUrl,
@@ -16,6 +15,7 @@ export function LivestockPhotoLink({
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const onClose = useCallback(() => setOpen(false), []);
 
   if (!photoUrl) {
     return <span className={className}>{children}</span>;
@@ -42,39 +42,7 @@ export function LivestockPhotoLink({
       >
         {children}
       </span>
-      {open && (
-        <div
-          className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"
-          onClick={(e) => {
-            e.stopPropagation();
-            setOpen(false);
-          }}
-        >
-          <div
-            className="relative max-w-lg w-full rounded-lg overflow-hidden shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Image
-              src={photoUrl}
-              alt={alt}
-              width={640}
-              height={480}
-              sizes="(max-width: 640px) 100vw, 640px"
-              className="w-full h-auto object-contain"
-            />
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setOpen(false);
-              }}
-              className="absolute top-2 right-2 bg-black/50 hover:bg-black/80 text-white rounded-full p-1 transition-colors"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-      )}
+      <Lightbox src={photoUrl} alt={alt} open={open} onClose={onClose} />
     </>
   );
 }

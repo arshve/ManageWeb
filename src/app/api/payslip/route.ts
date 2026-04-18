@@ -17,6 +17,7 @@ import { requireRole } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
 export async function GET() {
+  try {
   // Only admins can view payslip data
   await requireRole("ADMIN");
 
@@ -65,4 +66,8 @@ export async function GET() {
   });
 
   return NextResponse.json(payslips);
+  } catch (err) {
+    console.error('[api/payslip]', err);
+    return NextResponse.json({ error: 'Gagal memuat data payslip' }, { status: 500 });
+  }
 }

@@ -18,14 +18,19 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid coords' }, { status: 400 });
   }
 
-  await prisma.profile.update({
-    where: { id: profile.id },
-    data: {
-      lastLat: lat,
-      lastLng: lng,
-      lastLocationAt: new Date(),
-    },
-  });
+  try {
+    await prisma.profile.update({
+      where: { id: profile.id },
+      data: {
+        lastLat: lat,
+        lastLng: lng,
+        lastLocationAt: new Date(),
+      },
+    });
 
-  return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error('[api/driver/location]', err);
+    return NextResponse.json({ error: 'Gagal memperbarui lokasi' }, { status: 500 });
+  }
 }

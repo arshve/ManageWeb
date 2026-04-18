@@ -57,6 +57,14 @@ enum PaymentStatus {
   LUNAS
 }
 
+enum Pengiriman {
+  HARI_H
+  H_1
+  H_2
+  H_3
+  TITIP_POTONG
+}
+
 model Profile {
   id             String               @id @default(cuid())
   username       String               @unique
@@ -112,11 +120,11 @@ model Entry {
   paymentStatus PaymentStatus @default(BELUM_BAYAR)
   buyerName     String
   buyerPhone    String?
-  buyerWa       String?
   buyerAddress  String?
   buyerMaps     String?
   buyerLat      Float?
   buyerLng      Float?
+  pengiriman    Pengiriman?
   notes         String?
   buktiTransfer String[]      @default([])
   isSent        Boolean       @default(false)

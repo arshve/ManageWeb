@@ -9,21 +9,19 @@ import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 export default async function AdminDashboardPage() {
-  const [
-    totalLivestock,
-    soldLivestock,
-    totalEntries,
-    pendingEntries,
-    totalSales,
-    approvedEntries,
-    allEntries,
-    availableLivestock,
-  ] = await Promise.all([
-    prisma.livestock.count(),
-    prisma.livestock.count({ where: { isSold: true } }),
-    prisma.entry.count(),
-    prisma.entry.count({ where: { status: 'PENDING' } }),
-    prisma.profile.count({ where: { role: 'SALES', isActive: true } }),
+  const totalLivestock = await prisma.livestock.count();
+  const soldLivestock = await prisma.livestock.count({
+    where: { isSold: true },
+  });
+  const totalEntries = await prisma.entry.count();
+  const pendingEntries = await prisma.entry.count({
+    where: { status: 'PENDING' },
+  });
+  const totalSales = await prisma.profile.count({
+    where: { role: 'SALES', isActive: true },
+  });
+
+  const [approvedEntries, allEntries, availableLivestock] = await Promise.all([
     prisma.entry.findMany({
       where: { status: 'APPROVED' },
       select: { hargaJual: true, hargaModal: true, profit: true },

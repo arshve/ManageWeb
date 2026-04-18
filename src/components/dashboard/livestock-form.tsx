@@ -11,7 +11,8 @@
 
 'use client';
 
-import React, { useState, useRef } from 'react';
+// 1. Add useEffect to the imports
+import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { RupiahInput } from '@/components/ui/rupiah-input';
@@ -61,7 +62,6 @@ export function LivestockForm({ livestock, trigger }: LivestockFormProps) {
   const [type, setType] = useState(livestock?.type ?? 'KAMBING');
   const [grade, setGrade] = useState(livestock?.grade ?? 'A');
   const [condition, setCondition] = useState(livestock?.condition ?? 'SEHAT');
-  // Single text input — accepts "300" or "250-300". Parsed on submit into min/max.
   const [weight, setWeight] = useState(
     formatWeight(
       livestock?.weightMin ?? null,
@@ -74,10 +74,6 @@ export function LivestockForm({ livestock, trigger }: LivestockFormProps) {
   const [tag, setTag] = useState(livestock?.tag ?? '');
   const [notes, setNotes] = useState(livestock?.notes ?? '');
 
-  // Photo state
-  // `photoUrl` = the final URL stored in DB (existing or newly uploaded)
-  // `photoFile` = the File object picked by the user, pending upload
-  // `photoPreview` = local object URL for instant preview before upload
   const [photoUrl, setPhotoUrl] = useState(livestock?.photoUrl ?? '');
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string>(
@@ -85,18 +81,36 @@ export function LivestockForm({ livestock, trigger }: LivestockFormProps) {
   );
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  /** Handle file selection: create a local preview URL immediately */
+  useEffect(() => {
+    if (open) {
+      setSku(livestock?.sku ?? '');
+      setType(livestock?.type ?? 'KAMBING');
+      setGrade(livestock?.grade ?? 'A');
+      setCondition(livestock?.condition ?? 'SEHAT');
+      setWeight(
+        formatWeight(
+          livestock?.weightMin ?? null,
+          livestock?.weightMax ?? null,
+        )?.replace(' kg', '') ?? '',
+      );
+      setHargaJual(livestock?.hargaJual?.toString() ?? '');
+      setTag(livestock?.tag ?? '');
+      setNotes(livestock?.notes ?? '');
+      setPhotoUrl(livestock?.photoUrl ?? '');
+      setPhotoFile(null);
+      setPhotoPreview(livestock?.photoUrl ?? '');
+    }
+  }, [open, livestock]);
+
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
     if (!file.type.startsWith('image/')) {
       toast.error('Hanya file gambar yang diperbolehkan');
       return;
     }
 
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast.error('Ukuran foto maksimal 5MB');
       return;
@@ -104,14 +118,12 @@ export function LivestockForm({ livestock, trigger }: LivestockFormProps) {
 
     setPhotoFile(file);
 
-    // Revoke previous object URL to avoid memory leaks
     if (photoPreview && photoPreview.startsWith('blob:')) {
       URL.revokeObjectURL(photoPreview);
     }
     setPhotoPreview(URL.createObjectURL(file));
   }
 
-  /** Remove the selected/existing photo */
   function handleRemovePhoto() {
     if (photoPreview && photoPreview.startsWith('blob:')) {
       URL.revokeObjectURL(photoPreview);
@@ -122,10 +134,6 @@ export function LivestockForm({ livestock, trigger }: LivestockFormProps) {
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
-  /**
-   * Upload the selected file to /api/upload.
-   * Returns the remote URL on success, or throws on failure.
-   */
   async function uploadPhoto(file: File): Promise<string> {
     const formData = new FormData();
     formData.append('file', file);
@@ -148,7 +156,6 @@ export function LivestockForm({ livestock, trigger }: LivestockFormProps) {
     e.preventDefault();
     setLoading(true);
 
-    // Parse weight input ("300" or "250-300") into min/max before uploading anything
     let weightMin: number | null = null;
     let weightMax: number | null = null;
     try {
@@ -156,18 +163,19 @@ export function LivestockForm({ livestock, trigger }: LivestockFormProps) {
       weightMin = parsed.min;
       weightMax = parsed.max;
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Format berat tidak valid');
+      toast.error(
+        err instanceof Error ? err.message : 'Format berat tidak valid',
+      );
       setLoading(false);
       return;
     }
 
     try {
-      // If a new file was picked, upload it first and get the URL
       let finalPhotoUrl = photoUrl;
       if (photoFile) {
         try {
           finalPhotoUrl = await uploadPhoto(photoFile);
-          setPhotoUrl(finalPhotoUrl); // keep state in sync
+          setPhotoUrl(finalPhotoUrl);
         } catch (err) {
           toast.error(
             err instanceof Error ? err.message : 'Gagal mengunggah foto',
@@ -180,7 +188,6 @@ export function LivestockForm({ livestock, trigger }: LivestockFormProps) {
       const formData = new FormData();
       formData.set('sku', sku);
       formData.set('type', type);
-      // Sapi has no grade — omit so server writes null
       if (type !== 'SAPI') formData.set('grade', grade);
       formData.set('condition', condition);
       if (weightMin !== null) formData.set('weightMin', weightMin.toString());
@@ -319,12 +326,9 @@ export function LivestockForm({ livestock, trigger }: LivestockFormProps) {
               />
             </div>
 
-            {/* ── Photo Upload ── */}
             <div className="space-y-2">
               <Label>Foto Hewan</Label>
-
               {photoPreview ? (
-                /* Preview card — shown when a photo is selected or already exists */
                 <div className="relative w-full rounded-lg overflow-hidden border bg-muted">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -332,7 +336,6 @@ export function LivestockForm({ livestock, trigger }: LivestockFormProps) {
                     alt="Preview foto hewan"
                     className="w-full h-48 object-cover"
                   />
-                  {/* Overlay: change or remove buttons */}
                   <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                     <Button
                       type="button"
@@ -353,7 +356,6 @@ export function LivestockForm({ livestock, trigger }: LivestockFormProps) {
                       Hapus
                     </Button>
                   </div>
-                  {/* Badge: shows "Foto baru" when a new file is staged but not yet uploaded */}
                   {photoFile && (
                     <span className="absolute top-2 left-2 text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded-full">
                       Foto baru
@@ -361,7 +363,6 @@ export function LivestockForm({ livestock, trigger }: LivestockFormProps) {
                   )}
                 </div>
               ) : (
-                /* Drop zone — shown when no photo is selected */
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
@@ -375,7 +376,6 @@ export function LivestockForm({ livestock, trigger }: LivestockFormProps) {
                 </button>
               )}
 
-              {/* Hidden native file input */}
               <input
                 ref={fileInputRef}
                 type="file"

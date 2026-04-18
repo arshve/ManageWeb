@@ -103,31 +103,65 @@ export async function createEntry(formData: FormData) {
   const hpp = hargaModal ? hargaModal + (resellerCut ?? 0) : null;
   const profit = hpp !== null ? hargaJual - hpp : null;
 
-  const entry = await prisma.entry.create({
-    data: {
-      invoiceNo: generateInvoiceNo(),
-      livestockId,
-      salesId: profile.id,
-      hargaJual,
-      hargaModal,
-      resellerCut,
-      hpp,
-      profit,
-      dp: formData.get('dp') ? Number(formData.get('dp')) : null,
-      totalBayar: formData.get('totalBayar')
-        ? Number(formData.get('totalBayar'))
-        : null,
-      paymentStatus:
-        (formData.get('paymentStatus') as 'BELUM_BAYAR' | 'DP' | 'LUNAS') ||
-        'BELUM_BAYAR',
-      buyerName: formData.get('buyerName') as string,
-      buyerPhone: (formData.get('buyerPhone') as string) || null,
-      buyerWa: (formData.get('buyerWa') as string) || null,
-      buyerAddress: (formData.get('buyerAddress') as string) || null,
-      buyerMaps: (formData.get('buyerMaps') as string) || null,
-      notes: (formData.get('notes') as string) || null,
-      buktiTransfer: formData.getAll('buktiTransfer') as string[],
-    },
+  // Determine Sales ID & Status based on Role
+  let salesId = profile.id;
+  let status: 'PENDING' | 'APPROVED' = 'PENDING';
+  let approvedAt: Date | null = null;
+  let approvedBy: string | null = null;
+
+  if (profile.role === 'ADMIN') {
+    const adminSelectedSalesId = formData.get('salesId') as string;
+    if (adminSelectedSalesId) {
+      salesId = adminSelectedSalesId;
+    }
+    status = 'APPROVED';
+    approvedAt = new Date();
+    approvedBy = profile.id;
+  }
+
+  const entryData = {
+    invoiceNo: generateInvoiceNo(),
+    livestockId,
+    salesId,
+    status,
+    hargaJual,
+    hargaModal,
+    resellerCut,
+    hpp,
+    profit,
+    dp: formData.get('dp') ? Number(formData.get('dp')) : null,
+    totalBayar: formData.get('totalBayar')
+      ? Number(formData.get('totalBayar'))
+      : null,
+    paymentStatus:
+      (formData.get('paymentStatus') as 'BELUM_BAYAR' | 'DP' | 'LUNAS') ||
+      'BELUM_BAYAR',
+    buyerName: formData.get('buyerName') as string,
+    buyerPhone: (formData.get('buyerPhone') as string) || null,
+    buyerWa: (formData.get('buyerWa') as string) || null,
+    buyerAddress: (formData.get('buyerAddress') as string) || null,
+    buyerMaps: (formData.get('buyerMaps') as string) || null,
+    notes: (formData.get('notes') as string) || null,
+    buktiTransfer: formData.getAll('buktiTransfer') as string[],
+    approvedAt,
+    approvedBy,
+  };
+
+  // Create entry and update livestock in a transaction so we don't end up with data mismatch
+  const entry = await prisma.$transaction(async (tx) => {
+    const created = await tx.entry.create({
+      data: entryData,
+    });
+
+    // Automatically mark as sold if it's approved immediately (by Admin)
+    if (status === 'APPROVED') {
+      await tx.livestock.update({
+        where: { id: livestockId },
+        data: { isSold: true },
+      });
+    }
+
+    return created;
   });
 
   await logAudit({
@@ -141,6 +175,7 @@ export async function createEntry(formData: FormData) {
 
   revalidatePath('/sales');
   revalidatePath('/admin');
+  revalidatePath('/catalogue');
   return { success: true, entryId: entry.id };
 }
 
@@ -359,7 +394,9 @@ export async function updateEntry(id: string, formData: FormData) {
   });
 
   // Delete removed photos from storage (diff between old and new URL list)
-  const removedUrls = entry.buktiTransfer.filter((url) => !buktiTransfer.includes(url));
+  const removedUrls = entry.buktiTransfer.filter(
+    (url) => !buktiTransfer.includes(url),
+  );
   await deleteStorageFiles(removedUrls);
 
   revalidatePath('/admin');

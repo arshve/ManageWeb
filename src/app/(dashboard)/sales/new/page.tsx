@@ -21,13 +21,14 @@ import { toast } from 'sonner';
 import { Beef } from 'lucide-react';
 import { LivestockPhoto } from '@/components/dashboard/livestock-photo';
 import { BuktiTransferUpload } from '@/components/dashboard/bukti-transfer-upload';
-import { formatWeight } from '@/lib/format';
+import { formatWeight, formatRupiah } from '@/lib/format';
 
 interface AvailableLivestock {
   id: string;
   sku: string;
   type: string;
   grade: string | null;
+  hargaJual: number | null;
   weightMin: number | null;
   weightMax: number | null;
   condition: string;
@@ -42,7 +43,7 @@ export default function NewEntryPage() {
   const router = useRouter();
 
   useEffect(() => {
-    fetch('/api/livestock/available')
+    fetch('/api/livestock/available', { cache: 'no-store' })
       .then((res) => res.json())
       .then(setLivestock)
       .catch(() => toast.error('Gagal memuat data hewan'));
@@ -109,12 +110,12 @@ export default function NewEntryPage() {
             {selected && (
               <div className="flex gap-4 p-3 bg-muted rounded-lg text-sm">
                 {/* Photo */}
-                <div className="relative w-24 h-24 flex-shrink-0 rounded-md overflow-hidden bg-background">
+                <div className="relative w-24 h-28 flex-shrink-0 rounded-md overflow-hidden bg-background">
                   {selected.photoUrl ? (
                     <LivestockPhoto
                       photoUrl={selected.photoUrl}
                       alt={`${selected.type}${selected.grade ? ' ' + selected.grade : ''}`}
-                      thumbnailClassName="w-24 h-24"
+                      thumbnailClassName="w-24 h-28"
                       priority
                     />
                   ) : (
@@ -140,6 +141,12 @@ export default function NewEntryPage() {
                   </p>
                   <p>
                     <strong>Kondisi:</strong> {selected.condition}
+                  </p>
+                  <p>
+                    <strong>Harga Katalog:</strong>{' '}
+                    {selected.hargaJual
+                      ? formatRupiah(selected.hargaJual)
+                      : 'Belum diset'}
                   </p>
                 </div>
               </div>

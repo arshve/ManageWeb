@@ -10,13 +10,13 @@
  * - SALES: Can only create entries and view their own entries
  */
 
-"use server";
+'use server';
 
-import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/auth";
-import { revalidatePath } from "next/cache";
-import { hashSync } from "bcryptjs";
-import { logAudit } from "@/lib/audit";
+import { prisma } from '@/lib/prisma';
+import { requireRole } from '@/lib/auth';
+import { revalidatePath } from 'next/cache';
+import { hashSync } from 'bcryptjs';
+import { logAudit } from '@/lib/audit';
 
 /**
  * Creates a new user account. Admin-only.
@@ -27,18 +27,20 @@ import { logAudit } from "@/lib/audit";
  * @returns { success } or { error: "Username sudah terdaftar" }
  */
 export async function createUser(formData: FormData) {
-  const actor = await requireRole("ADMIN");
+  const actor = await requireRole('ADMIN');
 
-  const username = formData.get("username") as string;
-  const password = formData.get("password") as string;
-  const name = formData.get("name") as string;
-  const phone = (formData.get("phone") as string) || null;
-  const role = (formData.get("role") as "ADMIN" | "SALES" | "MANAGE" | "DRIVER") || "SALES";
+  const username = formData.get('username') as string;
+  const password = formData.get('password') as string;
+  const name = formData.get('name') as string;
+  const phone = (formData.get('phone') as string) || null;
+  const role =
+    (formData.get('role') as 'ADMIN' | 'SALES' | 'MANAGE' | 'DRIVER') ||
+    'SALES';
 
   // Check for duplicate username
   const existing = await prisma.profile.findUnique({ where: { username } });
   if (existing) {
-    return { error: "Username sudah terdaftar" };
+    return { error: 'Username sudah terdaftar' };
   }
 
   const created = await prisma.profile.create({
@@ -53,14 +55,14 @@ export async function createUser(formData: FormData) {
 
   await logAudit({
     actor,
-    action: "CREATE",
-    entity: "Profile",
+    action: 'CREATE',
+    entity: 'Profile',
     entityId: created.id,
     label: `${created.username} — ${created.name}`,
     after: created,
   });
 
-  revalidatePath("/admin/users");
+  revalidatePath('/admin/users');
   return { success: true };
 }
 
@@ -74,16 +76,16 @@ export async function createUser(formData: FormData) {
  * @returns { success }
  */
 export async function updateUser(id: string, formData: FormData) {
-  const actor = await requireRole("ADMIN");
+  const actor = await requireRole('ADMIN');
 
   const before = await prisma.profile.findUnique({ where: { id } });
-  if (!before) return { error: "User tidak ditemukan" };
+  if (!before) return { error: 'User tidak ditemukan' };
 
-  const name = formData.get("name") as string;
-  const phone = (formData.get("phone") as string) || null;
-  const role = formData.get("role") as "ADMIN" | "SALES";
-  const isActive = formData.get("isActive") === "true";
-  const newPassword = formData.get("newPassword") as string;
+  const name = formData.get('name') as string;
+  const phone = (formData.get('phone') as string) || null;
+  const role = formData.get('role') as 'ADMIN' | 'SALES';
+  const isActive = formData.get('isActive') === 'true';
+  const newPassword = formData.get('newPassword') as string;
 
   const data: Record<string, unknown> = { name, phone, role, isActive };
 
@@ -99,15 +101,15 @@ export async function updateUser(id: string, formData: FormData) {
 
   await logAudit({
     actor,
-    action: "UPDATE",
-    entity: "Profile",
+    action: 'UPDATE',
+    entity: 'Profile',
     entityId: id,
     label: `${updated.username} — ${updated.name}`,
     before,
     after: { ...updated, passwordChanged: Boolean(data.password) },
   });
 
-  revalidatePath("/admin/users");
+  revalidatePath('/admin/users');
   return { success: true };
 }
 
@@ -121,10 +123,10 @@ export async function updateUser(id: string, formData: FormData) {
  * @returns { success }
  */
 export async function toggleUserActive(id: string, isActive: boolean) {
-  const actor = await requireRole("ADMIN");
+  const actor = await requireRole('ADMIN');
 
   const before = await prisma.profile.findUnique({ where: { id } });
-  if (!before) return { error: "User tidak ditemukan" };
+  if (!before) return { error: 'User tidak ditemukan' };
 
   await prisma.profile.update({
     where: { id },
@@ -133,14 +135,23 @@ export async function toggleUserActive(id: string, isActive: boolean) {
 
   await logAudit({
     actor,
-    action: "UPDATE",
-    entity: "Profile",
+    action: 'UPDATE',
+    entity: 'Profile',
     entityId: id,
     label: `${before.username} — ${isActive ? 'aktif' : 'nonaktif'}`,
     before: { isActive: before.isActive },
     after: { isActive },
   });
 
-  revalidatePath("/admin/users");
+  revalidatePath('/admin/users');
   return { success: true };
+}
+
+export async function getActiveSales() {
+  await requireRole('ADMIN');
+  return prisma.profile.findMany({
+    where: { role: 'SALES', isActive: true },
+    select: { id: true, name: true },
+    orderBy: { name: 'asc' },
+  });
 }

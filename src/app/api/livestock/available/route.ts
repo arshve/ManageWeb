@@ -12,6 +12,9 @@
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET() {
   const livestock = await prisma.livestock.findMany({
     where: { isSold: false, condition: 'SEHAT', entry: null },
@@ -21,6 +24,7 @@ export async function GET() {
       sku: true,
       type: true,
       grade: true,
+      hargaJual: true,
       weightMin: true,
       weightMax: true,
       condition: true,

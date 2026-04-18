@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { Label } from '@/components/ui/label'; // <-- Add this import
 import { LivestockPhoto } from '@/components/dashboard/livestock-photo';
 import { LivestockActions } from '@/components/dashboard/livestock-actions';
 import {
@@ -88,6 +89,7 @@ export function LivestockTableClient({
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [conditionFilter, setConditionFilter] = useState('ALL');
+  const [gradeFilter, setGradeFilter] = useState('ALL');
 
   const filtered = useMemo(() => {
     return livestock.filter((item) => {
@@ -96,59 +98,94 @@ export function LivestockTableClient({
       if (statusFilter === 'AVAILABLE' && item.isSold) return false;
       if (conditionFilter !== 'ALL' && item.condition !== conditionFilter)
         return false;
+      if (gradeFilter !== 'ALL' && item.grade !== gradeFilter) return false;
       return true;
     });
-  }, [livestock, typeFilter, statusFilter, conditionFilter]);
+  }, [livestock, typeFilter, statusFilter, conditionFilter, gradeFilter]);
 
   const hasFilters =
-    typeFilter !== 'ALL' || statusFilter !== 'ALL' || conditionFilter !== 'ALL';
+    typeFilter !== 'ALL' ||
+    statusFilter !== 'ALL' ||
+    conditionFilter !== 'ALL' ||
+    gradeFilter !== 'ALL';
 
   return (
     <div className="space-y-4">
-      {/* Filter bar */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-sm text-muted-foreground">Filter:</span>
-        <Select
-          value={typeFilter}
-          onValueChange={(val) => setTypeFilter(val ?? typeFilter)}
-        >
-          <SelectTrigger className="h-8 w-[130px] text-xs">
-            <SelectValue placeholder="Jenis" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="ALL">Semua Jenis</SelectItem>
-            <SelectItem value="KAMBING">Kambing</SelectItem>
-            <SelectItem value="DOMBA">Domba</SelectItem>
-            <SelectItem value="SAPI">Sapi</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select
-          value={statusFilter}
-          onValueChange={(val) => setStatusFilter(val ?? statusFilter)}
-        >
-          <SelectTrigger className="h-8 w-[130px] text-xs">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="ALL">Semua Status</SelectItem>
-            <SelectItem value="AVAILABLE">Tersedia</SelectItem>
-            <SelectItem value="SOLD">Terjual</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select
-          value={conditionFilter}
-          onValueChange={(val) => setConditionFilter(val ?? conditionFilter)}
-        >
-          <SelectTrigger className="h-8 w-[130px] text-xs">
-            <SelectValue placeholder="Kondisi" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="ALL">Semua Kondisi</SelectItem>
-            <SelectItem value="SEHAT">Sehat</SelectItem>
-            <SelectItem value="SAKIT">Sakit</SelectItem>
-            <SelectItem value="MATI">Mati</SelectItem>
-          </SelectContent>
-        </Select>
+      {/* Filter bar with labels */}
+      <div className="flex items-end gap-3 flex-wrap bg-muted/20 p-3 rounded-lg border border-border/50">
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">Jenis Hewan</Label>
+          <Select
+            value={typeFilter}
+            onValueChange={(val) => setTypeFilter(val ?? typeFilter)}
+          >
+            <SelectTrigger className="h-8 w-[130px] text-xs">
+              <SelectValue placeholder="Jenis" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">Semua Jenis</SelectItem>
+              <SelectItem value="KAMBING">Kambing</SelectItem>
+              <SelectItem value="DOMBA">Domba</SelectItem>
+              <SelectItem value="SAPI">Sapi</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">Grade</Label>
+          <Select
+            value={gradeFilter}
+            onValueChange={(val) => setGradeFilter(val ?? gradeFilter)}
+          >
+            <SelectTrigger className="h-8 w-[130px] text-xs">
+              <SelectValue placeholder="Grade" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">Semua Grade</SelectItem>
+              <SelectItem value="SUPER">Super</SelectItem>
+              <SelectItem value="A">A</SelectItem>
+              <SelectItem value="B">B</SelectItem>
+              <SelectItem value="C">C</SelectItem>
+              <SelectItem value="D">D</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">Status</Label>
+          <Select
+            value={statusFilter}
+            onValueChange={(val) => setStatusFilter(val ?? statusFilter)}
+          >
+            <SelectTrigger className="h-8 w-[130px] text-xs">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">Semua Status</SelectItem>
+              <SelectItem value="AVAILABLE">Tersedia</SelectItem>
+              <SelectItem value="SOLD">Terjual</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">Kondisi</Label>
+          <Select
+            value={conditionFilter}
+            onValueChange={(val) => setConditionFilter(val ?? conditionFilter)}
+          >
+            <SelectTrigger className="h-8 w-[130px] text-xs">
+              <SelectValue placeholder="Kondisi" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">Semua Kondisi</SelectItem>
+              <SelectItem value="SEHAT">Sehat</SelectItem>
+              <SelectItem value="SAKIT">Sakit</SelectItem>
+              <SelectItem value="MATI">Mati</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
         {hasFilters && (
           <button
             type="button"
@@ -156,13 +193,14 @@ export function LivestockTableClient({
               setTypeFilter('ALL');
               setStatusFilter('ALL');
               setConditionFilter('ALL');
+              setGradeFilter('ALL');
             }}
-            className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors"
+            className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors mb-2 ml-1"
           >
             Reset
           </button>
         )}
-        <span className="ml-auto text-xs text-muted-foreground">
+        <span className="ml-auto text-xs text-muted-foreground mb-2">
           {filtered.length} dari {livestock.length} hewan
         </span>
       </div>
@@ -203,84 +241,88 @@ export function LivestockTableClient({
                     ? 'text-white/70'
                     : 'text-muted-foreground';
                   return (
-                  <tr
-                    key={item.id}
-                    className={`border-b last:border-0 transition-colors ${rowClass}`}
-                  >
-                    <td className="p-3">
-                      <LivestockPhoto
-                        photoUrl={item.photoUrl}
-                        alt={`${item.type} ${item.grade} - ${item.sku}`}
-                      />
-                    </td>
-                    <td className="p-3 font-mono text-xs whitespace-nowrap">
-                      {item.sku}
-                    </td>
-                    <td className={`p-3 text-xs ${mutedClass}`}>
-                      {item.tag || '—'}
-                    </td>
-                    <td className="p-3 whitespace-nowrap">
-                      {item.type.charAt(0) + item.type.slice(1).toLowerCase()}
-                    </td>
-                    <td className="p-3 text-center">
-                      {item.grade ? (
-                        <Badge
-                          variant="outline"
-                          className={
-                            isMati ? 'border-white/40 text-white' : ''
-                          }
-                        >
-                          {item.grade}
-                        </Badge>
-                      ) : (
-                        <span className={mutedClass}>—</span>
-                      )}
-                    </td>
-                    <td className="p-3 text-right tabular-nums whitespace-nowrap">
-                      {formatWeight(item.weightMin, item.weightMax) ?? '—'}
-                    </td>
-                    <td className="p-3 text-right tabular-nums whitespace-nowrap">
-                      {item.hargaJual ? formatRupiah(item.hargaJual) : '—'}
-                    </td>
-                    <td className="p-3 text-center">
-                      <ConditionIcon condition={item.condition} />
-                    </td>
-                    <td className="p-3 text-center">
-                      <StatusIcon isSold={item.isSold} />
-                    </td>
-                    <td className="p-3 text-xs whitespace-nowrap">
-                      {item.buyerName || <span className={mutedClass}>—</span>}
-                    </td>
-                    <td className="p-3 text-xs whitespace-nowrap">
-                      {item.salesName || <span className={mutedClass}>—</span>}
-                    </td>
-                    <td className="p-3 text-xs whitespace-nowrap">
-                      {item.deliveryStatus ? (
-                        <div className="flex items-center gap-1.5">
-                          <span>{item.driverName ?? '—'}</span>
+                    <tr
+                      key={item.id}
+                      className={`border-b last:border-0 transition-colors ${rowClass}`}
+                    >
+                      <td className="p-3">
+                        <LivestockPhoto
+                          photoUrl={item.photoUrl}
+                          alt={`${item.type} ${item.grade} - ${item.sku}`}
+                        />
+                      </td>
+                      <td className="p-3 font-mono text-xs whitespace-nowrap">
+                        {item.sku}
+                      </td>
+                      <td className={`p-3 text-xs ${mutedClass}`}>
+                        {item.tag || '—'}
+                      </td>
+                      <td className="p-3 whitespace-nowrap">
+                        {item.type.charAt(0) + item.type.slice(1).toLowerCase()}
+                      </td>
+                      <td className="p-3 text-center">
+                        {item.grade ? (
                           <Badge
                             variant="outline"
                             className={
-                              isMati
-                                ? 'border-white/40 text-white text-[10px]'
-                                : 'text-[10px]'
+                              isMati ? 'border-white/40 text-white' : ''
                             }
                           >
-                            {item.deliveryStatus}
+                            {item.grade}
                           </Badge>
-                        </div>
-                      ) : (
-                        <span className={mutedClass}>—</span>
-                      )}
-                    </td>
-                    {!readOnly && (
-                      <td className="p-3">
-                        <div className="flex items-center justify-center">
-                          <LivestockActions livestock={item} />
-                        </div>
+                        ) : (
+                          <span className={mutedClass}>—</span>
+                        )}
                       </td>
-                    )}
-                  </tr>
+                      <td className="p-3 text-right tabular-nums whitespace-nowrap">
+                        {formatWeight(item.weightMin, item.weightMax) ?? '—'}
+                      </td>
+                      <td className="p-3 text-right tabular-nums whitespace-nowrap">
+                        {item.hargaJual ? formatRupiah(item.hargaJual) : '—'}
+                      </td>
+                      <td className="p-3 text-center">
+                        <ConditionIcon condition={item.condition} />
+                      </td>
+                      <td className="p-3 text-center">
+                        <StatusIcon isSold={item.isSold} />
+                      </td>
+                      <td className="p-3 text-xs whitespace-nowrap">
+                        {item.buyerName || (
+                          <span className={mutedClass}>—</span>
+                        )}
+                      </td>
+                      <td className="p-3 text-xs whitespace-nowrap">
+                        {item.salesName || (
+                          <span className={mutedClass}>—</span>
+                        )}
+                      </td>
+                      <td className="p-3 text-xs whitespace-nowrap">
+                        {item.deliveryStatus ? (
+                          <div className="flex items-center gap-1.5">
+                            <span>{item.driverName ?? '—'}</span>
+                            <Badge
+                              variant="outline"
+                              className={
+                                isMati
+                                  ? 'border-white/40 text-white text-[10px]'
+                                  : 'text-[10px]'
+                              }
+                            >
+                              {item.deliveryStatus}
+                            </Badge>
+                          </div>
+                        ) : (
+                          <span className={mutedClass}>—</span>
+                        )}
+                      </td>
+                      {!readOnly && (
+                        <td className="p-3">
+                          <div className="flex items-center justify-center">
+                            <LivestockActions livestock={item} />
+                          </div>
+                        </td>
+                      )}
+                    </tr>
                   );
                 })}
                 {filtered.length === 0 && (
@@ -341,9 +383,7 @@ function MobileLivestockCard({
         : 'bg-card';
 
   return (
-    <div
-      className={`rounded-lg border shadow-sm overflow-hidden ${cardClass}`}
-    >
+    <div className={`rounded-lg border shadow-sm overflow-hidden ${cardClass}`}>
       {/* Header — photo opens lightbox, rest toggles expand */}
       <div className="flex items-center gap-3 p-3 hover:bg-muted/30 transition-colors">
         <LivestockPhoto
@@ -386,11 +426,7 @@ function MobileLivestockCard({
             <LivestockCardRow
               label="Grade"
               value={
-                item.grade ? (
-                  <Badge variant="outline">{item.grade}</Badge>
-                ) : (
-                  '—'
-                )
+                item.grade ? <Badge variant="outline">{item.grade}</Badge> : '—'
               }
             />
             <LivestockCardRow

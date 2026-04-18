@@ -17,11 +17,12 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DashboardShell } from '@/components/dashboard/dashboard-shell';
 import { createEntry } from '@/app/actions/entries';
+import { getActiveSales } from '@/app/actions/users';
 import { toast } from 'sonner';
 import { Beef } from 'lucide-react';
 import { LivestockPhoto } from '@/components/dashboard/livestock-photo';
 import { BuktiTransferUpload } from '@/components/dashboard/bukti-transfer-upload';
-import { formatWeight } from '@/lib/format';
+import { formatWeight, formatRupiah } from '@/lib/format';
 
 interface AvailableLivestock {
   id: string;
@@ -32,38 +33,66 @@ interface AvailableLivestock {
   weightMax: number | null;
   condition: string;
   photoUrl: string | null;
+  hargaJual: number | null;
+}
+
+interface SalesUser {
+  id: string;
+  name: string;
 }
 
 export default function AdminNewEntryPage() {
   const [livestock, setLivestock] = useState<AvailableLivestock[]>([]);
+  const [salesUsers, setSalesUsers] = useState<SalesUser[]>([]);
   const [selectedId, setSelectedId] = useState('');
+  const [selectedSalesId, setSelectedSalesId] = useState('');
   const [buktiTransferUrls, setBuktiTransferUrls] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [hargaJual, setHargaJual] = useState<string>('');
   const router = useRouter();
 
   useEffect(() => {
-    fetch('/api/livestock/available')
+    fetch('/api/livestock/available', { cache: 'no-store' })
       .then((res) => res.json())
       .then(setLivestock)
       .catch(() => toast.error('Gagal memuat data hewan'));
+
+    getActiveSales()
+      .then(setSalesUsers)
+      .catch(() => toast.error('Gagal memuat data sales'));
   }, []);
 
   const selected = livestock.find((l) => l.id === selectedId);
+  const selectedUser = salesUsers.find((s) => s.id === selectedSalesId);
+
+  useEffect(() => {
+    if (selected && selected.hargaJual) {
+      setHargaJual(selected.hargaJual.toString());
+    } else {
+      setHargaJual('');
+    }
+  }, [selected]);
 
   async function handleSubmit(formData: FormData) {
+    if (!selectedSalesId) {
+      toast.error('Pilih sales yang menangani');
+      return;
+    }
     if (!selectedId) {
       toast.error('Pilih hewan terlebih dahulu');
       return;
     }
+
+    formData.set('salesId', selectedSalesId);
     formData.set('livestockId', selectedId);
     buktiTransferUrls.forEach((url) => formData.append('buktiTransfer', url));
     setLoading(true);
 
     const result = await createEntry(formData);
-    if ('error' in result) {
-      toast.error(result.error);
+    if (result && 'error' in result) {
+      toast.error(String(result.error));
     } else {
-      toast.success('Entry berhasil dibuat');
+      toast.success('Entry berhasil dibuat & Otomatis Disetujui');
       router.push('/admin');
     }
     setLoading(false);
@@ -72,9 +101,41 @@ export default function AdminNewEntryPage() {
   return (
     <DashboardShell
       title="Tambah Entry Baru"
-      description="Pilih hewan dan isi data pembeli"
+      description="Pilih sales, hewan, dan isi data pembeli (Otomatis Disetujui)"
     >
       <form action={handleSubmit} className="space-y-6 max-w-2xl">
+        {/* NATIVE HIDDEN INPUTS */}
+        <input type="hidden" name="salesId" value={selectedSalesId} />
+        <input type="hidden" name="livestockId" value={selectedId} />
+
+        {/* Select Sales */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">
+              Penanggung Jawab (Sales)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Select
+              value={selectedSalesId}
+              onValueChange={(val) => setSelectedSalesId(val ?? '')}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Pilih sales yang menangani pesanan...">
+                  {selectedUser ? selectedUser.name : undefined}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent className="min-w-max w-auto">
+                {salesUsers.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </CardContent>
+        </Card>
+
         {/* Select Animal */}
         <Card>
           <CardHeader>
@@ -87,7 +148,9 @@ export default function AdminNewEntryPage() {
             >
               <SelectTrigger>
                 <SelectValue placeholder="Pilih hewan yang tersedia...">
-                  {selected?.sku}
+                  {selected
+                    ? `${selected.sku} — ${selected.type}${selected.grade ? ` ${selected.grade}` : ''}`
+                    : undefined}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent className="min-w-max w-auto">
@@ -104,8 +167,7 @@ export default function AdminNewEntryPage() {
               </SelectContent>
             </Select>
             {selected && (
-              <div className="flex gap-4 p-3 bg-muted rounded-lg text-sm">
-                {/* Photo */}
+              <div className="flex gap-4 p-3 mt-3 bg-muted rounded-lg text-sm">
                 <div className="relative w-24 h-24 flex-shrink-0 rounded-md overflow-hidden bg-background">
                   {selected.photoUrl ? (
                     <LivestockPhoto
@@ -121,7 +183,6 @@ export default function AdminNewEntryPage() {
                   )}
                 </div>
 
-                {/* Info */}
                 <div className="space-y-1">
                   <p>
                     <strong>SKU:</strong> {selected.sku}
@@ -137,6 +198,12 @@ export default function AdminNewEntryPage() {
                   </p>
                   <p>
                     <strong>Kondisi:</strong> {selected.condition}
+                  </p>
+                  <p>
+                    <strong>Harga Jual:</strong>{' '}
+                    {selected.hargaJual
+                      ? formatRupiah(selected.hargaJual)
+                      : 'Belum diset'}
                   </p>
                 </div>
               </div>
@@ -190,6 +257,8 @@ export default function AdminNewEntryPage() {
               <RupiahInput
                 id="hargaJual"
                 name="hargaJual"
+                value={hargaJual}
+                onValueChange={setHargaJual}
                 required
                 placeholder="3500000"
               />
@@ -210,6 +279,7 @@ export default function AdminNewEntryPage() {
             </div>
             <div className="space-y-2">
               <Label>Status Pembayaran</Label>
+              {/* Added native hidden input for paymentStatus just in case */}
               <Select name="paymentStatus" defaultValue="BELUM_BAYAR">
                 <SelectTrigger>
                   <SelectValue />
@@ -239,7 +309,7 @@ export default function AdminNewEntryPage() {
         </Card>
 
         <Button type="submit" className="w-full" disabled={loading}>
-          {loading ? 'Menyimpan...' : 'Kirim Entry'}
+          {loading ? 'Menyimpan...' : 'Kirim Entry & Setujui'}
         </Button>
       </form>
     </DashboardShell>

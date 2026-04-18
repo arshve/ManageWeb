@@ -19,7 +19,7 @@ import { DashboardShell } from '@/components/dashboard/dashboard-shell';
 import { createEntry } from '@/app/actions/entries';
 import { getActiveSales } from '@/app/actions/users';
 import { toast } from 'sonner';
-import { Beef } from 'lucide-react';
+import { Beef, Search } from 'lucide-react';
 import { LivestockPhoto } from '@/components/dashboard/livestock-photo';
 import { BuktiTransferUpload } from '@/components/dashboard/bukti-transfer-upload';
 import { formatWeight, formatRupiah } from '@/lib/format';
@@ -34,6 +34,7 @@ interface AvailableLivestock {
   condition: string;
   photoUrl: string | null;
   hargaJual: number | null;
+  tag: string | null;
 }
 
 interface SalesUser {
@@ -44,11 +45,18 @@ interface SalesUser {
 export default function AdminNewEntryPage() {
   const [livestock, setLivestock] = useState<AvailableLivestock[]>([]);
   const [salesUsers, setSalesUsers] = useState<SalesUser[]>([]);
+
+  // Search states for dropdowns
+  const [salesSearch, setSalesSearch] = useState('');
+  const [livestockSearch, setLivestockSearch] = useState('');
+
   const [selectedId, setSelectedId] = useState('');
   const [selectedSalesId, setSelectedSalesId] = useState('');
+  const [paymentStatus, setPaymentStatus] = useState('BELUM_BAYAR');
+  const [hargaJual, setHargaJual] = useState<string>('');
+
   const [buktiTransferUrls, setBuktiTransferUrls] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
-  const [hargaJual, setHargaJual] = useState<string>('');
   const router = useRouter();
 
   useEffect(() => {
@@ -64,6 +72,21 @@ export default function AdminNewEntryPage() {
 
   const selected = livestock.find((l) => l.id === selectedId);
   const selectedUser = salesUsers.find((s) => s.id === selectedSalesId);
+
+  // Filter lists based on search
+  const filteredSales = salesUsers.filter((s) =>
+    s.name.toLowerCase().includes(salesSearch.toLowerCase()),
+  );
+
+  const filteredLivestock = livestock.filter((l) => {
+    const q = livestockSearch.toLowerCase();
+    return (
+      l.sku.toLowerCase().includes(q) ||
+      l.type.toLowerCase().includes(q) ||
+      (l.grade && l.grade.toLowerCase().includes(q)) ||
+      (l.tag && l.tag.toLowerCase().includes(q))
+    );
+  });
 
   useEffect(() => {
     if (selected && selected.hargaJual) {
@@ -83,8 +106,7 @@ export default function AdminNewEntryPage() {
       return;
     }
 
-    formData.set('salesId', selectedSalesId);
-    formData.set('livestockId', selectedId);
+    // Lampirkan URL bukti transfer ke formData
     buktiTransferUrls.forEach((url) => formData.append('buktiTransfer', url));
     setLoading(true);
 
@@ -104,9 +126,9 @@ export default function AdminNewEntryPage() {
       description="Pilih sales, hewan, dan isi data pembeli (Otomatis Disetujui)"
     >
       <form action={handleSubmit} className="space-y-6 max-w-2xl">
-        {/* NATIVE HIDDEN INPUTS */}
-        <input type="hidden" name="salesId" value={selectedSalesId} />
-        <input type="hidden" name="livestockId" value={selectedId} />
+        <input type="hidden" name="salesId" value={selectedSalesId ?? ''} />
+        <input type="hidden" name="livestockId" value={selectedId ?? ''} />
+        <input type="hidden" name="paymentStatus" value={paymentStatus ?? ''} />
 
         {/* Select Sales */}
         <Card>
@@ -117,20 +139,47 @@ export default function AdminNewEntryPage() {
           </CardHeader>
           <CardContent>
             <Select
-              value={selectedSalesId}
-              onValueChange={(val) => setSelectedSalesId(val ?? '')}
+              value={selectedSalesId || 'admin'}
+              onValueChange={(val) => {
+                const v = val ?? '';
+                setSelectedSalesId(v === 'admin' ? '' : v);
+                if (val) setSalesSearch('');
+              }}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Pilih sales yang menangani pesanan...">
+                <SelectValue placeholder="Diri Sendiri (Admin)">
                   {selectedUser ? selectedUser.name : undefined}
                 </SelectValue>
               </SelectTrigger>
-              <SelectContent className="min-w-max w-auto">
-                {salesUsers.map((s) => (
+              <SelectContent className="min-w-max w-auto max-h-[350px]">
+                {/* Pembungkus Kotak Pencarian */}
+                <div className="sticky top-0 z-20 -mx-1 -mt-1 mb-1 border-b bg-popover p-2 rounded-t-md">
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                    <Input
+                      placeholder="Cari sales..."
+                      value={salesSearch}
+                      onChange={(e) => setSalesSearch(e.target.value)}
+                      onKeyDown={(e) => {
+                        e.stopPropagation();
+                        e.nativeEvent.stopImmediatePropagation();
+                      }}
+                      className="h-8 pl-8 text-xs"
+                    />
+                  </div>
+                </div>
+
+                <SelectItem value="admin">Diri Sendiri (Admin)</SelectItem>
+                {filteredSales.map((s) => (
                   <SelectItem key={s.id} value={s.id}>
                     {s.name}
                   </SelectItem>
                 ))}
+                {filteredSales.length === 0 && (
+                  <div className="py-4 text-center text-xs text-muted-foreground">
+                    Tidak ditemukan
+                  </div>
+                )}
               </SelectContent>
             </Select>
           </CardContent>
@@ -144,7 +193,10 @@ export default function AdminNewEntryPage() {
           <CardContent>
             <Select
               value={selectedId}
-              onValueChange={(val) => setSelectedId(val ?? '')}
+              onValueChange={(val) => {
+                setSelectedId(val ?? '');
+                if (val) setLivestockSearch('');
+              }}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Pilih hewan yang tersedia...">
@@ -153,17 +205,39 @@ export default function AdminNewEntryPage() {
                     : undefined}
                 </SelectValue>
               </SelectTrigger>
-              <SelectContent className="min-w-max w-auto">
-                {livestock.map((l) => {
+              <SelectContent className="min-w-max w-auto max-h-[350px]">
+                {/* Pembungkus Kotak Pencarian */}
+                <div className="sticky top-0 z-20 -mx-1 -mt-1 mb-1 border-b bg-popover p-2 rounded-t-md">
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                    <Input
+                      placeholder="Cari SKU, Jenis, atau Tag..."
+                      value={livestockSearch}
+                      onChange={(e) => setLivestockSearch(e.target.value)}
+                      onKeyDown={(e) => {
+                        e.stopPropagation();
+                        e.nativeEvent.stopImmediatePropagation();
+                      }}
+                      className="h-8 pl-8 text-xs"
+                    />
+                  </div>
+                </div>
+
+                {filteredLivestock.map((l) => {
                   const weightStr = formatWeight(l.weightMin, l.weightMax);
                   return (
                     <SelectItem key={l.id} value={l.id}>
-                      {l.sku} — {l.type}
+                      <span className="font-mono">{l.sku}</span> — {l.type}
                       {l.grade ? ` Grade ${l.grade}` : ''}
                       {weightStr ? ` (${weightStr})` : ''}
                     </SelectItem>
                   );
                 })}
+                {filteredLivestock.length === 0 && (
+                  <div className="py-4 text-center text-xs text-muted-foreground">
+                    Hewan tidak ditemukan
+                  </div>
+                )}
               </SelectContent>
             </Select>
             {selected && (
@@ -279,8 +353,10 @@ export default function AdminNewEntryPage() {
             </div>
             <div className="space-y-2">
               <Label>Status Pembayaran</Label>
-              {/* Added native hidden input for paymentStatus just in case */}
-              <Select name="paymentStatus" defaultValue="BELUM_BAYAR">
+              <Select
+                value={paymentStatus}
+                onValueChange={(val) => setPaymentStatus(val ?? 'BELUM_BAYAR')}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>

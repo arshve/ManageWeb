@@ -596,9 +596,9 @@ export function DeliveriesAdminView({
                           On Delivery
                         </Badge>
                       ) : (
-                        <Badge color="blue">
-                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block" />
-                          Tersedia
+                        <Badge color="green">
+                          <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
+                          Available
                         </Badge>
                       )}
                     </td>

@@ -627,6 +627,32 @@ function EntryEditFields({
   setNewLivestockId: (id: string) => void;
 }) {
   const isMati = entry.livestock.condition === 'MATI';
+  const [livestockSearch, setLivestockSearch] = useState('');
+
+  const filteredLivestock = useMemo(() => {
+    const q = livestockSearch.toLowerCase();
+    if (!q) return availableLivestock;
+    return availableLivestock.filter(
+      (l) =>
+        l.sku.toLowerCase().includes(q) ||
+        (l.tag && l.tag.toLowerCase().includes(q)) ||
+        l.type.toLowerCase().includes(q) ||
+        (l.grade && l.grade.toLowerCase().includes(q)),
+    );
+  }, [availableLivestock, livestockSearch]);
+
+  const selectedLivestock = newLivestockId
+    ? availableLivestock.find((l) => l.id === newLivestockId)
+    : null;
+  const selectedLabel = selectedLivestock
+    ? [
+        selectedLivestock.sku,
+        selectedLivestock.type.charAt(0) +
+          selectedLivestock.type.slice(1).toLowerCase() +
+          (selectedLivestock.grade ? ' ' + selectedLivestock.grade : ''),
+      ].join(' — ')
+    : null;
+
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
       {isMati && (
@@ -636,18 +662,36 @@ function EntryEditFields({
           </Label>
           <Select
             value={newLivestockId || '__none__'}
-            onValueChange={(val) =>
-              setNewLivestockId(val === '__none__' ? '' : (val ?? ''))
-            }
+            onValueChange={(val) => {
+              setNewLivestockId(val === '__none__' ? '' : (val ?? ''));
+              if (val) setLivestockSearch('');
+            }}
           >
             <SelectTrigger className="h-8 text-sm">
-              <SelectValue placeholder="Pilih hewan pengganti" />
+              <SelectValue placeholder="Pilih hewan pengganti">
+                {selectedLabel ?? 'Tetap — tidak diganti'}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="__none__">
-                Tetap — tidak diganti
-              </SelectItem>
-              {availableLivestock.map((l) => {
+              {/* Search input inside dropdown */}
+              <div className="px-2 py-1.5 border-b">
+                <div className="relative">
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                  <input
+                    className="w-full pl-6 pr-2 py-1 text-xs rounded border bg-background focus:outline-none focus:ring-1 focus:ring-ring"
+                    placeholder="Cari SKU, tag, jenis..."
+                    value={livestockSearch}
+                    onChange={(e) => setLivestockSearch(e.target.value)}
+                    onKeyDown={(e) => {
+                      e.stopPropagation();
+                      e.nativeEvent.stopImmediatePropagation();
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </div>
+              </div>
+              <SelectItem value="__none__">Tetap — tidak diganti</SelectItem>
+              {filteredLivestock.map((l) => {
                 const typeLabel =
                   l.type.charAt(0) + l.type.slice(1).toLowerCase();
                 const label = [
@@ -660,9 +704,11 @@ function EntryEditFields({
                   </SelectItem>
                 );
               })}
-              {availableLivestock.length === 0 && (
+              {filteredLivestock.length === 0 && (
                 <SelectItem value="__empty__" disabled>
-                  Tidak ada hewan tersedia
+                  {livestockSearch
+                    ? `Tidak ada hasil untuk "${livestockSearch}"`
+                    : 'Tidak ada hewan tersedia'}
                 </SelectItem>
               )}
             </SelectContent>
@@ -1053,9 +1099,7 @@ function MobileEntryCard({
     : 'bg-card';
 
   return (
-    <div
-      className={`rounded-lg border shadow-sm overflow-hidden ${cardClass}`}
-    >
+    <div className={`rounded-lg border shadow-sm overflow-hidden ${cardClass}`}>
       {/* Header — tap to toggle */}
       <div
         role="button"

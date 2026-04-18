@@ -18,7 +18,6 @@ import { revalidatePath } from 'next/cache';
 import { generateInvoiceNo } from '@/lib/format';
 import { supabaseAdmin } from '@/lib/supabase';
 import { logAudit } from '@/lib/audit';
-import type { AnimalType, AnimalGrade } from '@/generated/prisma/client';
 
 /**
  * Deletes files from Supabase Storage given their public URLs.
@@ -56,7 +55,10 @@ async function deleteStorageFiles(urls: string[]) {
 export async function createEntry(formData: FormData) {
   const profile = await requireAuth();
 
-  const livestockId = formData.get('livestockId') as string;
+  const livestockId = formData.get('livestockId')?.toString().trim();
+  if (!livestockId) {
+    return { error: 'Pilih hewan terlebih dahulu' };
+  }
 
   const livestock = await prisma.livestock.findUnique({
     where: { id: livestockId },
@@ -76,8 +78,6 @@ export async function createEntry(formData: FormData) {
     return { error: 'Hewan tidak tersedia atau sudah terjual' };
   }
 
-  // Look up pricing for auto-fill of hargaModal (buy price from pricing table).
-  // Sapi has no grade, so pricing lookup is skipped — admin enters hargaModal manually.
   const pricing =
     livestock.grade != null
       ? await prisma.pricing.findUnique({
@@ -90,7 +90,6 @@ export async function createEntry(formData: FormData) {
         })
       : null;
 
-  // Calculate financials — prefer livestock.hargaJual (per-animal), fall back to pricing table
   const hargaJual =
     Number(formData.get('hargaJual')) ||
     livestock.hargaJual ||
@@ -103,17 +102,31 @@ export async function createEntry(formData: FormData) {
   const hpp = hargaModal ? hargaModal + (resellerCut ?? 0) : null;
   const profit = hpp !== null ? hargaJual - hpp : null;
 
-  // Determine Sales ID & Status based on Role
   let salesId = profile.id;
   let status: 'PENDING' | 'APPROVED' = 'PENDING';
   let approvedAt: Date | null = null;
   let approvedBy: string | null = null;
 
   if (profile.role === 'ADMIN') {
-    const adminSelectedSalesId = formData.get('salesId') as string;
+    const adminSelectedSalesId = formData.get('salesId')?.toString().trim();
+
+    // FIX: Jika Admin memilih sales, gunakan ID Sales tersebut.
+    // Jika tidak, gunakan ID Admin itu sendiri (Diri Sendiri).
     if (adminSelectedSalesId) {
+      const salesExists = await prisma.profile.findUnique({
+        where: { id: adminSelectedSalesId },
+      });
+
+      if (!salesExists) {
+        return {
+          error: 'Akun sales yang dipilih tidak valid atau sudah dihapus.',
+        };
+      }
       salesId = adminSelectedSalesId;
+    } else {
+      salesId = profile.id;
     }
+
     status = 'APPROVED';
     approvedAt = new Date();
     approvedBy = profile.id;
@@ -147,13 +160,11 @@ export async function createEntry(formData: FormData) {
     approvedBy,
   };
 
-  // Create entry and update livestock in a transaction so we don't end up with data mismatch
   const entry = await prisma.$transaction(async (tx) => {
     const created = await tx.entry.create({
       data: entryData,
     });
 
-    // Automatically mark as sold if it's approved immediately (by Admin)
     if (status === 'APPROVED') {
       await tx.livestock.update({
         where: { id: livestockId },

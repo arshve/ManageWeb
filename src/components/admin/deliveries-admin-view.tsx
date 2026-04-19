@@ -12,8 +12,8 @@ import {
   backfillCoordinates,
   resetRoutes,
   clearSchedule,
+  updateEntryCoordinates,
 } from '@/app/actions/deliveries';
-import { setDriverAvailability } from '@/app/actions/drivers';
 import { navigationUrl } from '@/lib/delivery/maps';
 import {
   DeliveryMap,
@@ -22,6 +22,7 @@ import {
 } from '@/components/admin/delivery-map-loader';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 const badgeColors = {
   gray: 'bg-gray-100 text-gray-600 border-gray-200',
@@ -79,6 +80,8 @@ type UnscheduledEntry = {
   sku: string | undefined;
   buyerName: string;
   buyerAddress: string | null;
+  buyerLat: number | null;
+  buyerLng: number | null;
   hasCoords: boolean;
 };
 
@@ -296,14 +299,6 @@ export function DeliveriesAdminView({
     });
   }
 
-  function toggleDriverAvail(driverId: string, isActive: boolean) {
-    startTransition(async () => {
-      const r = await setDriverAvailability([driverId], dateStr, isActive);
-      if ('error' in r) toast.error(r.error);
-      else refresh();
-    });
-  }
-
   function handleGenerate() {
     if (activeRouteCount < 1) {
       toast.error('Jumlah rute minimal 1');
@@ -448,33 +443,29 @@ export function DeliveriesAdminView({
 
       {/* ── Date nav ── */}
       <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
-        <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm"variant="outline" onClick={() => gotoDate(dateOffset(-1))}>
-            ← Hari sebelum
-          </Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={() => gotoDate(dateOffset(-1))}>←</Button>
           <input
             type="date"
             value={dateStr}
             onChange={(e) => e.target.value && gotoDate(e.target.value)}
-            className="h-8 rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400"
+            className="h-8 flex-1 min-w-0 rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400"
           />
-          <Button size="sm"variant="outline" onClick={() => gotoDate(dateOffset(1))}>
-            Hari sesudah →
-          </Button>
-          <span className="ml-auto text-xs text-gray-400">
-            {scheduled.length} dijadwalkan · {unscheduled.length} belum dijadwal
-          </span>
+          <Button size="sm" variant="outline" onClick={() => gotoDate(dateOffset(1))}>→</Button>
         </div>
+        <p className="text-xs text-gray-400 mt-2 text-center sm:text-left">
+          {scheduled.length} dijadwalkan · {unscheduled.length} belum dijadwal
+        </p>
       </div>
 
-      {/* ── Driver availability table ── */}
+      {/* ── Driver availability ── */}
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+        <div className="flex items-center justify-between border-b border-gray-100 px-4 sm:px-5 py-4">
           <h2 className="text-sm font-semibold text-gray-900">
-            Status Driver — {dateStr}
+            Driver — {dateStr}
           </h2>
           <span className="text-xs text-gray-400">
-            {driverCount} dari {drivers.length} tersedia
+            {driverCount}/{drivers.length} tersedia
           </span>
         </div>
         {drivers.length === 0 ? (
@@ -482,98 +473,91 @@ export function DeliveriesAdminView({
             Belum ada user dengan role DRIVER.
           </p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-100 bg-gray-50">
-                  <th className={cn(th, 'pl-5')}>Driver</th>
-                  <th className={th}>Telepon</th>
-                  <th className={th}>Lokasi (live)</th>
-                  <th className={cn(th, 'pr-5')}>Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {drivers.map((d) => (
-                  <tr
-                    key={d.id}
-                    className={cn(
-                      'transition-colors',
-                      d.isAssigned
-                        ? 'bg-amber-50/40 cursor-not-allowed'
-                        : 'cursor-pointer hover:bg-gray-50',
-                    )}
-                  >
-                    <td className={cn(td, 'pl-5')}>
-                      <div className="flex items-center gap-2">
-                        <div
-                          className={cn(
-                            'w-7 h-7 shrink-0 rounded-full flex items-center justify-center text-xs font-semibold select-none',
-                            d.isAssigned
-                              ? 'bg-amber-100 text-amber-700'
-                              : 'bg-blue-100 text-blue-700',
-                          )}
-                        >
-                          {initials(d.name)}
-                        </div>
-                        <span className="font-medium text-gray-900">
-                          {d.name}
-                        </span>
-                      </div>
-                    </td>
-                    <td className={cn(td, 'text-gray-500')}>
-                      {d.phone ?? '—'}
-                    </td>
-                    <td className={td}>
-                      {(() => {
-                        const loc = driverLocs.get(d.id);
-                        if (loc?.lastLat != null && loc?.lastLng != null) {
-                          return (
-                            <div className="flex flex-col gap-0.5">
-                              <span className="font-mono text-xs text-gray-700">
-                                {loc.lastLat.toFixed(5)},{' '}
-                                {loc.lastLng.toFixed(5)}
-                              </span>
-                              {loc.lastLocationAt && (
-                                <span className="text-xs text-gray-400">
-                                  {new Date(
-                                    loc.lastLocationAt,
-                                  ).toLocaleTimeString()}
-                                </span>
-                              )}
-                            </div>
-                          );
-                        }
-                        return (
-                          <span className="text-xs text-gray-400">
-                            no signal
-                          </span>
-                        );
-                      })()}
-                    </td>
-                    <td className={cn(td, 'pr-5')}>
-                      {d.isAssigned ? (
-                        <ColorBadge color="amber">
-                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block" />
-                          On Delivery
-                        </ColorBadge>
-                      ) : (
-                        <ColorBadge color="green">
-                          <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
-                          Available
-                        </ColorBadge>
-                      )}
-                    </td>
+          <>
+            {/* Desktop */}
+            <div className="hidden sm:block overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50">
+                    <th className={cn(th, 'pl-5')}>Driver</th>
+                    <th className={th}>Telepon</th>
+                    <th className={th}>Lokasi (live)</th>
+                    <th className={cn(th, 'pr-5')}>Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {drivers.map((d) => {
+                    const loc = driverLocs.get(d.id);
+                    return (
+                      <tr key={d.id} className={cn('transition-colors', d.isAssigned ? 'bg-amber-50/40' : 'hover:bg-gray-50')}>
+                        <td className={cn(td, 'pl-5')}>
+                          <div className="flex items-center gap-2">
+                            <div className={cn('w-7 h-7 shrink-0 rounded-full flex items-center justify-center text-xs font-semibold select-none', d.isAssigned ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700')}>
+                              {initials(d.name)}
+                            </div>
+                            <span className="font-medium text-gray-900">{d.name}</span>
+                          </div>
+                        </td>
+                        <td className={cn(td, 'text-gray-500')}>{d.phone ?? '—'}</td>
+                        <td className={td}>
+                          {loc?.lastLat != null && loc?.lastLng != null ? (
+                            <div className="flex flex-col gap-0.5">
+                              <span className="font-mono text-xs text-gray-700">{loc.lastLat.toFixed(5)}, {loc.lastLng.toFixed(5)}</span>
+                              {loc.lastLocationAt && <span className="text-xs text-gray-400">{new Date(loc.lastLocationAt).toLocaleTimeString()}</span>}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-gray-400">no signal</span>
+                          )}
+                        </td>
+                        <td className={cn(td, 'pr-5')}>
+                          {d.isAssigned ? (
+                            <ColorBadge color="amber"><span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block" /> On Delivery</ColorBadge>
+                          ) : (
+                            <ColorBadge color="green"><span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" /> Available</ColorBadge>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            {/* Mobile cards */}
+            <div className="sm:hidden divide-y divide-gray-100">
+              {drivers.map((d) => {
+                const loc = driverLocs.get(d.id);
+                return (
+                  <div key={d.id} className={cn('px-4 py-3 flex items-center gap-3', d.isAssigned && 'bg-amber-50/40')}>
+                    <div className={cn('w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-sm font-semibold select-none', d.isAssigned ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700')}>
+                      {initials(d.name)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-sm text-gray-900 truncate">{d.name}</span>
+                        {d.isAssigned ? (
+                          <ColorBadge color="amber">On Delivery</ColorBadge>
+                        ) : (
+                          <ColorBadge color="green">Available</ColorBadge>
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-0.5">
+                        {d.phone ?? 'No phone'}
+                        {loc?.lastLat != null && loc?.lastLng != null && (
+                          <span className="ml-2 font-mono">{loc.lastLat.toFixed(4)},{loc.lastLng.toFixed(4)}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
 
-      {/* ── Unscheduled table ── */}
+      {/* ── Unscheduled ── */}
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-5 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-4 sm:px-5 py-4">
           <h2 className="text-sm font-semibold text-gray-900">
             Belum Dijadwalkan{' '}
             <span className="font-normal text-gray-400">
@@ -581,27 +565,26 @@ export function DeliveriesAdminView({
             </span>
           </h2>
           <div className="flex flex-wrap gap-2">
-            <Button size="sm"variant="outline" onClick={handleBackfill} disabled={pending}>
+            <Button size="sm" variant="outline" onClick={handleBackfill} disabled={pending}>
               Backfill Coords
             </Button>
             <Button size="sm"
               onClick={handleAssignDate}
               disabled={pending || !selectedUnscheduled.size}
             >
-              Jadwalkan ke {dateStr}
-              {selectedUnscheduled.size > 0 && ` (${selectedUnscheduled.size})`}
+              Jadwalkan {selectedUnscheduled.size > 0 && `(${selectedUnscheduled.size})`}
             </Button>
           </div>
         </div>
 
         {selectedUnscheduled.size > 0 && (
-          <div className="mx-5 mt-3 flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-700">
-            <span>{selectedUnscheduled.size} item dipilih</span>
+          <div className="mx-4 sm:mx-5 mt-3 flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-700">
+            <span>{selectedUnscheduled.size} dipilih</span>
             <button
               className="ml-auto text-xs underline hover:no-underline"
               onClick={() => setSelectedUnscheduled(new Set())}
             >
-              Batalkan pilihan
+              Batal
             </button>
           </div>
         )}
@@ -611,135 +594,108 @@ export function DeliveriesAdminView({
             Semua entry sudah dijadwalkan.
           </p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-100 bg-gray-50">
-                  <th className="pl-5 py-2.5 w-12">
-                    <input
-                      type="checkbox"
-                      checked={allSelected}
-                      ref={(el) => {
-                        if (el) el.indeterminate = someSelected;
-                      }}
-                      onChange={(e) => toggleAll(e.target.checked)}
-                      className="h-4 w-4 rounded border-gray-300 accent-gray-800 cursor-pointer"
-                    />
-                  </th>
-                  <th className={cn(th, 'w-40')}>SKU</th>
-                  <th className={th}>Pembeli</th>
-                  <th className={th}>Alamat</th>
-                  <th className={cn(th, 'w-28 pr-5 text-center')}>Koordinat</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {unscheduled.map((e) => (
-                  <tr
-                    key={e.id}
-                    onClick={() => toggleOne(e.id)}
-                    className={cn(
-                      'cursor-pointer transition-colors hover:bg-gray-50',
-                      selectedUnscheduled.has(e.id) &&
-                        'bg-blue-50 hover:bg-blue-50',
-                    )}
-                  >
-                    <td
-                      className="pl-5 py-3"
-                      onClick={(ev) => ev.stopPropagation()}
-                    >
+          <>
+            {/* Desktop table */}
+            <div className="hidden sm:block overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50">
+                    <th className="pl-5 py-2.5 w-12">
                       <input
                         type="checkbox"
-                        checked={selectedUnscheduled.has(e.id)}
-                        onChange={() => toggleOne(e.id)}
+                        checked={allSelected}
+                        ref={(el) => {
+                          if (el) el.indeterminate = someSelected;
+                        }}
+                        onChange={(e) => toggleAll(e.target.checked)}
                         className="h-4 w-4 rounded border-gray-300 accent-gray-800 cursor-pointer"
                       />
-                    </td>
-                    <td className={td}>
-                      <span className="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded">
-                        {e.sku}
-                      </span>
-                    </td>
-                    <td className={cn(td, 'font-medium text-gray-900')}>
-                      {e.buyerName}
-                    </td>
-                    <td
-                      className={cn(
-                        td,
-                        'text-xs text-gray-500 max-w-xs truncate',
-                      )}
-                      title={e.buyerAddress ?? undefined}
-                    >
-                      {e.buyerAddress ?? '—'}
-                    </td>
-                    <td className={cn(td, 'pr-5 text-center')}>
-                      {e.hasCoords ? (
-                        <ColorBadge color="green">📍 Ada</ColorBadge>
-                      ) : (
-                        <ColorBadge color="red">📍 Tidak ada</ColorBadge>
-                      )}
-                    </td>
+                    </th>
+                    <th className={cn(th, 'w-40')}>SKU</th>
+                    <th className={th}>Pembeli</th>
+                    <th className={th}>Alamat</th>
+                    <th className={cn(th, 'w-52 pr-5')}>Koordinat</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {unscheduled.map((e) => (
+                    <UnscheduledRow
+                      key={e.id}
+                      entry={e}
+                      selected={selectedUnscheduled.has(e.id)}
+                      onToggle={() => toggleOne(e.id)}
+                      pending={pending}
+                      startTransition={startTransition}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile cards */}
+            <div className="sm:hidden divide-y divide-gray-100">
+              <div className="px-4 py-2 bg-gray-50 flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  ref={(el) => {
+                    if (el) el.indeterminate = someSelected;
+                  }}
+                  onChange={(e) => toggleAll(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 accent-gray-800 cursor-pointer"
+                />
+                <span className="text-xs text-gray-500">Pilih semua</span>
+              </div>
+              {unscheduled.map((e) => (
+                <UnscheduledCard
+                  key={e.id}
+                  entry={e}
+                  selected={selectedUnscheduled.has(e.id)}
+                  onToggle={() => toggleOne(e.id)}
+                  pending={pending}
+                  startTransition={startTransition}
+                />
+              ))}
+            </div>
+          </>
         )}
       </div>
 
       {/* ── Route management ── */}
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-        <div className="space-y-3 border-b border-gray-100 px-5 py-4">
+        <div className="space-y-3 border-b border-gray-100 px-4 sm:px-5 py-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-sm font-semibold text-gray-900">
               Rute — {dateStr}
             </h2>
             <div className="flex flex-wrap gap-2">
-              <Button size="sm"
-                variant="outline"
-                onClick={handleClearSchedule}
-                disabled={pending || !scheduled.length}
-              >
-                Kosongkan Jadwal
+              <Button size="sm" variant="outline" onClick={handleClearSchedule} disabled={pending || !scheduled.length}>
+                Kosongkan
               </Button>
-              <Button size="sm"
-                variant="outline"
-                onClick={handleResetRoutes}
-                disabled={pending || !scheduled.length}
-              >
+              <Button size="sm" variant="outline" onClick={handleResetRoutes} disabled={pending || !scheduled.length}>
                 Reset Rute
               </Button>
-
-              <div className="flex items-center gap-2 border border-gray-300 rounded-md p-1 pl-3 ml-2">
-                <label className="text-xs text-gray-500 font-medium">
-                  Bagi ke
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  value={customRouteCount}
-                  onChange={(e) =>
-                    setCustomRouteCount(
-                      e.target.value === '' ? '' : parseInt(e.target.value),
-                    )
-                  }
-                  placeholder={String(Math.max(driverCount, 1))}
-                  className="h-6 w-12 rounded bg-white px-1 text-xs text-center border focus:outline-none focus:ring-1"
-                />
-                <span className="text-xs text-gray-500 mr-2">rute</span>
-                <Button size="sm"
-                  onClick={handleGenerate}
-                  disabled={pending || !scheduled.length}
-                  className="py-1 px-3 h-6"
-                >
-                  Generate
-                </Button>
-              </div>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2 border border-gray-300 rounded-md p-1 pl-3">
+              <label className="text-xs text-gray-500 font-medium">Bagi ke</label>
+              <input
+                type="number"
+                min={1}
+                value={customRouteCount}
+                onChange={(e) => setCustomRouteCount(e.target.value === '' ? '' : parseInt(e.target.value))}
+                placeholder={String(Math.max(driverCount, 1))}
+                className="h-6 w-12 rounded bg-white px-1 text-xs text-center border focus:outline-none focus:ring-1"
+              />
+              <span className="text-xs text-gray-500 mr-2">rute</span>
+              <Button size="sm" onClick={handleGenerate} disabled={pending || !scheduled.length} className="py-1 px-3 h-6">
+                Generate
+              </Button>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <label className="text-xs text-gray-500 whitespace-nowrap">
-              Titik awal:
-            </label>
+            <label className="text-xs text-gray-500 whitespace-nowrap">Titik awal:</label>
             <input
               type="text"
               placeholder="lat,lng atau Google Maps URL"
@@ -750,49 +706,29 @@ export function DeliveriesAdminView({
           </div>
         </div>
 
-        <div className="space-y-4 p-5">
+        <div className="space-y-4 p-4 sm:p-5">
           {/* Bucket driver assignment */}
           {buckets && (
             <div className="space-y-3 rounded-lg border border-blue-200 bg-blue-50/60 p-3">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-gray-800">
-                  Pilih driver untuk tiap rute
-                </p>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-medium text-gray-800">Pilih driver tiap rute</p>
                 <div className="flex gap-2">
-                  <Button size="sm"variant="outline" onClick={() => setBuckets(null)}>
-                    Batal
-                  </Button>
-                  <Button size="sm"onClick={handleCommitDrivers} disabled={pending}>
-                    Commit
-                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setBuckets(null)}>Batal</Button>
+                  <Button size="sm" onClick={handleCommitDrivers} disabled={pending}>Commit</Button>
                 </div>
               </div>
               {buckets.map((entryIds, i) => (
-                <div
-                  key={i}
-                  className="flex items-center gap-3 rounded-md border border-gray-200 bg-white p-2"
-                >
-                  <span className="text-sm font-medium text-gray-700">
-                    🚚 Rute {i + 1}
-                  </span>
-                  <span className="text-xs text-gray-400">
-                    {entryIds.length} stop
-                  </span>
+                <div key={i} className="flex flex-wrap items-center gap-2 sm:gap-3 rounded-md border border-gray-200 bg-white p-2">
+                  <span className="text-sm font-medium text-gray-700">🚚 Rute {i + 1}</span>
+                  <span className="text-xs text-gray-400">{entryIds.length} stop</span>
                   <select
                     value={bucketDrivers[i] ?? ''}
-                    onChange={(e) =>
-                      setBucketDrivers((prev) => ({
-                        ...prev,
-                        [i]: e.target.value,
-                      }))
-                    }
-                    className="ml-auto h-8 rounded-md border border-gray-300 bg-white px-2 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400"
+                    onChange={(e) => setBucketDrivers((prev) => ({ ...prev, [i]: e.target.value }))}
+                    className="ml-auto h-8 w-full sm:w-auto rounded-md border border-gray-300 bg-white px-2 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400"
                   >
                     <option value="">Pilih driver…</option>
                     {assignableDrivers.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.name}
-                      </option>
+                      <option key={d.id} value={d.id}>{d.name}</option>
                     ))}
                   </select>
                 </div>
@@ -800,56 +736,36 @@ export function DeliveriesAdminView({
             </div>
           )}
 
-          {/* Per-driver route tables */}
+          {/* Per-driver route groups */}
           {Array.from(groupedByDriver.entries()).map(([driverId, stops]) => {
             const isUnassigned = driverId === '__unassigned__';
             const driverName = isUnassigned
               ? 'Belum di-assign'
               : (stops[0]?.delivery?.driver?.name ?? driverId);
             return (
-              <div
-                key={driverId}
-                className="overflow-hidden rounded-lg border border-gray-200"
-              >
+              <div key={driverId} className="overflow-hidden rounded-lg border border-gray-200">
                 {/* group header */}
-                <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50 px-4 py-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 bg-gray-50 px-4 py-2.5">
                   <div className="flex items-center gap-2">
-                    <div
-                      className={cn(
-                        'w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 select-none',
-                        isUnassigned
-                          ? 'bg-amber-100 text-amber-700'
-                          : 'bg-blue-100 text-blue-700',
-                      )}
-                    >
+                    <div className={cn('w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 select-none', isUnassigned ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700')}>
                       {isUnassigned ? '?' : initials(driverName)}
                     </div>
-                    <span className="text-sm font-medium text-gray-900">
-                      {driverName}
-                    </span>
-                    <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
-                      {stops.length} stop
-                    </span>
+                    <span className="text-sm font-medium text-gray-900">{driverName}</span>
+                    <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">{stops.length} stop</span>
                   </div>
-                  <Button size="sm"
-                    variant="ghost"
-                    className="text-xs"
-                    onClick={() => handleUnassign(stops.map((s) => s.id))}
-                    disabled={pending}
-                  >
-                    Lepas dari jadwal
+                  <Button size="sm" variant="ghost" className="text-xs" onClick={() => handleUnassign(stops.map((s) => s.id))} disabled={pending}>
+                    Lepas
                   </Button>
                 </div>
 
-                {/* stops */}
-                <div className="overflow-x-auto">
+                {/* Desktop stops table */}
+                <div className="hidden sm:block overflow-x-auto">
                   <table className="w-full">
                     <thead>
                       <tr className="border-b border-gray-100 bg-gray-50/60">
                         <th className={cn(th, 'pl-4 w-10')}>#</th>
                         <th className={cn(th, 'w-36')}>Hewan / SKU</th>
                         <th className={th}>Pembeli</th>
-                        <th className={th}>Sales</th>
                         <th className={th}>Alamat</th>
                         <th className={cn(th, 'w-28 text-center')}>Status</th>
                         <th className={cn(th, 'w-12 pr-4')}></th>
@@ -857,86 +773,27 @@ export function DeliveriesAdminView({
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                       {stops.map((s) => {
-                        const href = navigationUrl({
-                          buyerMaps: s.buyerMaps,
-                          buyerLat: s.buyerLat,
-                          buyerLng: s.buyerLng,
-                          buyerAddress: s.buyerAddress,
-                        });
-
+                        const href = navigationUrl({ buyerMaps: s.buyerMaps, buyerLat: s.buyerLat, buyerLng: s.buyerLng, buyerAddress: s.buyerAddress });
                         return (
-                          <tr
-                            key={s.id}
-                            className="hover:bg-gray-50 transition-colors"
-                          >
-                            <td
-                              className={cn(
-                                td,
-                                'pl-4 text-xs text-gray-400 font-mono',
-                              )}
-                            >
-                              {(s.delivery?.sequence ?? 0) + 1}
-                            </td>
+                          <tr key={s.id} className="hover:bg-gray-50 transition-colors">
+                            <td className={cn(td, 'pl-4 text-xs text-gray-400 font-mono')}>{(s.delivery?.sequence ?? 0) + 1}</td>
                             <td className={td}>
                               <div className="font-medium text-gray-900 mb-0.5">
-                                {s.animalType
-                                  ? s.animalType.charAt(0) +
-                                    s.animalType.slice(1).toLowerCase()
-                                  : ''}
-                                {s.animalGrade ? ` ${s.animalGrade}` : ''}
+                                {s.animalType ? s.animalType.charAt(0) + s.animalType.slice(1).toLowerCase() : ''}{s.animalGrade ? ` ${s.animalGrade}` : ''}
                               </div>
-                              <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">
-                                {s.sku}
-                              </span>
+                              <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">{s.sku}</span>
                             </td>
                             <td className={td}>
-                              <span className="font-medium text-gray-900">
-                                {s.buyerName}
-                              </span>
-                              {s.buyerPhone && (
-                                <span className="block text-xs text-gray-400">
-                                  {s.buyerPhone}
-                                </span>
-                              )}
+                              <span className="font-medium text-gray-900">{s.buyerName}</span>
+                              {s.buyerPhone && <span className="block text-xs text-gray-400">{s.buyerPhone}</span>}
                             </td>
-                            <td
-                              className={cn(
-                                td,
-                                'text-xs text-gray-600 whitespace-nowrap',
-                              )}
-                            >
-                              {s.salesName ?? '—'}
-                            </td>
-                            <td
-                              className={cn(
-                                td,
-                                'text-xs text-gray-500 max-w-xs truncate',
-                              )}
-                              title={s.buyerAddress ?? undefined}
-                            >
-                              {s.buyerAddress ?? '—'}
-                            </td>
+                            <td className={cn(td, 'text-xs text-gray-500 max-w-xs truncate')} title={s.buyerAddress ?? undefined}>{s.buyerAddress ?? '—'}</td>
                             <td className={cn(td, 'text-center')}>
-                              <ColorBadge
-                                color={
-                                  STATUS_COLOR[s.delivery?.status ?? ''] ??
-                                  'gray'
-                                }
-                              >
-                                {s.delivery?.status ?? 'PENDING'}
-                              </ColorBadge>
+                              <ColorBadge color={STATUS_COLOR[s.delivery?.status ?? ''] ?? 'gray'}>{s.delivery?.status ?? 'PENDING'}</ColorBadge>
                             </td>
                             <td className={cn(td, 'pr-4 text-right')}>
                               {href && (
-                                <a
-                                  href={href}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  title="Buka di Maps"
-                                  className="inline-flex items-center justify-center w-7 h-7 rounded-md border border-gray-200 text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors text-base"
-                                >
-                                  ↗
-                                </a>
+                                <a href={href} target="_blank" rel="noreferrer" title="Buka di Maps" className="inline-flex items-center justify-center w-7 h-7 rounded-md border border-gray-200 text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors text-base">↗</a>
                               )}
                             </td>
                           </tr>
@@ -944,6 +801,37 @@ export function DeliveriesAdminView({
                       })}
                     </tbody>
                   </table>
+                </div>
+
+                {/* Mobile stop cards */}
+                <div className="sm:hidden divide-y divide-gray-100">
+                  {stops.map((s) => {
+                    const href = navigationUrl({ buyerMaps: s.buyerMaps, buyerLat: s.buyerLat, buyerLng: s.buyerLng, buyerAddress: s.buyerAddress });
+                    return (
+                      <div key={s.id} className="px-4 py-3 space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-400 font-mono w-5">#{(s.delivery?.sequence ?? 0) + 1}</span>
+                            <span className="font-medium text-sm text-gray-900">{s.buyerName}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <ColorBadge color={STATUS_COLOR[s.delivery?.status ?? ''] ?? 'gray'}>{s.delivery?.status ?? 'PENDING'}</ColorBadge>
+                            {href && (
+                              <a href={href} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center w-7 h-7 rounded-md border border-gray-200 text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors text-base">↗</a>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="font-medium text-gray-700">
+                            {s.animalType ? s.animalType.charAt(0) + s.animalType.slice(1).toLowerCase() : ''}{s.animalGrade ? ` ${s.animalGrade}` : ''}
+                          </span>
+                          <span className="font-mono bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">{s.sku}</span>
+                        </div>
+                        {s.buyerAddress && <p className="text-xs text-gray-500 line-clamp-2">{s.buyerAddress}</p>}
+                        {s.buyerPhone && <p className="text-xs text-gray-400">{s.buyerPhone}</p>}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             );
@@ -955,6 +843,174 @@ export function DeliveriesAdminView({
             </p>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Unscheduled row (desktop) ────────────────────────────────────────────────
+
+function UnscheduledRow({
+  entry: e,
+  selected,
+  onToggle,
+  pending,
+  startTransition,
+}: {
+  entry: UnscheduledEntry;
+  selected: boolean;
+  onToggle: () => void;
+  pending: boolean;
+  startTransition: (fn: () => void) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [coordInput, setCoordInput] = useState(
+    e.buyerLat != null && e.buyerLng != null ? `${e.buyerLat},${e.buyerLng}` : '',
+  );
+
+  const td = 'px-3 py-3 text-sm';
+
+  function saveCoords() {
+    const parsed = parseLatLng(coordInput);
+    if (!parsed && coordInput.trim() !== '') {
+      toast.error('Format: lat,lng (contoh: -6.123,106.456)');
+      return;
+    }
+    startTransition(async () => {
+      const r = await updateEntryCoordinates(e.id, parsed?.lat ?? null, parsed?.lng ?? null);
+      if ('error' in r) toast.error(r.error);
+      else {
+        toast.success('Koordinat disimpan');
+        setEditing(false);
+      }
+    });
+  }
+
+  return (
+    <tr
+      onClick={() => onToggle()}
+      className={cn('cursor-pointer transition-colors hover:bg-gray-50', selected && 'bg-blue-50 hover:bg-blue-50')}
+    >
+      <td className="pl-5 py-3" onClick={(ev) => ev.stopPropagation()}>
+        <input type="checkbox" checked={selected} onChange={onToggle} className="h-4 w-4 rounded border-gray-300 accent-gray-800 cursor-pointer" />
+      </td>
+      <td className={td}>
+        <span className="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded">{e.sku}</span>
+      </td>
+      <td className={cn(td, 'font-medium text-gray-900')}>{e.buyerName}</td>
+      <td className={cn(td, 'text-xs text-gray-500 max-w-xs truncate')} title={e.buyerAddress ?? undefined}>
+        {e.buyerAddress ?? '—'}
+      </td>
+      <td className={cn(td, 'pr-5')} onClick={(ev) => ev.stopPropagation()}>
+        {editing ? (
+          <div className="flex items-center gap-1">
+            <Input
+              value={coordInput}
+              onChange={(ev) => setCoordInput(ev.target.value)}
+              onKeyDown={(ev) => { if (ev.key === 'Enter') saveCoords(); if (ev.key === 'Escape') setEditing(false); }}
+              placeholder="-6.123,106.456"
+              className="h-7 text-xs w-36 font-mono"
+              autoFocus
+            />
+            <Button size="sm" className="h-7 px-2 text-xs" onClick={saveCoords} disabled={pending}>OK</Button>
+            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setEditing(false)}>✕</Button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            className="inline-flex items-center gap-1"
+          >
+            {e.hasCoords ? (
+              <ColorBadge color="green">📍 {e.buyerLat?.toFixed(4)},{e.buyerLng?.toFixed(4)}</ColorBadge>
+            ) : (
+              <ColorBadge color="red">📍 Belum ada</ColorBadge>
+            )}
+            <span className="text-xs text-gray-400 ml-1">✎</span>
+          </button>
+        )}
+      </td>
+    </tr>
+  );
+}
+
+// ─── Unscheduled card (mobile) ────────────────────────────────────────────────
+
+function UnscheduledCard({
+  entry: e,
+  selected,
+  onToggle,
+  pending,
+  startTransition,
+}: {
+  entry: UnscheduledEntry;
+  selected: boolean;
+  onToggle: () => void;
+  pending: boolean;
+  startTransition: (fn: () => void) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [coordInput, setCoordInput] = useState(
+    e.buyerLat != null && e.buyerLng != null ? `${e.buyerLat},${e.buyerLng}` : '',
+  );
+
+  function saveCoords() {
+    const parsed = parseLatLng(coordInput);
+    if (!parsed && coordInput.trim() !== '') {
+      toast.error('Format: lat,lng');
+      return;
+    }
+    startTransition(async () => {
+      const r = await updateEntryCoordinates(e.id, parsed?.lat ?? null, parsed?.lng ?? null);
+      if ('error' in r) toast.error(r.error);
+      else {
+        toast.success('Koordinat disimpan');
+        setEditing(false);
+      }
+    });
+  }
+
+  return (
+    <div className={cn('px-4 py-3 space-y-2', selected && 'bg-blue-50')}>
+      <div className="flex items-start gap-3">
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={onToggle}
+          className="h-4 w-4 mt-0.5 rounded border-gray-300 accent-gray-800 cursor-pointer shrink-0"
+        />
+        <div className="flex-1 min-w-0" onClick={onToggle}>
+          <div className="flex items-center gap-2">
+            <span className="font-medium text-sm text-gray-900 truncate">{e.buyerName}</span>
+            <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded text-gray-600 shrink-0">{e.sku}</span>
+          </div>
+          {e.buyerAddress && <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{e.buyerAddress}</p>}
+        </div>
+      </div>
+      <div className="pl-7">
+        {editing ? (
+          <div className="flex items-center gap-1">
+            <Input
+              value={coordInput}
+              onChange={(ev) => setCoordInput(ev.target.value)}
+              onKeyDown={(ev) => { if (ev.key === 'Enter') saveCoords(); if (ev.key === 'Escape') setEditing(false); }}
+              placeholder="-6.123,106.456"
+              className="h-7 text-xs flex-1 font-mono"
+              autoFocus
+            />
+            <Button size="sm" className="h-7 px-2 text-xs" onClick={saveCoords} disabled={pending}>OK</Button>
+            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setEditing(false)}>✕</Button>
+          </div>
+        ) : (
+          <button type="button" onClick={() => setEditing(true)} className="inline-flex items-center gap-1">
+            {e.hasCoords ? (
+              <ColorBadge color="green">📍 {e.buyerLat?.toFixed(4)},{e.buyerLng?.toFixed(4)}</ColorBadge>
+            ) : (
+              <ColorBadge color="red">📍 Belum ada</ColorBadge>
+            )}
+            <span className="text-xs text-gray-400 ml-1">✎</span>
+          </button>
+        )}
       </div>
     </div>
   );

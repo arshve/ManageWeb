@@ -151,6 +151,8 @@ export default async function AdminDeliveriesPage({
     sku: e.livestock?.sku,
     buyerName: e.buyerName,
     buyerAddress: e.buyerAddress,
+    buyerLat: e.buyerLat,
+    buyerLng: e.buyerLng,
     hasCoords: e.buyerLat != null && e.buyerLng != null,
   }));
 

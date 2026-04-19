@@ -74,7 +74,7 @@ export async function unassignDeliveryDate(entryIds: string[]) {
   const inFlight = await prisma.delivery.findMany({
     where: {
       entryId: { in: entryIds },
-      status: { in: ['ON_DELIVERY', 'DELIVERED', 'FAILED'] },
+      status: { in: ['ON_DELIVERY', 'DELIVERED'] },
     },
     select: { entryId: true, status: true },
   });
@@ -88,7 +88,7 @@ export async function unassignDeliveryDate(entryIds: string[]) {
     await tx.delivery.deleteMany({
       where: {
         entryId: { in: entryIds },
-        status: { in: ['PENDING', 'ASSIGNED'] },
+        status: { in: ['PENDING', 'ASSIGNED', 'FAILED'] },
       },
     });
     await tx.entry.updateMany({
@@ -144,7 +144,7 @@ export async function clearSchedule(deliveryDate: string) {
   const inFlight = await prisma.delivery.count({
     where: {
       entry: { deliveryDate: date },
-      status: { in: ['ON_DELIVERY', 'DELIVERED', 'FAILED'] },
+      status: { in: ['ON_DELIVERY', 'DELIVERED'] },
     },
   });
   if (inFlight > 0) {
@@ -163,7 +163,7 @@ export async function clearSchedule(deliveryDate: string) {
     await tx.delivery.deleteMany({
       where: {
         entryId: { in: entryIds },
-        status: { in: ['PENDING', 'ASSIGNED'] },
+        status: { in: ['PENDING', 'ASSIGNED', 'FAILED'] },
       },
     });
     await tx.entry.updateMany({
@@ -426,6 +426,26 @@ export async function markFailed(deliveryId: string, reason: string) {
   revalidatePath('/driver');
   revalidatePath('/admin/deliveries');
   return { success: true };
+}
+
+export async function updateEntryCoordinates(
+  entryId: string,
+  lat: number | null,
+  lng: number | null,
+) {
+  await requireRole('ADMIN');
+  if (lat !== null && (lat < -90 || lat > 90))
+    return { error: 'Latitude tidak valid' };
+  if (lng !== null && (lng < -180 || lng > 180))
+    return { error: 'Longitude tidak valid' };
+
+  await prisma.entry.update({
+    where: { id: entryId },
+    data: { buyerLat: lat, buyerLng: lng },
+  });
+
+  revalidatePath('/admin/deliveries');
+  return { success: true as const };
 }
 
 export async function backfillCoordinates(entryIds?: string[]) {

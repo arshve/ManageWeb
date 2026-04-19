@@ -155,7 +155,9 @@ export function UserForm({ user, trigger }: UserFormProps) {
                 onValueChange={(val) => setRole(val ?? role)}
               >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue>
+                    {{ ADMIN: 'Admin', SALES: 'Sales', MANAGE: 'Manage', DRIVER: 'Driver' }[role] ?? role}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ADMIN">Admin</SelectItem>

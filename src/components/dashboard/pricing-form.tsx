@@ -94,7 +94,9 @@ export function PricingForm({ pricing, trigger }: PricingFormProps) {
                 onValueChange={(val) => setAnimalType(val ?? animalType)}
               >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue>
+                    {{ KAMBING: 'Kambing', DOMBA: 'Domba' }[animalType] ?? animalType}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="KAMBING">Kambing</SelectItem>
@@ -109,7 +111,9 @@ export function PricingForm({ pricing, trigger }: PricingFormProps) {
                 onValueChange={(val) => setGrade(val ?? grade)}
               >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue>
+                    {{ SUPER: 'Super', A: 'A', B: 'B', C: 'C', D: 'D' }[grade] ?? grade}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="SUPER">Super</SelectItem>

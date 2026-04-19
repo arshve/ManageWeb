@@ -25,6 +25,7 @@ export async function GET() {
         sku: true,
         type: true,
         grade: true,
+        tag: true,
         hargaJual: true,
         weightMin: true,
         weightMax: true,

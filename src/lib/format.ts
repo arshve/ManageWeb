@@ -125,6 +125,29 @@ export function generateSku(
  *
  * @returns Formatted invoice number string
  */
+const PENGIRIMAN_LABELS: Record<string, string> = {
+  HARI_H: 'Hari H',
+  H_1: 'H-1',
+  H_2: 'H-2',
+  H_3: 'H-3',
+  TITIP_POTONG: 'Titip Potong',
+};
+
+const PAYMENT_LABELS: Record<string, string> = {
+  BELUM_BAYAR: 'Belum Bayar',
+  DP: 'DP',
+  LUNAS: 'Lunas',
+};
+
+export function formatPengiriman(value: string | null): string {
+  if (!value) return '—';
+  return PENGIRIMAN_LABELS[value] ?? value;
+}
+
+export function formatPaymentStatus(value: string): string {
+  return PAYMENT_LABELS[value] ?? value;
+}
+
 export function generateInvoiceNo(): string {
   const now = new Date();
   const y = now.getFullYear().toString().slice(-2);

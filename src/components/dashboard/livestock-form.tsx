@@ -243,7 +243,9 @@ export function LivestockForm({ livestock, trigger }: LivestockFormProps) {
                   onValueChange={(val) => setType(val ?? type)}
                 >
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue>
+                      {{ KAMBING: 'Kambing', DOMBA: 'Domba', SAPI: 'Sapi' }[type] ?? type}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="KAMBING">Kambing</SelectItem>
@@ -263,7 +265,9 @@ export function LivestockForm({ livestock, trigger }: LivestockFormProps) {
                     onValueChange={(val) => setGrade(val ?? grade ?? 'A')}
                   >
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue>
+                        {{ SUPER: 'Super', A: 'A', B: 'B', C: 'C', D: 'D' }[grade ?? 'A'] ?? grade}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="SUPER">Super</SelectItem>
@@ -282,7 +286,9 @@ export function LivestockForm({ livestock, trigger }: LivestockFormProps) {
                   onValueChange={(val) => setCondition(val ?? condition)}
                 >
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue>
+                      {{ SEHAT: 'Sehat', SAKIT: 'Sakit', MATI: 'Mati' }[condition] ?? condition}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="SEHAT">Sehat</SelectItem>

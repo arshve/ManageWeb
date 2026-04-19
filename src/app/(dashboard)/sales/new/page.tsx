@@ -27,6 +27,7 @@ interface AvailableLivestock {
   sku: string;
   type: string;
   grade: string | null;
+  tag: string | null;
   hargaJual: number | null;
   weightMin: number | null;
   weightMax: number | null;
@@ -42,11 +43,24 @@ const PENGIRIMAN_OPTIONS = [
   { value: 'TITIP_POTONG', label: 'Titip Potong' },
 ] as const;
 
+const PENGIRIMAN_LABEL: Record<string, string> = Object.fromEntries(
+  PENGIRIMAN_OPTIONS.map((o) => [o.value, o.label]),
+);
+
+const PAYMENT_LABEL: Record<string, string> = {
+  BELUM_BAYAR: 'Belum Bayar',
+  DP: 'DP (Uang Muka)',
+  LUNAS: 'Lunas',
+};
+
 export default function NewEntryPage() {
   const [livestock, setLivestock] = useState<AvailableLivestock[]>([]);
   const [livestockSearch, setLivestockSearch] = useState('');
   const [selectedId, setSelectedId] = useState('');
+  const [livestockTag, setLivestockTag] = useState('');
+  const [pengiriman, setPengiriman] = useState('HARI_H');
   const [paymentStatus, setPaymentStatus] = useState('BELUM_BAYAR');
+  const [hargaJual, setHargaJual] = useState<string>('');
   const [buktiTransferUrls, setBuktiTransferUrls] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -62,6 +76,16 @@ export default function NewEntryPage() {
   }, []);
 
   const selected = livestock.find((l) => l.id === selectedId);
+
+  useEffect(() => {
+    if (selected) {
+      setHargaJual(selected.hargaJual?.toString() ?? '');
+      setLivestockTag(selected.tag ?? '');
+    } else {
+      setHargaJual('');
+      setLivestockTag('');
+    }
+  }, [selected]);
 
   const filteredLivestock = livestock.filter((l) => {
     const q = livestockSearch.toLowerCase();
@@ -82,7 +106,7 @@ export default function NewEntryPage() {
 
     // Lunas: auto-set totalBayar = hargaJual
     if (paymentStatus === 'LUNAS') {
-      formData.set('totalBayar', formData.get('hargaJual') as string);
+      formData.set('totalBayar', hargaJual);
     }
 
     buktiTransferUrls.forEach((url) => formData.append('buktiTransfer', url));
@@ -137,8 +161,9 @@ export default function NewEntryPage() {
               </div>
               {filteredLivestock.map((l) => {
                 const weightStr = formatWeight(l.weightMin, l.weightMax);
+                const itemLabel = `${l.sku} — ${l.type}${l.grade ? ` Grade ${l.grade}` : ''}${weightStr ? ` (${weightStr})` : ''}`;
                 return (
-                  <SelectItem key={l.id} value={l.id}>
+                  <SelectItem key={l.id} value={l.id} label={itemLabel}>
                     <span className="font-mono">{l.sku}</span> — {l.type}
                     {l.grade ? ` Grade ${l.grade}` : ''}
                     {weightStr ? ` (${weightStr})` : ''}
@@ -154,37 +179,50 @@ export default function NewEntryPage() {
           </Select>
 
           {selected && (
-            <div className="flex gap-3 p-3 bg-muted rounded-lg text-sm">
-              <div className="relative w-20 h-20 flex-shrink-0 rounded-md overflow-hidden bg-background">
-                {selected.photoUrl ? (
-                  <LivestockPhoto
-                    photoUrl={selected.photoUrl}
-                    alt={`${selected.type}${selected.grade ? ' ' + selected.grade : ''}`}
-                    thumbnailClassName="w-20 h-20"
-                    priority
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <Beef className="h-6 w-6 text-muted-foreground/30" />
-                  </div>
-                )}
+            <>
+              <div className="flex gap-3 p-3 bg-muted rounded-lg text-sm">
+                <div className="relative w-20 h-20 flex-shrink-0 rounded-md overflow-hidden bg-background">
+                  {selected.photoUrl ? (
+                    <LivestockPhoto
+                      photoUrl={selected.photoUrl}
+                      alt={`${selected.type}${selected.grade ? ' ' + selected.grade : ''}`}
+                      thumbnailClassName="w-20 h-20"
+                      priority
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Beef className="h-6 w-6 text-muted-foreground/30" />
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-0.5 text-xs">
+                  <p className="font-medium text-sm">{selected.sku}</p>
+                  <p className="text-muted-foreground">
+                    {selected.type}
+                    {selected.grade ? ` · Grade ${selected.grade}` : ''}
+                  </p>
+                  <p className="text-muted-foreground">
+                    {formatWeight(selected.weightMin, selected.weightMax) ??
+                      '—'}
+                  </p>
+                  <p className="font-medium">
+                    {selected.hargaJual
+                      ? formatRupiah(selected.hargaJual)
+                      : 'Harga belum diset'}
+                  </p>
+                </div>
               </div>
-              <div className="space-y-0.5 text-xs">
-                <p className="font-medium text-sm">{selected.sku}</p>
-                <p className="text-muted-foreground">
-                  {selected.type}
-                  {selected.grade ? ` · Grade ${selected.grade}` : ''}
-                </p>
-                <p className="text-muted-foreground">
-                  {formatWeight(selected.weightMin, selected.weightMax) ?? '—'}
-                </p>
-                <p className="font-medium">
-                  {selected.hargaJual
-                    ? formatRupiah(selected.hargaJual)
-                    : 'Harga belum diset'}
-                </p>
+              <div className="space-y-1.5">
+                <Label htmlFor="livestockTag">Tag Hewan</Label>
+                <Input
+                  id="livestockTag"
+                  name="livestockTag"
+                  value={livestockTag}
+                  onChange={(e) => setLivestockTag(e.target.value)}
+                  placeholder="MF-00X | RQ-00X | QB-00X"
+                />
               </div>
-            </div>
+            </>
           )}
         </section>
 
@@ -216,9 +254,15 @@ export default function NewEntryPage() {
         {/* ── Pengiriman ── */}
         <section className="rounded-xl border bg-card p-4 space-y-4">
           <h3 className="font-semibold text-sm">Pengiriman</h3>
-          <Select name="pengiriman" defaultValue="HARI_H">
+          <input type="hidden" name="pengiriman" value={pengiriman} />
+          <Select
+            value={pengiriman}
+            onValueChange={(val) => setPengiriman(val ?? 'HARI_H')}
+          >
             <SelectTrigger>
-              <SelectValue />
+              <SelectValue>
+                {PENGIRIMAN_LABEL[pengiriman] ?? pengiriman}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               {PENGIRIMAN_OPTIONS.map((o) => (
@@ -238,6 +282,8 @@ export default function NewEntryPage() {
             <RupiahInput
               id="hargaJual"
               name="hargaJual"
+              value={hargaJual}
+              onValueChange={setHargaJual}
               required
               placeholder="3500000"
             />
@@ -249,7 +295,9 @@ export default function NewEntryPage() {
               onValueChange={(val) => setPaymentStatus(val ?? 'BELUM_BAYAR')}
             >
               <SelectTrigger>
-                <SelectValue />
+                <SelectValue>
+                  {PAYMENT_LABEL[paymentStatus] ?? paymentStatus}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="BELUM_BAYAR">Belum Bayar</SelectItem>
@@ -276,7 +324,11 @@ export default function NewEntryPage() {
           <Textarea name="notes" rows={2} placeholder="Catatan tambahan..." />
         </section>
 
-        <Button type="submit" className="w-full h-12 text-base" disabled={loading}>
+        <Button
+          type="submit"
+          className="w-full h-12 text-base"
+          disabled={loading}
+        >
           {loading ? 'Menyimpan...' : 'Kirim Entry'}
         </Button>
       </form>

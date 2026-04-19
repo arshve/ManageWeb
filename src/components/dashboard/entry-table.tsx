@@ -58,7 +58,7 @@ import {
   deleteEntry,
 } from '@/app/actions/entries';
 import { toast } from 'sonner';
-import { formatRupiah, formatDateTime } from '@/lib/format';
+import { formatRupiah, formatDateTime, formatPaymentStatus } from '@/lib/format';
 import { BuktiTransferUpload } from '@/components/dashboard/bukti-transfer-upload';
 import { PdfMenu } from '@/components/dashboard/pdf-menu';
 import { LivestockPhotoLink } from '@/components/dashboard/livestock-photo-link';
@@ -108,6 +108,20 @@ export interface AvailableLivestock {
   grade: string | null;
   tag: string | null;
 }
+
+const PENGIRIMAN_LABEL: Record<string, string> = {
+  HARI_H: 'Hari H',
+  H_1: 'H-1',
+  H_2: 'H-2',
+  H_3: 'H-3',
+  TITIP_POTONG: 'Titip Potong',
+};
+
+const PAYMENT_LABEL: Record<string, string> = {
+  BELUM_BAYAR: 'Belum Bayar',
+  DP: 'DP',
+  LUNAS: 'Lunas',
+};
 
 type SortField =
   | 'invoiceNo'
@@ -237,7 +251,9 @@ export function EntryTable({
             onValueChange={(val) => setStatusFilter(val ?? 'ALL')}
           >
             <SelectTrigger className="h-8 w-[140px] text-xs">
-              <SelectValue placeholder="Status" />
+              <SelectValue>
+                {{ ALL: 'Semua Status', PENDING: 'Pending', APPROVED: 'Approved', REJECTED: 'Rejected' }[statusFilter] ?? statusFilter}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="ALL">Semua Status</SelectItem>
@@ -251,7 +267,9 @@ export function EntryTable({
             onValueChange={(val) => setPaymentFilter(val ?? 'ALL')}
           >
             <SelectTrigger className="h-8 w-[150px] text-xs">
-              <SelectValue placeholder="Pembayaran" />
+              <SelectValue>
+                {{ ALL: 'Semua Bayar', BELUM_BAYAR: 'Belum Bayar', DP: 'DP', LUNAS: 'Lunas' }[paymentFilter] ?? paymentFilter}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="ALL">Semua Bayar</SelectItem>
@@ -265,7 +283,9 @@ export function EntryTable({
             onValueChange={(val) => setSentFilter(val ?? 'ALL')}
           >
             <SelectTrigger className="h-8 w-[140px] text-xs">
-              <SelectValue placeholder="Pengiriman" />
+              <SelectValue>
+                {{ ALL: 'Semua Kirim', YES: 'Sudah Kirim', NO: 'Belum Kirim' }[sentFilter] ?? sentFilter}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="ALL">Semua Kirim</SelectItem>
@@ -457,7 +477,7 @@ function HoverBuktiTransfer({
           onClick={handleClick}
           className={buktiTransfer.length > 0 ? 'cursor-pointer' : ''}
         >
-          {paymentStatus === 'BELUM_BAYAR' ? 'Belum' : paymentStatus}
+          {formatPaymentStatus(paymentStatus)}
           {buktiTransfer.length > 0 && (
             <span className="ml-1 opacity-60 text-[10px]">
               ({buktiTransfer.length})
@@ -522,6 +542,7 @@ function useEntryRow(entry: EntryData, onSaved: () => void) {
     totalBayar: entry.totalBayar?.toString() ?? '',
     paymentStatus: entry.paymentStatus,
     pengiriman: entry.pengiriman ?? '',
+    livestockTag: entry.livestock.tag ?? '',
     isSent: entry.isSent,
     notes: entry.notes ?? '',
   });
@@ -553,6 +574,7 @@ function useEntryRow(entry: EntryData, onSaved: () => void) {
         formData.set('totalBayar', form.hargaJual);
       }
       formData.set('pengiriman', form.pengiriman);
+      formData.set('livestockTag', form.livestockTag);
       formData.set('isSent', form.isSent.toString());
       formData.set('notes', form.notes);
       if (newLivestockId) {
@@ -694,7 +716,7 @@ function EntryEditFields({
                   />
                 </div>
               </div>
-              <SelectItem value="__none__">Tetap — tidak diganti</SelectItem>
+              <SelectItem value="__none__" label="Tetap — tidak diganti">Tetap — tidak diganti</SelectItem>
               {filteredLivestock.map((l) => {
                 const typeLabel =
                   l.type.charAt(0) + l.type.slice(1).toLowerCase();
@@ -703,7 +725,7 @@ function EntryEditFields({
                   typeLabel + (l.grade ? ' ' + l.grade : ''),
                 ].join(' — ');
                 return (
-                  <SelectItem key={l.id} value={l.id}>
+                  <SelectItem key={l.id} value={l.id} label={label}>
                     {label}
                   </SelectItem>
                 );
@@ -719,6 +741,16 @@ function EntryEditFields({
           </Select>
         </div>
       )}
+      {/* Tag Hewan */}
+      <div className="space-y-1">
+        <Label className="text-xs">Tag Hewan</Label>
+        <Input
+          value={form.livestockTag}
+          onChange={(e) => update('livestockTag', e.target.value)}
+          className="h-8 text-sm"
+          placeholder="MF-00X | RQ-00X | QB-00X"
+        />
+      </div>
       {/* Buyer */}
       <div className="space-y-1">
         <Label className="text-xs">Nama Pembeli</Label>
@@ -816,7 +848,9 @@ function EntryEditFields({
           }
         >
           <SelectTrigger className="h-8 text-sm">
-            <SelectValue />
+            <SelectValue>
+              {form.pengiriman ? (PENGIRIMAN_LABEL[form.pengiriman] ?? form.pengiriman) : '— Tidak ada —'}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="__none__">— Tidak ada —</SelectItem>
@@ -841,7 +875,9 @@ function EntryEditFields({
               }
             >
               <SelectTrigger className="h-8 text-sm">
-                <SelectValue />
+                <SelectValue>
+                  {PAYMENT_LABEL[form.paymentStatus] ?? form.paymentStatus}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="BELUM_BAYAR">Belum Bayar</SelectItem>

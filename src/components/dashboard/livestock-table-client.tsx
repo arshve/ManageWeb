@@ -120,7 +120,9 @@ export function LivestockTableClient({
             onValueChange={(val) => setTypeFilter(val ?? typeFilter)}
           >
             <SelectTrigger className="h-8 w-[130px] text-xs">
-              <SelectValue placeholder="Jenis" />
+              <SelectValue>
+                {{ ALL: 'Semua Jenis', KAMBING: 'Kambing', DOMBA: 'Domba', SAPI: 'Sapi' }[typeFilter] ?? typeFilter}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="ALL">Semua Jenis</SelectItem>
@@ -138,7 +140,9 @@ export function LivestockTableClient({
             onValueChange={(val) => setGradeFilter(val ?? gradeFilter)}
           >
             <SelectTrigger className="h-8 w-[130px] text-xs">
-              <SelectValue placeholder="Grade" />
+              <SelectValue>
+                {{ ALL: 'Semua Grade', SUPER: 'Super', A: 'A', B: 'B', C: 'C', D: 'D' }[gradeFilter] ?? gradeFilter}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="ALL">Semua Grade</SelectItem>
@@ -158,7 +162,9 @@ export function LivestockTableClient({
             onValueChange={(val) => setStatusFilter(val ?? statusFilter)}
           >
             <SelectTrigger className="h-8 w-[130px] text-xs">
-              <SelectValue placeholder="Status" />
+              <SelectValue>
+                {{ ALL: 'Semua Status', AVAILABLE: 'Tersedia', SOLD: 'Terjual' }[statusFilter] ?? statusFilter}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="ALL">Semua Status</SelectItem>
@@ -175,7 +181,9 @@ export function LivestockTableClient({
             onValueChange={(val) => setConditionFilter(val ?? conditionFilter)}
           >
             <SelectTrigger className="h-8 w-[130px] text-xs">
-              <SelectValue placeholder="Kondisi" />
+              <SelectValue>
+                {{ ALL: 'Semua Kondisi', SEHAT: 'Sehat', SAKIT: 'Sakit', MATI: 'Mati' }[conditionFilter] ?? conditionFilter}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="ALL">Semua Kondisi</SelectItem>

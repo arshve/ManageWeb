@@ -161,17 +161,22 @@ export async function createEntry(formData: FormData) {
     approvedBy,
   };
 
+  const livestockTag = (formData.get('livestockTag') as string) || null;
+
   const entry = await prisma.$transaction(async (tx) => {
     const created = await tx.entry.create({
       data: entryData,
     });
 
+    const livestockUpdate: Record<string, unknown> = { tag: livestockTag };
     if (status === 'APPROVED') {
-      await tx.livestock.update({
-        where: { id: livestockId },
-        data: { isSold: true },
-      });
+      livestockUpdate.isSold = true;
     }
+
+    await tx.livestock.update({
+      where: { id: livestockId },
+      data: livestockUpdate,
+    });
 
     return created;
   });
@@ -350,6 +355,8 @@ export async function updateEntry(id: string, formData: FormData) {
         ? []
         : entry.buktiTransfer;
 
+  const livestockTag = (formData.get('livestockTag') as string) || null;
+
   const entryData = {
     hargaJual,
     hargaModal,
@@ -375,26 +382,33 @@ export async function updateEntry(id: string, formData: FormData) {
     ...(swapLivestockId ? { livestockId: swapLivestockId } : {}),
   };
 
-  const updated = await (swapLivestockId
-    ? prisma.$transaction(async (tx) => {
-        const u = await tx.entry.update({
-          where: { id },
-          data: entryData,
-        });
-        // If the entry is APPROVED, transfer the "sold" flag to the new livestock.
-        if (entry.status === 'APPROVED') {
-          await tx.livestock.update({
-            where: { id: entry.livestockId },
-            data: { isSold: false },
-          });
-          await tx.livestock.update({
-            where: { id: swapLivestockId },
-            data: { isSold: true },
-          });
-        }
-        return u;
-      })
-    : prisma.entry.update({ where: { id }, data: entryData }));
+  const targetLivestockId = swapLivestockId ?? entry.livestockId;
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const u = await tx.entry.update({
+      where: { id },
+      data: entryData,
+    });
+
+    // Update livestock tag
+    await tx.livestock.update({
+      where: { id: targetLivestockId },
+      data: { tag: livestockTag },
+    });
+
+    if (swapLivestockId && entry.status === 'APPROVED') {
+      await tx.livestock.update({
+        where: { id: entry.livestockId },
+        data: { isSold: false },
+      });
+      await tx.livestock.update({
+        where: { id: swapLivestockId },
+        data: { isSold: true },
+      });
+    }
+
+    return u;
+  });
 
   await logAudit({
     actor: profile,

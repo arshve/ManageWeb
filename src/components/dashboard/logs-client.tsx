@@ -117,7 +117,9 @@ export function LogsClient({
           onValueChange={(val) => apply({ entity: val ?? 'ALL' })}
         >
           <SelectTrigger className="h-8 w-[130px] text-xs">
-            <SelectValue placeholder="Entitas" />
+            <SelectValue>
+              {filters.entity === 'ALL' ? 'Semua Entitas' : filters.entity}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="ALL">Semua Entitas</SelectItem>
@@ -133,7 +135,9 @@ export function LogsClient({
           onValueChange={(val) => apply({ action: val ?? 'ALL' })}
         >
           <SelectTrigger className="h-8 w-[130px] text-xs">
-            <SelectValue placeholder="Aksi" />
+            <SelectValue>
+              {filters.action === 'ALL' ? 'Semua Aksi' : filters.action}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="ALL">Semua Aksi</SelectItem>
@@ -149,7 +153,9 @@ export function LogsClient({
           onValueChange={(val) => apply({ actorId: val ?? 'ALL' })}
         >
           <SelectTrigger className="h-8 w-[160px] text-xs">
-            <SelectValue placeholder="Aktor" />
+            <SelectValue>
+              {filters.actorId === 'ALL' ? 'Semua Aktor' : (actors.find((a) => a.id === filters.actorId)?.name ?? filters.actorId)}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="ALL">Semua Aktor</SelectItem>

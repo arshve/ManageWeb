@@ -147,6 +147,35 @@ export async function toggleUserActive(id: string, isActive: boolean) {
   return { success: true };
 }
 
+export async function changeOwnPassword(formData: FormData) {
+  const profile = await requireRole('SALES', 'DRIVER', 'MANAGE');
+
+  const currentPassword = formData.get('currentPassword') as string;
+  const newPassword = formData.get('newPassword') as string;
+
+  if (!currentPassword || !newPassword) {
+    return { error: 'Password lama dan baru harus diisi' };
+  }
+  if (newPassword.length < 4) {
+    return { error: 'Password baru minimal 4 karakter' };
+  }
+
+  const user = await prisma.profile.findUnique({ where: { id: profile.id } });
+  if (!user) return { error: 'User tidak ditemukan' };
+
+  const { compareSync } = await import('bcryptjs');
+  if (!compareSync(currentPassword, user.password)) {
+    return { error: 'Password lama salah' };
+  }
+
+  await prisma.profile.update({
+    where: { id: profile.id },
+    data: { password: hashSync(newPassword, 10) },
+  });
+
+  return { success: true as const };
+}
+
 export async function getActiveSales() {
   await requireRole('ADMIN');
   return prisma.profile.findMany({

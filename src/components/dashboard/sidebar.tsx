@@ -34,6 +34,7 @@ import {
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
+import { ChangePasswordButton } from '@/components/dashboard/change-password-form';
 
 interface SidebarProps {
   role: 'ADMIN' | 'SALES' | 'MANAGE' | 'DRIVER';
@@ -163,6 +164,7 @@ export function Sidebar({ role, userName }: SidebarProps) {
             <ChevronLeft className="h-4 w-4" />
             Ke Website
           </Link> */}
+          {role !== 'ADMIN' && <ChangePasswordButton />}
           <Button
             variant="ghost"
             onClick={handleLogout}

@@ -1,16 +1,19 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Beef } from 'lucide-react';
+import { Beef, ChevronLeft, ChevronRight } from 'lucide-react';
 import { AnimalCard } from './AnimalCard';
-import { FilterBar, type FilterType, type SortOrder } from './FilterBar';
+import { FilterBar, type FilterType, type GradeFilter, type SortOrder } from './FilterBar';
 import { StatsBar } from './StatsBar';
+import { formatWeight } from '@/lib/format';
 import type { AvailableLivestock } from '@/app/actions/livestock';
 import type { Decimal } from '@prisma/client/runtime/library';
 
 interface CatalogueGridProps {
   livestock: AvailableLivestock[];
 }
+
+const PAGE_SIZE = 9; // 3 cols × 3 rows
 
 function toNumber(val: Decimal | number | null | undefined): number {
   if (val == null) return 0;
@@ -20,6 +23,10 @@ function toNumber(val: Decimal | number | null | undefined): number {
 export function CatalogueGrid({ livestock }: CatalogueGridProps) {
   const [activeFilter, setActiveFilter] = useState<FilterType>('ALL');
   const [activeSort, setActiveSort] = useState<SortOrder>('newest');
+  const [activeGrade, setActiveGrade] = useState<GradeFilter>('ALL');
+  const [activeWeight, setActiveWeight] = useState('ALL');
+
+  const [page, setPage] = useState(0);
 
   /* ── Counts per type for filter pills ─────────────────────────────────── */
   const counts = useMemo<Record<string, number>>(() => {
@@ -30,13 +37,34 @@ export function CatalogueGrid({ livestock }: CatalogueGridProps) {
     return { ALL: livestock.length, ...base };
   }, [livestock]);
 
-  /* ── Filter + Sort ─────────────────────────────────────────────────────── */
-  const filtered = useMemo(() => {
-    let result =
-      activeFilter === 'ALL'
-        ? livestock
-        : livestock.filter((item) => item.type === activeFilter);
+  /* ── Weight options from type-filtered data ───────────────────────────── */
+  const weightOptions = useMemo(() => {
+    const source = activeFilter !== 'ALL'
+      ? livestock.filter((l) => l.type === activeFilter)
+      : livestock;
+    const set = new Set<string>();
+    source.forEach((l) => {
+      const w = formatWeight(l.weightMin, l.weightMax);
+      if (w) set.add(w);
+    });
+    return Array.from(set).sort();
+  }, [livestock, activeFilter]);
 
+  const showGrades = activeFilter !== 'SAPI';
+
+  /* ── Filter + Sort ────────────────────────────────────────────────────── */
+  const filtered = useMemo(() => {
+    let result = livestock;
+
+    if (activeFilter !== 'ALL') {
+      result = result.filter((item) => item.type === activeFilter);
+    }
+    if (activeGrade !== 'ALL') {
+      result = result.filter((item) => item.grade === activeGrade);
+    }
+    if (activeWeight !== 'ALL') {
+      result = result.filter((item) => formatWeight(item.weightMin, item.weightMax) === activeWeight);
+    }
     switch (activeSort) {
       case 'price_asc':
         result = [...result].sort(
@@ -49,12 +77,49 @@ export function CatalogueGrid({ livestock }: CatalogueGridProps) {
         );
         break;
       default:
-        // 'newest' — already sorted by server
         break;
     }
 
     return result;
-  }, [livestock, activeFilter, activeSort]);
+  }, [livestock, activeFilter, activeGrade, activeWeight, activeSort]);
+
+  /* ── Pagination ────────────────────────────────────────────────────────── */
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages - 1);
+  const paged = filtered.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
+
+  const hasActiveFilters =
+    activeFilter !== 'ALL' ||
+    activeGrade !== 'ALL' ||
+    activeWeight !== 'ALL' ||
+    activeSort !== 'newest';
+
+  /* ── Handlers (reset page on any change) ──────────────────────────────── */
+  function handleFilterChange(f: FilterType) {
+    setActiveFilter(f);
+    if (f === 'SAPI') setActiveGrade('ALL');
+    setActiveWeight('ALL');
+    setPage(0);
+  }
+  function handleGradeChange(g: GradeFilter) {
+    setActiveGrade(g);
+    setPage(0);
+  }
+  function handleWeightChange(w: string) {
+    setActiveWeight(w);
+    setPage(0);
+  }
+  function handleSortChange(s: SortOrder) {
+    setActiveSort(s);
+    setPage(0);
+  }
+  function handleReset() {
+    setActiveFilter('ALL');
+    setActiveSort('newest');
+    setActiveGrade('ALL');
+    setActiveWeight('ALL');
+    setPage(0);
+  }
 
   return (
     <div>
@@ -67,9 +132,19 @@ export function CatalogueGrid({ livestock }: CatalogueGridProps) {
       <FilterBar
         activeFilter={activeFilter}
         activeSort={activeSort}
-        onFilterChange={setActiveFilter}
-        onSortChange={setActiveSort}
+        activeGrade={activeGrade}
+        activeWeight={activeWeight}
+
+        onFilterChange={handleFilterChange}
+        onSortChange={handleSortChange}
+        onGradeChange={handleGradeChange}
+        onWeightChange={handleWeightChange}
+
+        onReset={handleReset}
         counts={counts}
+        weightOptions={weightOptions}
+        showGrades={showGrades}
+        hasActiveFilters={hasActiveFilters}
       />
 
       {/* Grid */}
@@ -82,10 +157,49 @@ export function CatalogueGrid({ livestock }: CatalogueGridProps) {
               {filtered.length} hewan ditemukan
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
-              {filtered.map((item, index) => (
-                <AnimalCard key={item.id} item={item} priority={index < 3} />
+              {paged.map((item, index) => (
+                <AnimalCard key={item.id} item={item} priority={safePage === 0 && index < 3} />
               ))}
             </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-4 pt-8">
+                <button
+                  type="button"
+                  disabled={safePage === 0}
+                  onClick={() => setPage(safePage - 1)}
+                  className={[
+                    'inline-flex items-center justify-center w-10 h-10 rounded-full',
+                    'border border-neutral-200 dark:border-neutral-800',
+                    'text-neutral-600 dark:text-neutral-400',
+                    'hover:bg-neutral-100 dark:hover:bg-neutral-800',
+                    'disabled:opacity-30 disabled:cursor-not-allowed',
+                    'transition-all duration-200',
+                  ].join(' ')}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <span className="text-sm text-neutral-500 dark:text-neutral-400 tabular-nums">
+                  {safePage + 1} / {totalPages}
+                </span>
+                <button
+                  type="button"
+                  disabled={safePage >= totalPages - 1}
+                  onClick={() => setPage(safePage + 1)}
+                  className={[
+                    'inline-flex items-center justify-center w-10 h-10 rounded-full',
+                    'border border-neutral-200 dark:border-neutral-800',
+                    'text-neutral-600 dark:text-neutral-400',
+                    'hover:bg-neutral-100 dark:hover:bg-neutral-800',
+                    'disabled:opacity-30 disabled:cursor-not-allowed',
+                    'transition-all duration-200',
+                  ].join(' ')}
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
           </>
         )}
       </div>

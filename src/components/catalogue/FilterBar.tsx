@@ -3,14 +3,25 @@
 import { SlidersHorizontal } from 'lucide-react';
 
 export type FilterType = 'ALL' | 'SAPI' | 'KAMBING' | 'DOMBA';
+export type GradeFilter = 'ALL' | 'SUPER' | 'A' | 'B' | 'C' | 'D';
 export type SortOrder = 'newest' | 'price_asc' | 'price_desc';
 
 interface FilterBarProps {
   activeFilter: FilterType;
   activeSort: SortOrder;
+  activeGrade: GradeFilter;
+  activeWeight: string;
+
   onFilterChange: (f: FilterType) => void;
   onSortChange: (s: SortOrder) => void;
+  onGradeChange: (g: GradeFilter) => void;
+  onWeightChange: (w: string) => void;
+
+  onReset: () => void;
   counts: Record<string, number>;
+  weightOptions: string[];
+  showGrades: boolean;
+  hasActiveFilters: boolean;
 }
 
 const FILTER_PILLS: { key: FilterType; label: string; emoji: string }[] = [
@@ -26,12 +37,29 @@ const SORT_OPTIONS: { key: SortOrder; label: string }[] = [
   { key: 'price_desc', label: 'Harga ↓' },
 ];
 
+const GRADE_OPTIONS: { key: GradeFilter; label: string }[] = [
+  { key: 'ALL', label: 'Semua' },
+  { key: 'SUPER', label: 'Super' },
+  { key: 'A', label: 'A' },
+  { key: 'B', label: 'B' },
+  { key: 'C', label: 'C' },
+  { key: 'D', label: 'D' },
+];
+
 export function FilterBar({
   activeFilter,
   activeSort,
+  activeGrade,
+  activeWeight,
   onFilterChange,
   onSortChange,
+  onGradeChange,
+  onWeightChange,
+  onReset,
   counts,
+  weightOptions,
+  showGrades,
+  hasActiveFilters,
 }: FilterBarProps) {
   return (
     <div
@@ -42,7 +70,8 @@ export function FilterBar({
         'py-3',
       ].join(' ')}
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-2.5">
+        {/* Row 1: Type pills + Sort */}
         <div className="flex items-center gap-2 overflow-x-auto scrollbar-none scroll-smooth snap-x snap-mandatory">
           {/* Filter pills */}
           <div className="flex items-center gap-2 shrink-0">
@@ -127,6 +156,102 @@ export function FilterBar({
             })}
           </div>
         </div>
+
+        {/* Row 2: Grade pills (hidden for Sapi) */}
+        {showGrades && (
+          <div className="flex items-center gap-2 overflow-x-auto scrollbar-none">
+            <span className="text-xs text-neutral-400 dark:text-neutral-500 shrink-0">Grade:</span>
+            {GRADE_OPTIONS.map((g) => {
+              const isActive = activeGrade === g.key;
+              return (
+                <button
+                  key={g.key}
+                  type="button"
+                  onClick={() => onGradeChange(g.key)}
+                  className={[
+                    'inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap',
+                    'transition-all duration-200',
+                    isActive
+                      ? 'bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900'
+                      : [
+                          'bg-white dark:bg-neutral-900',
+                          'text-neutral-500 dark:text-neutral-400',
+                          'border border-neutral-200 dark:border-neutral-800',
+                          'hover:border-neutral-400 dark:hover:border-neutral-600',
+                          'active:scale-95',
+                        ].join(' '),
+                  ].join(' ')}
+                >
+                  {g.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Row 3: Weight pills */}
+        {weightOptions.length > 0 && (
+          <div className="flex items-center gap-2 overflow-x-auto scrollbar-none">
+            <span className="text-xs text-neutral-400 dark:text-neutral-500 shrink-0">Berat:</span>
+            <button
+              type="button"
+              onClick={() => onWeightChange('ALL')}
+              className={[
+                'inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap',
+                'transition-all duration-200',
+                activeWeight === 'ALL'
+                  ? 'bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900'
+                  : [
+                      'bg-white dark:bg-neutral-900',
+                      'text-neutral-500 dark:text-neutral-400',
+                      'border border-neutral-200 dark:border-neutral-800',
+                      'hover:border-neutral-400 dark:hover:border-neutral-600',
+                      'active:scale-95',
+                    ].join(' '),
+              ].join(' ')}
+            >
+              Semua
+            </button>
+            {weightOptions.map((w) => {
+              const isActive = activeWeight === w;
+              return (
+                <button
+                  key={w}
+                  type="button"
+                  onClick={() => onWeightChange(w)}
+                  className={[
+                    'inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap',
+                    'transition-all duration-200',
+                    isActive
+                      ? 'bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900'
+                      : [
+                          'bg-white dark:bg-neutral-900',
+                          'text-neutral-500 dark:text-neutral-400',
+                          'border border-neutral-200 dark:border-neutral-800',
+                          'hover:border-neutral-400 dark:hover:border-neutral-600',
+                          'active:scale-95',
+                        ].join(' '),
+                  ].join(' ')}
+                >
+                  {w}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Reset */}
+        {hasActiveFilters && (
+          <div className="flex items-center">
+            <button
+              type="button"
+              onClick={onReset}
+              className="text-xs text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300 underline underline-offset-2"
+            >
+              Reset filter
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

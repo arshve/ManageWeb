@@ -380,6 +380,9 @@ export async function updateEntry(id: string, formData: FormData) {
     isSent: formData.get('isSent') === 'true',
     buktiTransfer,
     ...(swapLivestockId ? { livestockId: swapLivestockId } : {}),
+    ...(profile.role === 'ADMIN' && formData.get('salesId')
+      ? { salesId: formData.get('salesId') as string }
+      : {}),
   };
 
   const targetLivestockId = swapLivestockId ?? entry.livestockId;

@@ -20,6 +20,7 @@ import {
   type MapStop,
   type MapDriver,
 } from '@/components/admin/delivery-map-loader';
+import { formatPengiriman } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -82,6 +83,7 @@ type UnscheduledEntry = {
   buyerAddress: string | null;
   buyerLat: number | null;
   buyerLng: number | null;
+  pengiriman: string | null;
   hasCoords: boolean;
 };
 
@@ -232,6 +234,27 @@ export function DeliveriesAdminView({
   const activeRouteCount =
     customRouteCount === '' ? Math.max(driverCount, 1) : customRouteCount;
 
+  const [unscheduledSearch, setUnscheduledSearch] = useState('');
+  const [unscheduledCoordFilter, setUnscheduledCoordFilter] = useState<'ALL' | 'HAS_COORDS' | 'NO_COORDS'>('ALL');
+  const [unscheduledPengirimanFilter, setUnscheduledPengirimanFilter] = useState('ALL');
+
+  const filteredUnscheduled = useMemo(() => {
+    let list = unscheduled;
+    if (unscheduledCoordFilter === 'HAS_COORDS') list = list.filter((e) => e.hasCoords);
+    else if (unscheduledCoordFilter === 'NO_COORDS') list = list.filter((e) => !e.hasCoords);
+    if (unscheduledPengirimanFilter !== 'ALL') list = list.filter((e) => e.pengiriman === unscheduledPengirimanFilter);
+    if (unscheduledSearch.trim()) {
+      const q = unscheduledSearch.trim().toLowerCase();
+      list = list.filter(
+        (e) =>
+          e.buyerName.toLowerCase().includes(q) ||
+          (e.sku?.toLowerCase().includes(q)) ||
+          (e.buyerAddress?.toLowerCase().includes(q)),
+      );
+    }
+    return list;
+  }, [unscheduled, unscheduledSearch, unscheduledCoordFilter, unscheduledPengirimanFilter]);
+
   const deliveredCount = scheduled.filter(
     (e) => e.delivery?.status === 'DELIVERED',
   ).length;
@@ -271,7 +294,7 @@ export function DeliveriesAdminView({
   }
   function toggleAll(checked: boolean) {
     setSelectedUnscheduled(
-      checked ? new Set(unscheduled.map((e) => e.id)) : new Set(),
+      checked ? new Set(filteredUnscheduled.map((e) => e.id)) : new Set(),
     );
   }
 
@@ -381,7 +404,7 @@ export function DeliveriesAdminView({
   }
 
   const allSelected =
-    selectedUnscheduled.size === unscheduled.length && unscheduled.length > 0;
+    selectedUnscheduled.size === filteredUnscheduled.length && filteredUnscheduled.length > 0;
   const someSelected = selectedUnscheduled.size > 0 && !allSelected;
 
   // ─── shared table styles ──────────────────────────────────────────────────
@@ -577,6 +600,54 @@ export function DeliveriesAdminView({
           </div>
         </div>
 
+        {/* Search & filter bar */}
+        <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 px-4 sm:px-5 py-2.5">
+          <div className="relative flex-1 min-w-[160px]">
+            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            <Input
+              value={unscheduledSearch}
+              onChange={(ev) => setUnscheduledSearch(ev.target.value)}
+              placeholder="Cari nama / SKU / alamat"
+              className="h-8 text-xs pl-8"
+            />
+          </div>
+          <select
+            value={unscheduledPengirimanFilter}
+            onChange={(ev) => setUnscheduledPengirimanFilter(ev.target.value)}
+            className="h-8 rounded-md border border-gray-300 bg-white px-2 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400"
+          >
+            <option value="ALL">Semua Pengiriman</option>
+            <option value="HARI_H">{formatPengiriman('HARI_H')}</option>
+            <option value="H_1">{formatPengiriman('H_1')}</option>
+            <option value="H_2">{formatPengiriman('H_2')}</option>
+            <option value="H_3">{formatPengiriman('H_3')}</option>
+            <option value="TITIP_POTONG">{formatPengiriman('TITIP_POTONG')}</option>
+          </select>
+          <select
+            value={unscheduledCoordFilter}
+            onChange={(ev) => setUnscheduledCoordFilter(ev.target.value as 'ALL' | 'HAS_COORDS' | 'NO_COORDS')}
+            className="h-8 rounded-md border border-gray-300 bg-white px-2 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400"
+          >
+            <option value="ALL">Semua Koordinat</option>
+            <option value="HAS_COORDS">Punya Koordinat</option>
+            <option value="NO_COORDS">Belum Ada Koordinat</option>
+          </select>
+          {(unscheduledSearch || unscheduledCoordFilter !== 'ALL' || unscheduledPengirimanFilter !== 'ALL') && (
+            <button
+              type="button"
+              onClick={() => { setUnscheduledSearch(''); setUnscheduledCoordFilter('ALL'); setUnscheduledPengirimanFilter('ALL'); }}
+              className="text-xs text-gray-400 hover:text-gray-700 underline underline-offset-2"
+            >
+              Reset
+            </button>
+          )}
+          {filteredUnscheduled.length !== unscheduled.length && (
+            <span className="text-xs text-gray-400">
+              {filteredUnscheduled.length} dari {unscheduled.length}
+            </span>
+          )}
+        </div>
+
         {selectedUnscheduled.size > 0 && (
           <div className="mx-4 sm:mx-5 mt-3 flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-700">
             <span>{selectedUnscheduled.size} dipilih</span>
@@ -592,6 +663,10 @@ export function DeliveriesAdminView({
         {unscheduled.length === 0 ? (
           <p className="px-5 py-6 text-sm text-gray-400">
             Semua entry sudah dijadwalkan.
+          </p>
+        ) : filteredUnscheduled.length === 0 ? (
+          <p className="px-5 py-6 text-sm text-gray-400">
+            Tidak ada entry yang cocok dengan filter.
           </p>
         ) : (
           <>
@@ -614,11 +689,12 @@ export function DeliveriesAdminView({
                     <th className={cn(th, 'w-40')}>SKU</th>
                     <th className={th}>Pembeli</th>
                     <th className={th}>Alamat</th>
+                    <th className={cn(th, 'w-28')}>Pengiriman</th>
                     <th className={cn(th, 'w-52 pr-5')}>Koordinat</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {unscheduled.map((e) => (
+                  {filteredUnscheduled.map((e) => (
                     <UnscheduledRow
                       key={e.id}
                       entry={e}
@@ -646,7 +722,7 @@ export function DeliveriesAdminView({
                 />
                 <span className="text-xs text-gray-500">Pilih semua</span>
               </div>
-              {unscheduled.map((e) => (
+              {filteredUnscheduled.map((e) => (
                 <UnscheduledCard
                   key={e.id}
                   entry={e}
@@ -901,6 +977,9 @@ function UnscheduledRow({
       <td className={cn(td, 'text-xs text-gray-500 max-w-xs truncate')} title={e.buyerAddress ?? undefined}>
         {e.buyerAddress ?? '—'}
       </td>
+      <td className={cn(td, 'text-xs text-gray-600')}>
+        {formatPengiriman(e.pengiriman)}
+      </td>
       <td className={cn(td, 'pr-5')} onClick={(ev) => ev.stopPropagation()}>
         {editing ? (
           <div className="flex items-center gap-1">
@@ -980,9 +1059,10 @@ function UnscheduledCard({
           className="h-4 w-4 mt-0.5 rounded border-gray-300 accent-gray-800 cursor-pointer shrink-0"
         />
         <div className="flex-1 min-w-0" onClick={onToggle}>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="font-medium text-sm text-gray-900 truncate">{e.buyerName}</span>
             <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded text-gray-600 shrink-0">{e.sku}</span>
+            {e.pengiriman && <ColorBadge color="blue">{formatPengiriman(e.pengiriman)}</ColorBadge>}
           </div>
           {e.buyerAddress && <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{e.buyerAddress}</p>}
         </div>

@@ -17,7 +17,7 @@ export default async function SalesPage() {
       orderBy: { createdAt: 'desc' },
       include: {
         livestock: true,
-        sales: { select: { name: true } },
+        sales: { select: { id: true, name: true } },
         delivery: {
           select: {
             status: true,
@@ -89,6 +89,7 @@ export default async function SalesPage() {
       condition: entry.livestock.condition,
     },
     sales: {
+      id: entry.sales.id,
       name: entry.sales.name,
     },
   }));

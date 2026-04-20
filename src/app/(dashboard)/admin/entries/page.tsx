@@ -4,12 +4,12 @@ import { EntryTable } from '@/components/dashboard/entry-table';
 import { Card, CardContent } from '@/components/ui/card';
 
 export default async function AdminEntriesPage() {
-  const [entries, availableLivestock] = await Promise.all([
+  const [entries, availableLivestock, salesUsers] = await Promise.all([
     prisma.entry.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
         livestock: true,
-        sales: { select: { name: true } },
+        sales: { select: { id: true, name: true } },
         delivery: {
           select: {
             status: true,
@@ -32,6 +32,11 @@ export default async function AdminEntriesPage() {
         grade: true,
         tag: true,
       },
+    }),
+    prisma.profile.findMany({
+      where: { role: { in: ['SALES', 'ADMIN'] }, isActive: true },
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
     }),
   ]);
 
@@ -74,6 +79,7 @@ export default async function AdminEntriesPage() {
       condition: entry.livestock.condition,
     },
     sales: {
+      id: entry.sales.id,
       name: entry.sales.name,
     },
   }));
@@ -89,6 +95,7 @@ export default async function AdminEntriesPage() {
             entries={serialized}
             isAdmin={true}
             availableLivestock={availableLivestock}
+            salesUsers={salesUsers}
           />
         </CardContent>
       </Card>

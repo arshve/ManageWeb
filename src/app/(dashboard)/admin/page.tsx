@@ -21,7 +21,7 @@ export default async function AdminDashboardPage() {
     where: { role: 'SALES', isActive: true },
   });
 
-  const [approvedEntries, allEntries, availableLivestock] = await Promise.all([
+  const [approvedEntries, allEntries, availableLivestock, salesUsers] = await Promise.all([
     prisma.entry.findMany({
       where: { status: 'APPROVED' },
       select: { hargaJual: true, hargaModal: true, profit: true },
@@ -30,7 +30,7 @@ export default async function AdminDashboardPage() {
       orderBy: { createdAt: 'desc' },
       include: {
         livestock: true,
-        sales: { select: { name: true } },
+        sales: { select: { id: true, name: true } },
         delivery: {
           select: {
             status: true,
@@ -53,6 +53,11 @@ export default async function AdminDashboardPage() {
         grade: true,
         tag: true,
       },
+    }),
+    prisma.profile.findMany({
+      where: { role: { in: ['SALES', 'ADMIN'] }, isActive: true },
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
     }),
   ]);
 
@@ -103,6 +108,7 @@ export default async function AdminDashboardPage() {
       condition: entry.livestock.condition,
     },
     sales: {
+      id: entry.sales.id,
       name: entry.sales.name,
     },
   }));
@@ -174,6 +180,7 @@ export default async function AdminDashboardPage() {
             entries={serialized}
             isAdmin={true}
             availableLivestock={availableLivestock}
+            salesUsers={salesUsers}
           />
         </CardContent>
       </Card>

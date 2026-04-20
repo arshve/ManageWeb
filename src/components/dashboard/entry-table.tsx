@@ -98,7 +98,12 @@ export interface EntryData {
     photoUrl: string | null;
     condition: string;
   };
-  sales: { name: string };
+  sales: { id: string; name: string };
+}
+
+export interface SalesUser {
+  id: string;
+  name: string;
 }
 
 export interface AvailableLivestock {
@@ -136,10 +141,12 @@ export function EntryTable({
   entries,
   isAdmin = false,
   availableLivestock = [],
+  salesUsers = [],
 }: {
   entries: EntryData[];
   isAdmin?: boolean;
   availableLivestock?: AvailableLivestock[];
+  salesUsers?: SalesUser[];
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -396,6 +403,7 @@ export function EntryTable({
                 onCancel={() => setEditingId(null)}
                 onSaved={() => setEditingId(null)}
                 availableLivestock={availableLivestock}
+                salesUsers={salesUsers}
               />
             ))}
             {filtered.length === 0 && (
@@ -426,6 +434,7 @@ export function EntryTable({
             onCancel={() => setEditingId(null)}
             onSaved={() => setEditingId(null)}
             availableLivestock={availableLivestock}
+            salesUsers={salesUsers}
           />
         ))}
         {filtered.length === 0 && (
@@ -543,6 +552,7 @@ function useEntryRow(entry: EntryData, onSaved: () => void) {
     paymentStatus: entry.paymentStatus,
     pengiriman: entry.pengiriman ?? '',
     livestockTag: entry.livestock.tag ?? '',
+    salesId: entry.sales.id,
     isSent: entry.isSent,
     notes: entry.notes ?? '',
   });
@@ -575,6 +585,7 @@ function useEntryRow(entry: EntryData, onSaved: () => void) {
       }
       formData.set('pengiriman', form.pengiriman);
       formData.set('livestockTag', form.livestockTag);
+      formData.set('salesId', form.salesId);
       formData.set('isSent', form.isSent.toString());
       formData.set('notes', form.notes);
       if (newLivestockId) {
@@ -642,6 +653,7 @@ function EntryEditFields({
   availableLivestock,
   newLivestockId,
   setNewLivestockId,
+  salesUsers,
 }: {
   entry: EntryData;
   isAdmin: boolean;
@@ -651,6 +663,7 @@ function EntryEditFields({
   availableLivestock: AvailableLivestock[];
   newLivestockId: string;
   setNewLivestockId: (id: string) => void;
+  salesUsers: SalesUser[];
 }) {
   const isMati = entry.livestock.condition === 'MATI';
   const [livestockSearch, setLivestockSearch] = useState('');
@@ -751,6 +764,27 @@ function EntryEditFields({
           placeholder="MF-00X | RQ-00X | QB-00X"
         />
       </div>
+      {/* Sales */}
+      {isAdmin && salesUsers.length > 0 && (
+        <div className="space-y-1">
+          <Label className="text-xs">Sales</Label>
+          <Select
+            value={form.salesId}
+            onValueChange={(val) => update('salesId', val ?? form.salesId)}
+          >
+            <SelectTrigger className="h-8 text-sm">
+              <SelectValue>
+                {salesUsers.find((s) => s.id === form.salesId)?.name ?? form.salesId}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {salesUsers.map((s) => (
+                <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
       {/* Buyer */}
       <div className="space-y-1">
         <Label className="text-xs">Nama Pembeli</Label>
@@ -919,6 +953,7 @@ function EntryRow({
   onCancel,
   onSaved,
   availableLivestock,
+  salesUsers,
 }: {
   entry: EntryData;
   isAdmin: boolean;
@@ -927,6 +962,7 @@ function EntryRow({
   onCancel: () => void;
   onSaved: () => void;
   availableLivestock: AvailableLivestock[];
+  salesUsers: SalesUser[];
 }) {
   const {
     form,
@@ -1102,6 +1138,7 @@ function EntryRow({
               availableLivestock={availableLivestock}
               newLivestockId={newLivestockId}
               setNewLivestockId={setNewLivestockId}
+              salesUsers={salesUsers}
             />
           </td>
         </tr>
@@ -1118,6 +1155,7 @@ function MobileEntryCard({
   onCancel,
   onSaved,
   availableLivestock,
+  salesUsers,
 }: {
   entry: EntryData;
   isAdmin: boolean;
@@ -1126,6 +1164,7 @@ function MobileEntryCard({
   onCancel: () => void;
   onSaved: () => void;
   availableLivestock: AvailableLivestock[];
+  salesUsers: SalesUser[];
 }) {
   const [expanded, setExpanded] = useState(false);
   const {
@@ -1203,6 +1242,7 @@ function MobileEntryCard({
                 availableLivestock={availableLivestock}
                 newLivestockId={newLivestockId}
                 setNewLivestockId={setNewLivestockId}
+                salesUsers={salesUsers}
               />
               <div className="flex gap-2 pt-2 border-t">
                 <Button

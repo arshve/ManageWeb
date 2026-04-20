@@ -17,10 +17,8 @@ import {
 import { DashboardShell } from '@/components/dashboard/dashboard-shell';
 import { createEntry } from '@/app/actions/entries';
 import { toast } from 'sonner';
-import { Beef, Search } from 'lucide-react';
-import { LivestockPhoto } from '@/components/dashboard/livestock-photo';
+import { LivestockPicker } from '@/components/dashboard/livestock-picker';
 import { BuktiTransferUpload } from '@/components/dashboard/bukti-transfer-upload';
-import { formatWeight, formatRupiah } from '@/lib/format';
 
 interface AvailableLivestock {
   id: string;
@@ -55,7 +53,6 @@ const PAYMENT_LABEL: Record<string, string> = {
 
 export default function NewEntryPage() {
   const [livestock, setLivestock] = useState<AvailableLivestock[]>([]);
-  const [livestockSearch, setLivestockSearch] = useState('');
   const [selectedId, setSelectedId] = useState('');
   const [livestockTag, setLivestockTag] = useState('');
   const [pengiriman, setPengiriman] = useState('HARI_H');
@@ -87,14 +84,6 @@ export default function NewEntryPage() {
     }
   }, [selected]);
 
-  const filteredLivestock = livestock.filter((l) => {
-    const q = livestockSearch.toLowerCase();
-    return (
-      l.sku.toLowerCase().includes(q) ||
-      l.type.toLowerCase().includes(q) ||
-      (l.grade && l.grade.toLowerCase().includes(q))
-    );
-  });
 
   async function handleSubmit(formData: FormData) {
     if (!selectedId) {
@@ -131,98 +120,23 @@ export default function NewEntryPage() {
         {/* ── Pilih Hewan ── */}
         <section className="rounded-xl border bg-card p-4 space-y-3">
           <h3 className="font-semibold text-sm">Pilih Hewan</h3>
-          <Select
-            value={selectedId}
-            onValueChange={(val) => {
-              setSelectedId(val ?? '');
-              if (val) setLivestockSearch('');
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Pilih hewan yang tersedia...">
-                {selected?.sku}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent className="min-w-max w-auto max-h-[350px]">
-              <div className="sticky top-0 z-20 -mx-1 -mt-1 mb-1 border-b bg-popover p-2 rounded-t-md">
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                  <Input
-                    placeholder="Cari SKU, Jenis..."
-                    value={livestockSearch}
-                    onChange={(e) => setLivestockSearch(e.target.value)}
-                    onKeyDown={(e) => {
-                      e.stopPropagation();
-                      e.nativeEvent.stopImmediatePropagation();
-                    }}
-                    className="h-8 pl-8 text-xs"
-                  />
-                </div>
-              </div>
-              {filteredLivestock.map((l) => {
-                const weightStr = formatWeight(l.weightMin, l.weightMax);
-                const itemLabel = `${l.sku} — ${l.type}${l.grade ? ` Grade ${l.grade}` : ''}${weightStr ? ` (${weightStr})` : ''}`;
-                return (
-                  <SelectItem key={l.id} value={l.id} label={itemLabel}>
-                    <span className="font-mono">{l.sku}</span> — {l.type}
-                    {l.grade ? ` Grade ${l.grade}` : ''}
-                    {weightStr ? ` (${weightStr})` : ''}
-                  </SelectItem>
-                );
-              })}
-              {filteredLivestock.length === 0 && (
-                <div className="py-4 text-center text-xs text-muted-foreground">
-                  Hewan tidak ditemukan
-                </div>
-              )}
-            </SelectContent>
-          </Select>
+          <LivestockPicker
+            livestock={livestock}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+          />
 
           {selected && (
-            <>
-              <div className="flex gap-3 p-3 bg-muted rounded-lg text-sm">
-                <div className="relative w-20 h-20 flex-shrink-0 rounded-md overflow-hidden bg-background">
-                  {selected.photoUrl ? (
-                    <LivestockPhoto
-                      photoUrl={selected.photoUrl}
-                      alt={`${selected.type}${selected.grade ? ' ' + selected.grade : ''}`}
-                      thumbnailClassName="w-20 h-20"
-                      priority
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Beef className="h-6 w-6 text-muted-foreground/30" />
-                    </div>
-                  )}
-                </div>
-                <div className="space-y-0.5 text-xs">
-                  <p className="font-medium text-sm">{selected.sku}</p>
-                  <p className="text-muted-foreground">
-                    {selected.type}
-                    {selected.grade ? ` · Grade ${selected.grade}` : ''}
-                  </p>
-                  <p className="text-muted-foreground">
-                    {formatWeight(selected.weightMin, selected.weightMax) ??
-                      '—'}
-                  </p>
-                  <p className="font-medium">
-                    {selected.hargaJual
-                      ? formatRupiah(selected.hargaJual)
-                      : 'Harga belum diset'}
-                  </p>
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="livestockTag">Tag Hewan</Label>
-                <Input
-                  id="livestockTag"
-                  name="livestockTag"
-                  value={livestockTag}
-                  onChange={(e) => setLivestockTag(e.target.value)}
-                  placeholder="MF-00X | RQ-00X | QB-00X"
-                />
-              </div>
-            </>
+            <div className="space-y-1.5 pt-2 border-t">
+              <Label htmlFor="livestockTag">Tag Hewan</Label>
+              <Input
+                id="livestockTag"
+                name="livestockTag"
+                value={livestockTag}
+                onChange={(e) => setLivestockTag(e.target.value)}
+                placeholder="MF-00X | RQ-00X | QB-00X"
+              />
+            </div>
           )}
         </section>
 

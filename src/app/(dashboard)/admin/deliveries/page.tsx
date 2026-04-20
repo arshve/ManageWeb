@@ -95,6 +95,7 @@ export default async function AdminDeliveriesPage({
         },
         buyerLat: true,
         buyerLng: true,
+        pengiriman: true,
       },
       orderBy: { createdAt: 'desc' },
     }),
@@ -153,6 +154,7 @@ export default async function AdminDeliveriesPage({
     buyerAddress: e.buyerAddress,
     buyerLat: e.buyerLat,
     buyerLng: e.buyerLng,
+    pengiriman: e.pengiriman,
     hasCoords: e.buyerLat != null && e.buyerLng != null,
   }));
 

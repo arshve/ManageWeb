@@ -62,10 +62,6 @@ export default async function AdminDashboardPage() {
   ]);
 
   const totalRevenue = approvedEntries.reduce((sum, e) => sum + e.hargaJual, 0);
-  const totalProfit = approvedEntries.reduce(
-    (sum, e) => sum + (e.profit ?? 0),
-    0,
-  );
   const totalModal = approvedEntries.reduce(
     (sum, e) => sum + (e.hargaModal ?? 0),
     0,
@@ -133,9 +129,9 @@ export default async function AdminDashboardPage() {
       icon: DollarSign,
     },
     {
-      title: 'Total Profit',
-      value: formatRupiah(totalProfit),
-      sub: `${totalSales} sales aktif`,
+      title: 'Sales Aktif',
+      value: totalSales,
+      sub: 'Keuangan di menu terpisah',
       icon: Users,
     },
   ];

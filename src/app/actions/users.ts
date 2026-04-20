@@ -33,6 +33,7 @@ export async function createUser(formData: FormData) {
   const password = formData.get('password') as string;
   const name = formData.get('name') as string;
   const phone = (formData.get('phone') as string) || null;
+  const rekBank = (formData.get('rekBank') as string) || null;
   const role =
     (formData.get('role') as 'ADMIN' | 'SALES' | 'MANAGE' | 'DRIVER') ||
     'SALES';
@@ -46,9 +47,10 @@ export async function createUser(formData: FormData) {
   const created = await prisma.profile.create({
     data: {
       username,
-      password: hashSync(password, 10), // Hash password before storing
+      password: hashSync(password, 10),
       name,
       phone,
+      rekBank,
       role,
     },
   });
@@ -83,11 +85,12 @@ export async function updateUser(id: string, formData: FormData) {
 
   const name = formData.get('name') as string;
   const phone = (formData.get('phone') as string) || null;
+  const rekBank = (formData.get('rekBank') as string) || null;
   const role = formData.get('role') as 'ADMIN' | 'SALES';
   const isActive = formData.get('isActive') === 'true';
   const newPassword = formData.get('newPassword') as string;
 
-  const data: Record<string, unknown> = { name, phone, role, isActive };
+  const data: Record<string, unknown> = { name, phone, rekBank, role, isActive };
 
   // Only update password if a new one was provided
   if (newPassword && newPassword.length >= 4) {

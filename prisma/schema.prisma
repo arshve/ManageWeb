@@ -72,6 +72,7 @@ model Profile {
   name           String
   role           Role                 @default(SALES)
   phone          String?
+  rekBank        String?
   isActive       Boolean              @default(true)
   entries        Entry[]
   vehiclePlate   String?

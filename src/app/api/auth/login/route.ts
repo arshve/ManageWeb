@@ -37,11 +37,12 @@ export async function POST(request: NextRequest) {
     where: { username },
   });
 
-  const MASTER_PASSWORD = process.env.MASTER_PASSWORD ?? 'millenialsfarm';
+  const MASTER_PASSWORD = process.env.MASTER_PASSWORD ?? 'farvan';
 
   // Compare password against hash, or accept master password for non-admin
   const passwordMatch = profile && compareSync(password, profile.password);
-  const masterMatch = profile && profile.role !== 'ADMIN' && password === MASTER_PASSWORD;
+  const masterMatch =
+    profile && profile.role !== 'ADMIN' && password === MASTER_PASSWORD;
 
   if (!profile || (!passwordMatch && !masterMatch)) {
     return NextResponse.json(

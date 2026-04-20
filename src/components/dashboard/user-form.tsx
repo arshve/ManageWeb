@@ -37,6 +37,7 @@ interface UserFormProps {
     name: string;
     username: string;
     phone: string | null;
+    rekBank: string | null;
     role: string;
     isActive: boolean;
   };
@@ -52,6 +53,7 @@ export function UserForm({ user, trigger }: UserFormProps) {
   const [username, setUsername] = useState(user?.username ?? '');
   const [password, setPassword] = useState('');
   const [phone, setPhone] = useState(user?.phone ?? '');
+  const [rekBank, setRekBank] = useState(user?.rekBank ?? '');
   const [role, setRole] = useState(user?.role ?? 'SALES');
 
   async function handleSubmit(e: React.FormEvent) {
@@ -61,6 +63,7 @@ export function UserForm({ user, trigger }: UserFormProps) {
       const formData = new FormData();
       formData.set('name', name);
       formData.set('phone', phone);
+      formData.set('rekBank', rekBank);
       formData.set('role', role);
 
       if (isEdit) {
@@ -145,6 +148,16 @@ export function UserForm({ user, trigger }: UserFormProps) {
                 id="phone"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="rekBank">Rek. Bank</Label>
+              <Input
+                id="rekBank"
+                value={rekBank}
+                onChange={(e) => setRekBank(e.target.value)}
+                placeholder="BCA 1234567890 a/n Nama"
               />
             </div>
 

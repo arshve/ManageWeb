@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
+import Image from 'next/image';
 import { ArrowLeft } from 'lucide-react';
 import {
   Card,
@@ -62,6 +63,9 @@ export function LoginForm() {
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
+          <div className="flex justify-center mb-2">
+            <Image src="/logo.png" alt="Millenials Farm" width={64} height={64} />
+          </div>
           <CardTitle className="text-2xl font-bold text-primary">
             Millenials Farm
           </CardTitle>

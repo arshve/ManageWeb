@@ -16,6 +16,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import {
@@ -117,6 +118,7 @@ export function Sidebar({ role, userName }: SidebarProps) {
         {/* Header with brand name */}
         <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
           <Link href="/" className="flex items-center gap-2">
+            <Image src="/logo.png" alt="Millenials Farm" width={32} height={32} />
             <span className="text-lg font-bold text-sidebar-primary">
               Millenials Farm
             </span>

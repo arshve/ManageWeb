@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { getProfile, dashboardUrlForRole } from '@/lib/auth';
@@ -17,6 +18,7 @@ export default async function PublicLayout({
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b">
         <div className="max-w-7xl mx-auto flex items-center justify-between px-6 h-16">
           <Link href="/" className="flex items-center gap-2">
+            <Image src="/logo.png" alt="Millenials Farm" width={36} height={36} />
             <span className="text-base font-bold tracking-tight">
               MILLENIALS FARM
             </span>
@@ -66,9 +68,12 @@ export default async function PublicLayout({
         <div className="max-w-7xl mx-auto px-6 py-16">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-10">
             <div className="md:col-span-2">
-              <h3 className="text-lg font-bold tracking-tight mb-4">
-                MILLENIALS FARM
-              </h3>
+              <div className="flex items-center gap-2 mb-4">
+                <Image src="/logo.png" alt="Millenials Farm" width={32} height={32} className="brightness-0 invert" />
+                <h3 className="text-lg font-bold tracking-tight">
+                  MILLENIALS FARM
+                </h3>
+              </div>
               <p className="text-sm opacity-60 leading-relaxed max-w-sm">
                 PT. Millenials Farm Abadi — supplier hewan ternak terpercaya
                 untuk ibadah qurban Anda. Menyediakan kambing, domba, dan sapi

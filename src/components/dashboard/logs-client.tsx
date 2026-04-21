@@ -11,7 +11,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ChevronDown, Search } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { ChevronDown, ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import { formatDateTime } from '@/lib/format';
 
 export interface LogItem {
@@ -48,29 +49,46 @@ const ACTIONS = ['CREATE', 'UPDATE', 'DELETE'] as const;
 export function LogsClient({
   logs,
   actors,
+  page,
+  totalPages,
+  totalCount,
   initial,
 }: {
   logs: LogItem[];
   actors: Actor[];
+  page: number;
+  totalPages: number;
+  totalCount: number;
   initial: Filters;
 }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [filters, setFilters] = useState<Filters>(initial);
 
+  function buildQs(f: Filters, p?: number) {
+    const params = new URLSearchParams();
+    if (f.entity !== 'ALL') params.set('entity', f.entity);
+    if (f.action !== 'ALL') params.set('action', f.action);
+    if (f.actorId !== 'ALL') params.set('actorId', f.actorId);
+    if (f.from) params.set('from', f.from);
+    if (f.to) params.set('to', f.to);
+    if (f.q.trim()) params.set('q', f.q.trim());
+    if (p && p > 1) params.set('page', String(p));
+    const qs = params.toString();
+    return `/admin/logs${qs ? `?${qs}` : ''}`;
+  }
+
   function apply(next: Partial<Filters>) {
     const merged = { ...filters, ...next };
     setFilters(merged);
-    const params = new URLSearchParams();
-    if (merged.entity !== 'ALL') params.set('entity', merged.entity);
-    if (merged.action !== 'ALL') params.set('action', merged.action);
-    if (merged.actorId !== 'ALL') params.set('actorId', merged.actorId);
-    if (merged.from) params.set('from', merged.from);
-    if (merged.to) params.set('to', merged.to);
-    if (merged.q.trim()) params.set('q', merged.q.trim());
-    const qs = params.toString();
     startTransition(() => {
-      router.push(`/admin/logs${qs ? `?${qs}` : ''}`);
+      router.push(buildQs(merged));
+    });
+  }
+
+  function goToPage(p: number) {
+    startTransition(() => {
+      router.push(buildQs(filters, p));
     });
   }
 
@@ -202,6 +220,36 @@ export function LogsClient({
           </li>
         )}
       </ul>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between border-t px-3 py-2">
+          <span className="text-xs text-muted-foreground">
+            {(page - 1) * 50 + 1}–{Math.min(page * 50, totalCount)} dari {totalCount}
+          </span>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="icon-xs"
+              disabled={page <= 1}
+              onClick={() => goToPage(page - 1)}
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </Button>
+            <span className="text-xs px-2">
+              {page} / {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="icon-xs"
+              disabled={page >= totalPages}
+              onClick={() => goToPage(page + 1)}
+            >
+              <ChevronRight className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

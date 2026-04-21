@@ -102,7 +102,8 @@ export default async function PublicLayout({
           <div className="border-t border-background/10 mt-12 pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-xs opacity-40">
             <p>
               &copy; {new Date().getFullYear()} Millenials Farm. All rights
-              reserved.
+              reserved. Made with <span className="grayscale">❤️</span> by{' '}
+              <a href="https://www.instagram.com/farvnn/" target="_blank" rel="noopener noreferrer" className="hover:opacity-100 transition-opacity underline underline-offset-2">farvnn</a>
             </p>
             <div className="flex gap-6">
               <Link

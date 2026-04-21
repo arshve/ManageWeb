@@ -4,6 +4,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { LogsClient } from '@/components/dashboard/logs-client';
 import type { Prisma } from '@/generated/prisma/client';
 
+const PAGE_SIZE = 50;
+
 type SearchParams = {
   entity?: string;
   action?: string;
@@ -11,6 +13,7 @@ type SearchParams = {
   from?: string;
   to?: string;
   q?: string;
+  page?: string;
 };
 
 export default async function AdminLogsPage({
@@ -57,12 +60,16 @@ export default async function AdminLogsPage({
     ];
   }
 
-  const [logs, actors] = await Promise.all([
+  const page = Math.max(1, parseInt(params.page ?? '1', 10) || 1);
+
+  const [logs, totalCount, actors] = await Promise.all([
     prisma.auditLog.findMany({
       where,
       orderBy: { createdAt: 'desc' },
-      take: 500,
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
     }),
+    prisma.auditLog.count({ where }),
     prisma.profile.findMany({
       where: { role: { in: ['ADMIN', 'MANAGE', 'SALES'] } },
       select: { id: true, name: true, username: true },
@@ -86,13 +93,16 @@ export default async function AdminLogsPage({
   return (
     <DashboardShell
       title="Log Aktivitas"
-      description={`${logs.length} catatan perubahan${logs.length === 500 ? ' (maks 500 terbaru)' : ''}`}
+      description={`${totalCount} catatan perubahan`}
     >
       <Card>
         <CardContent className="p-0">
           <LogsClient
             logs={serialized}
             actors={actors}
+            page={page}
+            totalPages={Math.ceil(totalCount / PAGE_SIZE)}
+            totalCount={totalCount}
             initial={{
               entity: params.entity ?? 'ALL',
               action: params.action ?? 'ALL',

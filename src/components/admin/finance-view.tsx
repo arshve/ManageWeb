@@ -59,7 +59,7 @@ interface CashflowItem {
   date: string;
 }
 
-/* ── Colors & font (exact from design mockup) ──────────────────────────── */
+/* ── Colors & font ──────────────────────────── */
 
 const FC = {
   green: 'oklch(0.55 0.13 158)',
@@ -72,11 +72,20 @@ const FC = {
 
 const SERIF = "var(--font-dm-serif), 'DM Serif Display', serif";
 
-const AVATAR_HEXES = ['#c2855a', '#5a7fc2', '#7a5ac2', '#c25a8f', '#5ac276', '#c2a85a', '#5ac2b8'];
+const AVATAR_HEXES = [
+  '#c2855a',
+  '#5a7fc2',
+  '#7a5ac2',
+  '#c25a8f',
+  '#5ac276',
+  '#c2a85a',
+  '#5ac2b8',
+];
 
 function getAvatarHex(name: string): string {
   let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  for (let i = 0; i < name.length; i++)
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
   return AVATAR_HEXES[Math.abs(hash) % AVATAR_HEXES.length];
 }
 
@@ -86,18 +95,30 @@ function StatusBadge({ status }: { status: string }) {
   switch (status) {
     case 'LUNAS':
       return (
-        <Badge variant="secondary" className="text-[10px]" style={{ background: 'oklch(0.55 0.13 158 / 0.1)', color: FC.green }}>
+        <Badge
+          variant="secondary"
+          className="text-[10px]"
+          style={{ background: 'oklch(0.55 0.13 158 / 0.1)', color: FC.green }}
+        >
           Lunas
         </Badge>
       );
     case 'DP':
       return (
-        <Badge variant="secondary" className="text-[10px]" style={{ background: 'oklch(0.70 0.13 78 / 0.12)', color: FC.amber }}>
+        <Badge
+          variant="secondary"
+          className="text-[10px]"
+          style={{ background: 'oklch(0.70 0.13 78 / 0.12)', color: FC.amber }}
+        >
           DP
         </Badge>
       );
     default:
-      return <Badge variant="outline" className="text-[10px]">Belum Bayar</Badge>;
+      return (
+        <Badge variant="outline" className="text-[10px]">
+          Belum Bayar
+        </Badge>
+      );
   }
 }
 
@@ -106,7 +127,9 @@ function StatusBadge({ status }: { status: string }) {
 export function FinanceView({ entries, salesUsers }: FinanceViewProps) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [cashflow, setCashflow] = useState<CashflowItem[]>([]);
-  const [cfType, setCfType] = useState<'pengeluaran' | 'pemasukan'>('pengeluaran');
+  const [cfType, setCfType] = useState<'pengeluaran' | 'pemasukan'>(
+    'pengeluaran',
+  );
   const [cfName, setCfName] = useState('');
   const [cfAmount, setCfAmount] = useState('');
   const [cfCategory, setCfCategory] = useState('');
@@ -125,7 +148,15 @@ export function FinanceView({ entries, salesUsers }: FinanceViewProps) {
     const profit = penjualan - modal - fee;
     const avg = entries.length > 0 ? Math.round(penjualan / entries.length) : 0;
     const netAfterFee = penjualan - fee;
-    return { penjualan, modal, fee, profit, avg, netAfterFee, count: entries.length };
+    return {
+      penjualan,
+      modal,
+      fee,
+      profit,
+      avg,
+      netAfterFee,
+      count: entries.length,
+    };
   }, [entries]);
 
   const cfTotals = useMemo(() => {
@@ -140,9 +171,24 @@ export function FinanceView({ entries, salesUsers }: FinanceViewProps) {
 
   /* Per-sales aggregation */
   const perSales = useMemo(() => {
-    const map = new Map<string, { user: SalesUser; entries: EntryData[]; totalPenjualan: number; totalFee: number; totalModal: number }>();
+    const map = new Map<
+      string,
+      {
+        user: SalesUser;
+        entries: EntryData[];
+        totalPenjualan: number;
+        totalFee: number;
+        totalModal: number;
+      }
+    >();
     salesUsers.forEach((u) => {
-      map.set(u.id, { user: u, entries: [], totalPenjualan: 0, totalFee: 0, totalModal: 0 });
+      map.set(u.id, {
+        user: u,
+        entries: [],
+        totalPenjualan: 0,
+        totalFee: 0,
+        totalModal: 0,
+      });
     });
     entries.forEach((e) => {
       const record = map.get(e.salesId);
@@ -157,7 +203,8 @@ export function FinanceView({ entries, salesUsers }: FinanceViewProps) {
   }, [entries, salesUsers]);
 
   /* Expand/collapse helpers */
-  const allExpanded = perSales.length > 0 && perSales.every((r) => expanded.has(r.user.id));
+  const allExpanded =
+    perSales.length > 0 && perSales.every((r) => expanded.has(r.user.id));
 
   function toggleAll() {
     if (allExpanded) {
@@ -188,7 +235,10 @@ export function FinanceView({ entries, salesUsers }: FinanceViewProps) {
         name: cfName.trim(),
         amount,
         category: cfCategory.trim(),
-        date: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }),
+        date: new Date().toLocaleDateString('id-ID', {
+          day: 'numeric',
+          month: 'short',
+        }),
       },
     ]);
     setCfName('');
@@ -207,19 +257,38 @@ export function FinanceView({ entries, salesUsers }: FinanceViewProps) {
     <div className="space-y-6">
       {/* ── 1. Primary KPI Cards ─────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-[10px]">
-        <Card className="py-0 rounded-[14px] border-t-[3px]" style={{ borderTopColor: totals.profit >= 0 ? FC.green : FC.red }}>
+        <Card
+          className="py-0 rounded-[14px] border-t-[3px]"
+          style={{ borderTopColor: totals.profit >= 0 ? FC.green : FC.red }}
+        >
           <CardContent className="py-4 px-[18px] flex flex-col gap-[5px]">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.07em] text-muted-foreground">Profit Bersih</p>
-            <p style={{ fontFamily: SERIF, fontSize: 22, lineHeight: 1, color: totals.profit >= 0 ? FC.green : FC.red }}>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.07em] text-muted-foreground">
+              Profit Bersih
+            </p>
+            <p
+              style={{
+                fontFamily: SERIF,
+                fontSize: 22,
+                lineHeight: 1,
+                color: totals.profit >= 0 ? FC.green : FC.red,
+              }}
+            >
               {formatRupiah(totals.profit)}
             </p>
-            <p className="text-[11px] text-muted-foreground">Penjualan − Modal − Fee Sales</p>
+            <p className="text-[11px] text-muted-foreground">
+              Penjualan − Modal − Fee Sales
+            </p>
           </CardContent>
         </Card>
 
-        <Card className="py-0 rounded-[14px] border-t-[3px]" style={{ borderTopColor: FC.blue }}>
+        <Card
+          className="py-0 rounded-[14px] border-t-[3px]"
+          style={{ borderTopColor: FC.blue }}
+        >
           <CardContent className="py-4 px-[18px] flex flex-col gap-[5px]">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.07em] text-muted-foreground">Total Penjualan</p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.07em] text-muted-foreground">
+              Total Penjualan
+            </p>
             <p style={{ fontFamily: SERIF, fontSize: 22, lineHeight: 1 }}>
               {formatRupiah(totals.penjualan)}
             </p>
@@ -229,24 +298,50 @@ export function FinanceView({ entries, salesUsers }: FinanceViewProps) {
           </CardContent>
         </Card>
 
-        <Card className="py-0 rounded-[14px] border-t-[3px]" style={{ borderTopColor: FC.amber }}>
+        <Card
+          className="py-0 rounded-[14px] border-t-[3px]"
+          style={{ borderTopColor: FC.amber }}
+        >
           <CardContent className="py-4 px-[18px] flex flex-col gap-[5px]">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.07em] text-muted-foreground">Fee Sales</p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.07em] text-muted-foreground">
+              Fee Sales
+            </p>
             <p style={{ fontFamily: SERIF, fontSize: 22, lineHeight: 1 }}>
               {formatRupiah(totals.fee)}
             </p>
-            <p className="text-[11px] text-muted-foreground">Total komisi sales</p>
+            <p className="text-[11px] text-muted-foreground">
+              Total komisi sales
+            </p>
           </CardContent>
         </Card>
       </div>
 
       {/* ── 2. Secondary Mini-Stats ──────────────────────────────────────── */}
       <div className="flex flex-wrap gap-2">
-        <MiniStat label="Rata-rata/transaksi" value={formatRupiah(totals.avg)} />
-        <MiniStat label="Total modal" value={formatRupiah(totals.modal)} color={FC.text2} />
-        <MiniStat label="Net setelah fee" value={formatRupiah(totals.netAfterFee)} color={FC.blue} />
-        <MiniStat label="Total pengeluaran" value={formatRupiah(cfTotals.pengeluaran)} color={FC.red} />
-        <MiniStat label="Total pemasukan" value={formatRupiah(cfTotals.pemasukan)} color={FC.green} />
+        <MiniStat
+          label="Rata-rata/transaksi"
+          value={formatRupiah(totals.avg)}
+        />
+        <MiniStat
+          label="Total modal"
+          value={formatRupiah(totals.modal)}
+          color={FC.text2}
+        />
+        <MiniStat
+          label="Net setelah fee"
+          value={formatRupiah(totals.netAfterFee)}
+          color={FC.blue}
+        />
+        <MiniStat
+          label="Total pengeluaran"
+          value={formatRupiah(cfTotals.pengeluaran)}
+          color={FC.red}
+        />
+        <MiniStat
+          label="Total pemasukan"
+          value={formatRupiah(cfTotals.pemasukan)}
+          color={FC.green}
+        />
         <MiniStat label="Total transaksi" value={`${totals.count} item`} />
       </div>
 
@@ -295,9 +390,13 @@ export function FinanceView({ entries, salesUsers }: FinanceViewProps) {
             Pengeluaran / Pemasukan
           </p>
           <div className="flex items-center gap-2 text-[11px]">
-            <span className="font-semibold" style={{ color: FC.red }}>− {formatRupiah(cfTotals.pengeluaran)}</span>
+            <span className="font-semibold" style={{ color: FC.red }}>
+              − {formatRupiah(cfTotals.pengeluaran)}
+            </span>
             <span className="text-muted-foreground">·</span>
-            <span className="font-semibold" style={{ color: FC.green }}>+ {formatRupiah(cfTotals.pemasukan)}</span>
+            <span className="font-semibold" style={{ color: FC.green }}>
+              + {formatRupiah(cfTotals.pemasukan)}
+            </span>
           </div>
         </div>
 
@@ -317,12 +416,20 @@ export function FinanceView({ entries, salesUsers }: FinanceViewProps) {
                     style={{
                       padding: '5px 12px',
                       fontSize: 12,
-                      background: active ? (isPel ? 'oklch(0.55 0.14 20 / 0.08)' : 'oklch(0.55 0.13 158 / 0.08)') : undefined,
+                      background: active
+                        ? isPel
+                          ? 'oklch(0.55 0.14 20 / 0.08)'
+                          : 'oklch(0.55 0.13 158 / 0.08)'
+                        : undefined,
                       color: active ? (isPel ? FC.red : FC.green) : FC.text3,
                       fontWeight: active ? 600 : 400,
                     }}
                   >
-                    {isPel ? <ArrowDown className="h-[11px] w-[11px]" /> : <ArrowUp className="h-[11px] w-[11px]" />}
+                    {isPel ? (
+                      <ArrowDown className="h-[11px] w-[11px]" />
+                    ) : (
+                      <ArrowUp className="h-[11px] w-[11px]" />
+                    )}
                     {isPel ? 'Pengeluaran' : 'Pemasukan'}
                   </button>
                 );
@@ -354,7 +461,11 @@ export function FinanceView({ entries, salesUsers }: FinanceViewProps) {
                 onKeyDown={(e) => e.key === 'Enter' && addCashflow()}
                 className="flex-1 min-w-[110px]"
               />
-              <Button onClick={addCashflow} size="default" className="gap-[5px] shrink-0">
+              <Button
+                onClick={addCashflow}
+                size="default"
+                className="gap-[5px] shrink-0"
+              >
                 <Plus className="h-[13px] w-[13px]" /> Tambah
               </Button>
             </div>
@@ -368,20 +479,43 @@ export function FinanceView({ entries, salesUsers }: FinanceViewProps) {
               {cashflow.map((item, i) => {
                 const isPemasukan = item.type === 'pemasukan';
                 return (
-                  <div key={item.id} className="flex items-center gap-[10px] px-4 py-[11px]" style={i > 0 ? { borderTop: '1px solid var(--border)' } : undefined}>
+                  <div
+                    key={item.id}
+                    className="flex items-center gap-[10px] px-4 py-[11px]"
+                    style={
+                      i > 0
+                        ? { borderTop: '1px solid var(--border)' }
+                        : undefined
+                    }
+                  >
                     <div
                       className="w-7 h-7 rounded-[7px] flex items-center justify-center shrink-0"
-                      style={{ background: isPemasukan ? 'oklch(0.55 0.13 158 / 0.1)' : 'oklch(0.55 0.14 20 / 0.08)' }}
+                      style={{
+                        background: isPemasukan
+                          ? 'oklch(0.55 0.13 158 / 0.1)'
+                          : 'oklch(0.55 0.14 20 / 0.08)',
+                      }}
                     >
-                      {isPemasukan
-                        ? <ArrowUp className="h-[11px] w-[11px]" style={{ color: FC.green }} />
-                        : <ArrowDown className="h-[11px] w-[11px]" style={{ color: FC.red }} />
-                      }
+                      {isPemasukan ? (
+                        <ArrowUp
+                          className="h-[11px] w-[11px]"
+                          style={{ color: FC.green }}
+                        />
+                      ) : (
+                        <ArrowDown
+                          className="h-[11px] w-[11px]"
+                          style={{ color: FC.red }}
+                        />
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-medium truncate">{item.name}</p>
+                      <p className="text-[13px] font-medium truncate">
+                        {item.name}
+                      </p>
                       <div className="flex items-center gap-1.5 mt-0.5">
-                        <span className="text-[10px] text-muted-foreground">{item.date}</span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {item.date}
+                        </span>
                         {item.category && (
                           <span
                             className="text-[9px] font-bold uppercase bg-muted text-muted-foreground px-1.5 py-[1px] rounded"
@@ -392,7 +526,14 @@ export function FinanceView({ entries, salesUsers }: FinanceViewProps) {
                         )}
                       </div>
                     </div>
-                    <span className="shrink-0" style={{ fontFamily: SERIF, fontSize: 14, color: isPemasukan ? FC.green : FC.red }}>
+                    <span
+                      className="shrink-0"
+                      style={{
+                        fontFamily: SERIF,
+                        fontSize: 14,
+                        color: isPemasukan ? FC.green : FC.red,
+                      }}
+                    >
                       {isPemasukan ? '+' : '−'} {formatRupiah(item.amount)}
                     </span>
                     <button
@@ -409,8 +550,19 @@ export function FinanceView({ entries, salesUsers }: FinanceViewProps) {
                 className="flex items-center justify-between px-4 py-[10px] bg-muted/50"
                 style={{ borderTop: '2px solid var(--border)' }}
               >
-                <span className="text-[10px] font-bold uppercase text-muted-foreground" style={{ letterSpacing: '0.06em' }}>Net</span>
-                <span style={{ fontFamily: SERIF, fontSize: 16, color: netLabel > 0 ? FC.red : FC.green }}>
+                <span
+                  className="text-[10px] font-bold uppercase text-muted-foreground"
+                  style={{ letterSpacing: '0.06em' }}
+                >
+                  Net
+                </span>
+                <span
+                  style={{
+                    fontFamily: SERIF,
+                    fontSize: 16,
+                    color: netLabel > 0 ? FC.red : FC.green,
+                  }}
+                >
                   {netLabel >= 0 ? '−' : '+'} {formatRupiah(Math.abs(netLabel))}
                 </span>
               </div>
@@ -424,12 +576,30 @@ export function FinanceView({ entries, salesUsers }: FinanceViewProps) {
 
 /* ── Mini Stat Card ──────────────────────────────────────────────────────── */
 
-function MiniStat({ label, value, color }: { label: string; value: string; color?: string }) {
+function MiniStat({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: string;
+  color?: string;
+}) {
   return (
     <Card className="flex-1 min-w-[120px] py-0 rounded-xl">
       <CardContent className="py-[11px] px-[15px]">
-        <p className="text-[10px] uppercase text-muted-foreground mb-1" style={{ letterSpacing: '0.06em' }}>{label}</p>
-        <p className="text-sm font-semibold truncate" style={color ? { color } : undefined}>{value}</p>
+        <p
+          className="text-[10px] uppercase text-muted-foreground mb-1"
+          style={{ letterSpacing: '0.06em' }}
+        >
+          {label}
+        </p>
+        <p
+          className="text-sm font-semibold truncate"
+          style={color ? { color } : undefined}
+        >
+          {value}
+        </p>
       </CardContent>
     </Card>
   );
@@ -442,7 +612,13 @@ function SalesCard({
   isOpen,
   onToggle,
 }: {
-  record: { user: SalesUser; entries: EntryData[]; totalPenjualan: number; totalFee: number; totalModal: number };
+  record: {
+    user: SalesUser;
+    entries: EntryData[];
+    totalPenjualan: number;
+    totalFee: number;
+    totalModal: number;
+  };
   isOpen: boolean;
   onToggle: () => void;
 }) {
@@ -451,19 +627,33 @@ function SalesCard({
   return (
     <Card className="py-0 overflow-hidden rounded-xl">
       {/* Header */}
-      <div className="flex items-center gap-[10px] px-4 py-3 hover:bg-muted/30 transition-colors cursor-pointer select-none" onClick={onToggle}>
+      <div
+        className="flex items-center gap-[10px] px-4 py-3 hover:bg-muted/30 transition-colors cursor-pointer select-none"
+        onClick={onToggle}
+      >
         {/* Avatar */}
         <div
           className="w-[34px] h-[34px] rounded-full flex items-center justify-center shrink-0"
-          style={{ background: hex + '22', color: hex, border: `1.5px solid ${hex}55`, fontWeight: 600, fontSize: 13 }}
+          style={{
+            background: hex + '22',
+            color: hex,
+            border: `1.5px solid ${hex}55`,
+            fontWeight: 600,
+            fontSize: 13,
+          }}
         >
           {record.user.name.charAt(0).toUpperCase()}
         </div>
 
         {/* Info */}
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-[13px] leading-[1.2] truncate">{record.user.name}</p>
-          <div className="flex flex-wrap items-center mt-0.5" style={{ fontSize: 10, color: FC.text3, gap: '3px 8px' }}>
+          <p className="font-semibold text-[13px] leading-[1.2] truncate">
+            {record.user.name}
+          </p>
+          <div
+            className="flex flex-wrap items-center mt-0.5"
+            style={{ fontSize: 10, color: FC.text3, gap: '3px 8px' }}
+          >
             {record.user.phone && (
               <span className="inline-flex items-center gap-[3px]">
                 <Phone className="h-[11px] w-[11px]" /> {record.user.phone}
@@ -471,7 +661,8 @@ function SalesCard({
             )}
             {record.user.rekBank && (
               <span className="inline-flex items-center gap-[3px]">
-                <CreditCard className="h-[11px] w-[11px]" /> {record.user.rekBank}
+                <CreditCard className="h-[11px] w-[11px]" />{' '}
+                {record.user.rekBank}
               </span>
             )}
             <span style={{ color: 'var(--border)' }}>·</span>
@@ -481,8 +672,19 @@ function SalesCard({
 
         {/* Fee value */}
         <div className="text-right shrink-0">
-          <p className="text-[10px] uppercase text-muted-foreground mb-0.5" style={{ letterSpacing: '0.04em' }}>Fee</p>
-          <p style={{ fontFamily: SERIF, fontSize: 15, color: record.totalFee > 0 ? FC.amber : FC.text3 }}>
+          <p
+            className="text-[10px] uppercase text-muted-foreground mb-0.5"
+            style={{ letterSpacing: '0.04em' }}
+          >
+            Fee
+          </p>
+          <p
+            style={{
+              fontFamily: SERIF,
+              fontSize: 15,
+              color: record.totalFee > 0 ? FC.amber : FC.text3,
+            }}
+          >
             {record.totalFee > 0 ? formatRupiah(record.totalFee) : '—'}
           </p>
         </div>
@@ -502,7 +704,10 @@ function SalesCard({
 
         {/* Chevron */}
         <ChevronDown
-          className={cn('h-[13px] w-[13px] shrink-0 transition-transform duration-200', isOpen && 'rotate-180')}
+          className={cn(
+            'h-[13px] w-[13px] shrink-0 transition-transform duration-200',
+            isOpen && 'rotate-180',
+          )}
           style={{ color: FC.text3 }}
         />
       </div>
@@ -514,7 +719,15 @@ function SalesCard({
           <div className="hidden sm:block">
             <div
               className="grid grid-cols-[1fr_80px_80px_100px_110px_80px] px-4 bg-muted/40 items-center"
-              style={{ padding: '7px 16px', gap: 8, fontSize: 9, fontWeight: 700, color: FC.text3, letterSpacing: '0.07em', textTransform: 'uppercase' }}
+              style={{
+                padding: '7px 16px',
+                gap: 8,
+                fontSize: 9,
+                fontWeight: 700,
+                color: FC.text3,
+                letterSpacing: '0.07em',
+                textTransform: 'uppercase',
+              }}
             >
               <span>SKU</span>
               <span>Tag</span>
@@ -529,22 +742,46 @@ function SalesCard({
                 className="grid grid-cols-[1fr_80px_80px_100px_110px_80px] border-t items-center"
                 style={{ padding: '11px 16px', gap: 8 }}
               >
-                <span style={{ fontSize: 12, fontWeight: 500 }}>{e.livestock.sku}</span>
+                <span style={{ fontSize: 12, fontWeight: 500 }}>
+                  {e.livestock.sku}
+                </span>
                 <span
                   className="inline-flex w-fit rounded"
-                  style={{ background: hex + '18', color: hex, padding: '2px 6px', fontSize: 9, fontWeight: 700 }}
+                  style={{
+                    background: hex + '18',
+                    color: hex,
+                    padding: '2px 6px',
+                    fontSize: 9,
+                    fontWeight: 700,
+                  }}
                 >
                   {e.livestock.tag ?? '—'}
                 </span>
-                <span style={{ fontSize: 12, color: FC.text2 }}>{e.buyerName}</span>
-                <span style={{ textAlign: 'right', fontSize: 12, color: FC.text2 }}>{formatRupiah(e.hargaModal)}</span>
+                <span style={{ fontSize: 12, color: FC.text2 }}>
+                  {e.buyerName}
+                </span>
+                <span
+                  style={{ textAlign: 'right', fontSize: 12, color: FC.text2 }}
+                >
+                  {formatRupiah(e.hargaModal)}
+                </span>
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 12, fontWeight: 500 }}>{formatRupiah(e.hargaJual)}</div>
-                  <div style={{ fontSize: 10, color: e.resellerCut > 0 ? FC.amber : FC.text3, marginTop: 1 }}>
+                  <div style={{ fontSize: 12, fontWeight: 500 }}>
+                    {formatRupiah(e.hargaJual)}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 10,
+                      color: e.resellerCut > 0 ? FC.amber : FC.text3,
+                      marginTop: 1,
+                    }}
+                  >
                     Fee: {e.resellerCut > 0 ? formatRupiah(e.resellerCut) : '—'}
                   </div>
                 </div>
-                <div className="flex justify-center"><StatusBadge status={e.paymentStatus} /></div>
+                <div className="flex justify-center">
+                  <StatusBadge status={e.paymentStatus} />
+                </div>
               </div>
             ))}
           </div>
@@ -553,10 +790,16 @@ function SalesCard({
           <div className="sm:hidden divide-y">
             {record.entries.map((e) => (
               <div key={e.id} className="p-3 flex gap-3">
-                <LivestockPhoto photoUrl={e.livestock.photoUrl} alt={e.livestock.sku} thumbnailClassName="w-10 h-10" />
+                <LivestockPhoto
+                  photoUrl={e.livestock.photoUrl}
+                  alt={e.livestock.sku}
+                  thumbnailClassName="w-10 h-10"
+                />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="font-mono text-xs font-medium truncate">{e.livestock.sku}</p>
+                    <p className="font-mono text-xs font-medium truncate">
+                      {e.livestock.sku}
+                    </p>
                     <StatusBadge status={e.paymentStatus} />
                   </div>
                   {e.livestock.tag && (
@@ -567,11 +810,21 @@ function SalesCard({
                       {e.livestock.tag}
                     </span>
                   )}
-                  <p className="text-xs text-muted-foreground truncate mt-0.5">{e.buyerName}</p>
+                  <p className="text-xs text-muted-foreground truncate mt-0.5">
+                    {e.buyerName}
+                  </p>
                   <div className="flex items-center justify-between mt-1.5">
-                    <span className="text-xs font-semibold">{formatRupiah(e.hargaJual)}</span>
-                    <span style={{ fontSize: 11, color: e.resellerCut > 0 ? FC.amber : FC.text3 }}>
-                      Fee: {e.resellerCut > 0 ? formatRupiah(e.resellerCut) : '—'}
+                    <span className="text-xs font-semibold">
+                      {formatRupiah(e.hargaJual)}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        color: e.resellerCut > 0 ? FC.amber : FC.text3,
+                      }}
+                    >
+                      Fee:{' '}
+                      {e.resellerCut > 0 ? formatRupiah(e.resellerCut) : '—'}
                     </span>
                   </div>
                 </div>

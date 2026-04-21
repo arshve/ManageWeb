@@ -18,6 +18,12 @@ import { revalidatePath } from 'next/cache';
 import { hashSync } from 'bcryptjs';
 import { logAudit } from '@/lib/audit';
 
+function validateNoUpperOrSpace(value: string, label: string): string | null {
+  if (/[A-Z]/.test(value)) return `${label} tidak boleh menggunakan huruf besar`;
+  if (/\s/.test(value)) return `${label} tidak boleh mengandung spasi`;
+  return null;
+}
+
 /**
  * Creates a new user account. Admin-only.
  * Checks for duplicate username before creating.
@@ -37,6 +43,11 @@ export async function createUser(formData: FormData) {
   const role =
     (formData.get('role') as 'ADMIN' | 'SALES' | 'MANAGE' | 'DRIVER') ||
     'SALES';
+
+  const usernameErr = validateNoUpperOrSpace(username, 'Username');
+  if (usernameErr) return { error: usernameErr };
+  const passwordErr = validateNoUpperOrSpace(password, 'Password');
+  if (passwordErr) return { error: passwordErr };
 
   // Check for duplicate username
   const existing = await prisma.profile.findUnique({ where: { username } });
@@ -94,6 +105,8 @@ export async function updateUser(id: string, formData: FormData) {
 
   // Only update password if a new one was provided
   if (newPassword && newPassword.length >= 4) {
+    const pwErr = validateNoUpperOrSpace(newPassword, 'Password');
+    if (pwErr) return { error: pwErr };
     data.password = hashSync(newPassword, 10);
   }
 
@@ -162,6 +175,8 @@ export async function changeOwnPassword(formData: FormData) {
   if (newPassword.length < 4) {
     return { error: 'Password baru minimal 4 karakter' };
   }
+  const pwErr = validateNoUpperOrSpace(newPassword, 'Password');
+  if (pwErr) return { error: pwErr };
 
   const user = await prisma.profile.findUnique({ where: { id: profile.id } });
   if (!user) return { error: 'User tidak ditemukan' };

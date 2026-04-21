@@ -90,24 +90,53 @@ export function LivestockTableClient({
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [conditionFilter, setConditionFilter] = useState('ALL');
   const [gradeFilter, setGradeFilter] = useState('ALL');
+  const [weightFilter, setWeightFilter] = useState('ALL');
+  const [sortOrder, setSortOrder] = useState<'newest' | 'sku_asc' | 'sku_desc'>('newest');
+
+  const typeFiltered = useMemo(() => {
+    return typeFilter !== 'ALL' ? livestock.filter((l) => l.type === typeFilter) : livestock;
+  }, [livestock, typeFilter]);
+
+  const gradeOptions = useMemo(() => {
+    const set = new Set<string>();
+    typeFiltered.forEach((l) => { if (l.grade) set.add(l.grade); });
+    return Array.from(set).sort();
+  }, [typeFiltered]);
+
+  const weightOptions = useMemo(() => {
+    const set = new Set<string>();
+    typeFiltered.forEach((l) => {
+      const w = formatWeight(l.weightMin, l.weightMax);
+      if (w) set.add(w);
+    });
+    return Array.from(set).sort();
+  }, [typeFiltered]);
 
   const filtered = useMemo(() => {
-    return livestock.filter((item) => {
+    let result = livestock.filter((item) => {
       if (typeFilter !== 'ALL' && item.type !== typeFilter) return false;
       if (statusFilter === 'SOLD' && !item.isSold) return false;
       if (statusFilter === 'AVAILABLE' && item.isSold) return false;
-      if (conditionFilter !== 'ALL' && item.condition !== conditionFilter)
-        return false;
+      if (conditionFilter !== 'ALL' && item.condition !== conditionFilter) return false;
       if (gradeFilter !== 'ALL' && item.grade !== gradeFilter) return false;
+      if (weightFilter !== 'ALL' && formatWeight(item.weightMin, item.weightMax) !== weightFilter) return false;
       return true;
     });
-  }, [livestock, typeFilter, statusFilter, conditionFilter, gradeFilter]);
+    if (sortOrder === 'sku_asc') {
+      result = [...result].sort((a, b) => a.sku.localeCompare(b.sku));
+    } else if (sortOrder === 'sku_desc') {
+      result = [...result].sort((a, b) => b.sku.localeCompare(a.sku));
+    }
+    return result;
+  }, [livestock, typeFilter, statusFilter, conditionFilter, gradeFilter, weightFilter, sortOrder]);
 
   const hasFilters =
     typeFilter !== 'ALL' ||
     statusFilter !== 'ALL' ||
     conditionFilter !== 'ALL' ||
-    gradeFilter !== 'ALL';
+    gradeFilter !== 'ALL' ||
+    weightFilter !== 'ALL' ||
+    sortOrder !== 'newest';
 
   return (
     <div className="space-y-4">
@@ -117,7 +146,7 @@ export function LivestockTableClient({
           <Label className="text-xs text-muted-foreground">Jenis Hewan</Label>
           <Select
             value={typeFilter}
-            onValueChange={(val) => setTypeFilter(val ?? typeFilter)}
+            onValueChange={(val) => { setTypeFilter(val ?? typeFilter); setGradeFilter('ALL'); setWeightFilter('ALL'); }}
           >
             <SelectTrigger className="h-8 w-[130px] text-xs">
               <SelectValue>
@@ -133,27 +162,27 @@ export function LivestockTableClient({
           </Select>
         </div>
 
-        <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">Grade</Label>
-          <Select
-            value={gradeFilter}
-            onValueChange={(val) => setGradeFilter(val ?? gradeFilter)}
-          >
-            <SelectTrigger className="h-8 w-[130px] text-xs">
-              <SelectValue>
-                {{ ALL: 'Semua Grade', SUPER: 'Super', A: 'A', B: 'B', C: 'C', D: 'D' }[gradeFilter] ?? gradeFilter}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">Semua Grade</SelectItem>
-              <SelectItem value="SUPER">Super</SelectItem>
-              <SelectItem value="A">A</SelectItem>
-              <SelectItem value="B">B</SelectItem>
-              <SelectItem value="C">C</SelectItem>
-              <SelectItem value="D">D</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        {(typeFilter === 'KAMBING' || typeFilter === 'DOMBA') && gradeOptions.length > 0 && (
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Grade</Label>
+            <Select
+              value={gradeFilter}
+              onValueChange={(val) => setGradeFilter(val ?? gradeFilter)}
+            >
+              <SelectTrigger className="h-8 w-[130px] text-xs">
+                <SelectValue>
+                  {gradeFilter === 'ALL' ? 'Semua Grade' : gradeFilter}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Semua Grade</SelectItem>
+                {gradeOptions.map((g) => (
+                  <SelectItem key={g} value={g}>{g}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         <div className="space-y-1.5">
           <Label className="text-xs text-muted-foreground">Status</Label>
@@ -194,6 +223,47 @@ export function LivestockTableClient({
           </Select>
         </div>
 
+        {typeFilter === 'SAPI' && weightOptions.length > 0 && (
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Berat</Label>
+            <Select
+              value={weightFilter}
+              onValueChange={(val) => setWeightFilter(val ?? weightFilter)}
+            >
+              <SelectTrigger className="h-8 w-[130px] text-xs">
+                <SelectValue>
+                  {weightFilter === 'ALL' ? 'Semua Berat' : weightFilter}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Semua Berat</SelectItem>
+                {weightOptions.map((w) => (
+                  <SelectItem key={w} value={w}>{w}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">Urutkan</Label>
+          <Select
+            value={sortOrder}
+            onValueChange={(val) => setSortOrder(val as typeof sortOrder)}
+          >
+            <SelectTrigger className="h-8 w-[130px] text-xs">
+              <SelectValue>
+                {{ newest: 'Terbaru', sku_asc: 'SKU ↑', sku_desc: 'SKU ↓' }[sortOrder]}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="newest">Terbaru</SelectItem>
+              <SelectItem value="sku_asc">SKU ↑</SelectItem>
+              <SelectItem value="sku_desc">SKU ↓</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
         {hasFilters && (
           <button
             type="button"
@@ -202,6 +272,8 @@ export function LivestockTableClient({
               setStatusFilter('ALL');
               setConditionFilter('ALL');
               setGradeFilter('ALL');
+              setWeightFilter('ALL');
+              setSortOrder('newest');
             }}
             className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors mb-2 ml-1"
           >

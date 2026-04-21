@@ -9,6 +9,7 @@ import {
 } from '@react-pdf/renderer';
 import { COMPANY } from './company';
 import { terbilang } from './terbilang';
+import { formatPengiriman } from '@/lib/format';
 
 const logoSrc = path.join(process.cwd(), 'public', 'logo.png');
 const signatureSrc = path.join(process.cwd(), 'public', 'signature.png');
@@ -24,7 +25,9 @@ export interface InvoiceData {
     weightMax: number | null;
   };
   hargaJual: number;
-  totalBayar: number | null;
+  dp: number | null;
+  pengiriman: string | null;
+  deliveryDate: Date | null;
 }
 
 function formatRupiah(n: number): string {
@@ -142,7 +145,7 @@ const styles = StyleSheet.create({
 });
 
 export function InvoiceDocument({ data }: { data: InvoiceData }) {
-  const paidAmount = data.totalBayar ?? data.hargaJual;
+  const paidAmount = data.dp ?? 0;
   const sisa = Math.max(0, data.hargaJual - paidAmount);
 
   const tipeBerat = [
@@ -201,7 +204,7 @@ export function InvoiceDocument({ data }: { data: InvoiceData }) {
             </Text>
             <Text style={[styles.td, styles.colTipe]}>{tipeBerat || '-'}</Text>
             <Text style={[styles.td, styles.colBayar]}>
-              {paidAmount ? paidAmount.toLocaleString('id-ID') : '-'}
+              {paidAmount ? formatRupiah(paidAmount) : '-'}
             </Text>
             <Text style={[styles.td, styles.colHarga]}>
               {formatRupiah(data.hargaJual)}
@@ -219,7 +222,7 @@ export function InvoiceDocument({ data }: { data: InvoiceData }) {
           <View style={styles.totalsRow}>
             <Text style={styles.totalsLabel}>Total Bayar :</Text>
             <Text style={styles.totalsValue}>
-              {paidAmount.toLocaleString('id-ID')}
+              {formatRupiah(paidAmount)}
             </Text>
           </View>
           <View style={styles.totalsRow}>
@@ -232,7 +235,10 @@ export function InvoiceDocument({ data }: { data: InvoiceData }) {
         <Text style={styles.terbilangLabel}>Terbilang :</Text>
         <Text style={styles.terbilangValue}>{terbilang(paidAmount)}</Text>
 
-        <Text style={styles.shipRow}>Tanggal Pengiriman : -</Text>
+        <Text style={styles.shipRow}>
+          Pengiriman : {formatPengiriman(data.pengiriman)}
+          {data.deliveryDate ? ` — ${formatDateID(data.deliveryDate)}` : ''}
+        </Text>
 
         <View style={styles.footerRow}>
           <View style={styles.bankBlock}>

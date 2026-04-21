@@ -63,7 +63,9 @@ export async function GET(
                 weightMax: entry.livestock.weightMax,
               },
               hargaJual: entry.hargaJual,
-              totalBayar: entry.totalBayar,
+              dp: entry.dp,
+              pengiriman: entry.pengiriman,
+              deliveryDate: entry.deliveryDate,
             }}
           />,
         )

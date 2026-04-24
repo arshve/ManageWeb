@@ -7,7 +7,7 @@ import { CalendarDays } from 'lucide-react';
 
 export default async function FinancePage() {
   await requireRole('SUPER_ADMIN');
-  const [entries, salesUsers] = await Promise.all([
+  const [entries, salesUsers, cashflows] = await Promise.all([
     prisma.entry.findMany({
       where: { status: 'APPROVED' },
       orderBy: { createdAt: 'desc' },
@@ -38,6 +38,9 @@ export default async function FinancePage() {
         rekBank: true,
       },
       orderBy: { name: 'asc' },
+    }),
+    prisma.cashflow.findMany({
+      orderBy: { createdAt: 'desc' },
     }),
   ]);
 
@@ -73,7 +76,21 @@ export default async function FinancePage() {
         </Button>
       }
     >
-      <FinanceView entries={serialized} salesUsers={salesUsers} />
+      <FinanceView
+        entries={serialized}
+        salesUsers={salesUsers}
+        cashflows={cashflows.map((c) => ({
+          id: c.id,
+          type: c.type,
+          name: c.name,
+          amount: c.amount,
+          category: c.category,
+          date: c.createdAt.toLocaleDateString('id-ID', {
+            day: 'numeric',
+            month: 'short',
+          }),
+        }))}
+      />
     </DashboardShell>
   );
 }

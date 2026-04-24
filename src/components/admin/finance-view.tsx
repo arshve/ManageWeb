@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useTransition } from 'react';
+import { createCashflow, deleteCashflow } from '@/app/actions/cashflow';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { RupiahInput } from '@/components/ui/rupiah-input';
 import { LivestockPhoto } from '@/components/dashboard/livestock-photo';
 import { formatRupiah } from '@/lib/format';
 import {
@@ -45,18 +47,19 @@ interface SalesUser {
   rekBank: string | null;
 }
 
+interface CashflowItem {
+  id: string;
+  type: 'PENGELUARAN' | 'PEMASUKAN';
+  name: string;
+  amount: number;
+  category: string | null;
+  date: string;
+}
+
 interface FinanceViewProps {
   entries: EntryData[];
   salesUsers: SalesUser[];
-}
-
-interface CashflowItem {
-  id: string;
-  type: 'pengeluaran' | 'pemasukan';
-  name: string;
-  amount: number;
-  category: string;
-  date: string;
+  cashflows: CashflowItem[];
 }
 
 /* ── Colors & font ──────────────────────────── */
@@ -124,15 +127,20 @@ function StatusBadge({ status }: { status: string }) {
 
 /* ── Main Component ──────────────────────────────────────────────────────── */
 
-export function FinanceView({ entries, salesUsers }: FinanceViewProps) {
+export function FinanceView({
+  entries,
+  salesUsers,
+  cashflows,
+}: FinanceViewProps) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [cashflow, setCashflow] = useState<CashflowItem[]>([]);
-  const [cfType, setCfType] = useState<'pengeluaran' | 'pemasukan'>(
-    'pengeluaran',
+  const [cashflow, setCashflow] = useState<CashflowItem[]>(cashflows);
+  const [cfType, setCfType] = useState<'PENGELUARAN' | 'PEMASUKAN'>(
+    'PENGELUARAN',
   );
   const [cfName, setCfName] = useState('');
   const [cfAmount, setCfAmount] = useState('');
   const [cfCategory, setCfCategory] = useState('');
+  const [cfPending, startCfTransition] = useTransition();
   const nameRef = useRef<HTMLInputElement>(null);
 
   /* Totals */
@@ -163,7 +171,7 @@ export function FinanceView({ entries, salesUsers }: FinanceViewProps) {
     let pengeluaran = 0;
     let pemasukan = 0;
     cashflow.forEach((item) => {
-      if (item.type === 'pengeluaran') pengeluaran += item.amount;
+      if (item.type === 'PENGELUARAN') pengeluaran += item.amount;
       else pemasukan += item.amount;
     });
     return { pengeluaran, pemasukan, net: pemasukan - pengeluaran };
@@ -227,28 +235,43 @@ export function FinanceView({ entries, salesUsers }: FinanceViewProps) {
   function addCashflow() {
     const amount = parseFloat(cfAmount);
     if (!cfName.trim() || !amount || amount <= 0) return;
-    setCashflow((prev) => [
-      ...prev,
-      {
-        id: crypto.randomUUID(),
-        type: cfType,
-        name: cfName.trim(),
-        amount,
-        category: cfCategory.trim(),
-        date: new Date().toLocaleDateString('id-ID', {
-          day: 'numeric',
-          month: 'short',
-        }),
-      },
-    ]);
-    setCfName('');
-    setCfAmount('');
-    setCfCategory('');
-    nameRef.current?.focus();
+    const fd = new FormData();
+    fd.set('type', cfType);
+    fd.set('name', cfName.trim());
+    fd.set('amount', String(amount));
+    if (cfCategory.trim()) fd.set('category', cfCategory.trim());
+    startCfTransition(async () => {
+      const res = await createCashflow(fd);
+      if ('error' in res) {
+        toast.error(res.error);
+        return;
+      }
+      setCashflow((prev) => [
+        {
+          id: res.item.id,
+          type: res.item.type,
+          name: res.item.name,
+          amount: res.item.amount,
+          category: res.item.category,
+          date: new Date(res.item.createdAt).toLocaleDateString('id-ID', {
+            day: 'numeric',
+            month: 'short',
+          }),
+        },
+        ...prev,
+      ]);
+      setCfName('');
+      setCfAmount('');
+      setCfCategory('');
+      nameRef.current?.focus();
+    });
   }
 
   function removeCashflow(id: string) {
-    setCashflow((prev) => prev.filter((item) => item.id !== id));
+    setCashflow((c) => c.filter((item) => item.id !== id));
+    startCfTransition(async () => {
+      await deleteCashflow(id);
+    });
   }
 
   const netLabel = cfTotals.pengeluaran - cfTotals.pemasukan;
@@ -405,8 +428,8 @@ export function FinanceView({ entries, salesUsers }: FinanceViewProps) {
           <CardContent className="py-[14px] px-4">
             {/* Type toggle */}
             <div className="flex gap-1.5 mb-[10px]">
-              {(['pengeluaran', 'pemasukan'] as const).map((tipe) => {
-                const isPel = tipe === 'pengeluaran';
+              {(['PENGELUARAN', 'PEMASUKAN'] as const).map((tipe) => {
+                const isPel = tipe === 'PENGELUARAN';
                 const active = cfType === tipe;
                 return (
                   <button
@@ -446,11 +469,10 @@ export function FinanceView({ entries, salesUsers }: FinanceViewProps) {
                 onKeyDown={(e) => e.key === 'Enter' && addCashflow()}
                 className="flex-[2] min-w-[130px]"
               />
-              <Input
+              <RupiahInput
                 placeholder="Jumlah (Rp)"
-                type="number"
                 value={cfAmount}
-                onChange={(e) => setCfAmount(e.target.value)}
+                onValueChange={setCfAmount}
                 onKeyDown={(e) => e.key === 'Enter' && addCashflow()}
                 className="flex-1 min-w-[110px]"
               />
@@ -477,7 +499,7 @@ export function FinanceView({ entries, salesUsers }: FinanceViewProps) {
           <Card className="py-0 rounded-[14px]">
             <CardContent className="p-0">
               {cashflow.map((item, i) => {
-                const isPemasukan = item.type === 'pemasukan';
+                const isPemasukan = item.type === 'PEMASUKAN';
                 return (
                   <div
                     key={item.id}
@@ -790,11 +812,6 @@ function SalesCard({
           <div className="sm:hidden divide-y">
             {record.entries.map((e) => (
               <div key={e.id} className="p-3 flex gap-3">
-                <LivestockPhoto
-                  photoUrl={e.livestock.photoUrl}
-                  alt={e.livestock.sku}
-                  thumbnailClassName="w-10 h-10"
-                />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
                     <p className="font-mono text-xs font-medium truncate">

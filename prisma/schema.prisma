@@ -18,6 +18,22 @@ enum Role {
   DRIVER
 }
 
+enum CashflowType {
+  PENGELUARAN
+  PEMASUKAN
+}
+
+model Cashflow {
+  id        String       @id @default(cuid())
+  type      CashflowType
+  name      String
+  amount    Float
+  category  String?
+  createdAt DateTime     @default(now())
+
+  @@index([createdAt])
+}
+
 enum DeliveryStatus {
   PENDING
   ASSIGNED

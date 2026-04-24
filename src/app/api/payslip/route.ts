@@ -19,7 +19,7 @@ import { NextResponse } from "next/server";
 export async function GET() {
   try {
   // Only admins can view payslip data
-  await requireRole("ADMIN");
+  await requireRole("ADMIN", "SUPER_ADMIN");
 
   // Fetch all active sales persons with their approved entries
   const salesPersons = await prisma.profile.findMany({

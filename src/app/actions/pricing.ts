@@ -27,7 +27,7 @@ import type { AnimalType, AnimalGrade } from "@/generated/prisma/client";
  * @returns { success }
  */
 export async function upsertPricing(formData: FormData) {
-  const actor = await requireRole("ADMIN");
+  const actor = await requireRole("ADMIN", "SUPER_ADMIN");
 
   const animalType = formData.get("animalType") as AnimalType;
   const grade = formData.get("grade") as AnimalGrade;
@@ -65,7 +65,7 @@ export async function upsertPricing(formData: FormData) {
  * @returns { success }
  */
 export async function deletePricing(id: string) {
-  const actor = await requireRole("ADMIN");
+  const actor = await requireRole("ADMIN", "SUPER_ADMIN");
 
   const before = await prisma.pricing.findUnique({ where: { id } });
   if (!before) return { error: "Harga tidak ditemukan" };

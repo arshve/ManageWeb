@@ -30,7 +30,7 @@ import type {
  * @returns { success }
  */
 export async function createLivestock(formData: FormData) {
-  const actor = await requireRole('ADMIN', 'MANAGE');
+  const actor = await requireRole('ADMIN', 'MANAGE', 'SUPER_ADMIN');
 
   const type = formData.get('type') as AnimalType;
   const gradeRaw = formData.get('grade') as string | null;
@@ -49,6 +49,9 @@ export async function createLivestock(formData: FormData) {
       : null,
     hargaJual: formData.get('hargaJual')
       ? Number(formData.get('hargaJual'))
+      : null,
+    hargaModal: formData.get('hargaModal')
+      ? Number(formData.get('hargaModal'))
       : null,
     tag: (formData.get('tag') as string) || null,
     photoUrl: (formData.get('photoUrl') as string) || null,
@@ -80,7 +83,7 @@ export async function createLivestock(formData: FormData) {
  * @returns { success }
  */
 export async function updateLivestock(id: string, formData: FormData) {
-  const actor = await requireRole('ADMIN', 'MANAGE');
+  const actor = await requireRole('ADMIN', 'MANAGE', 'SUPER_ADMIN');
 
   const before = await prisma.livestock.findUnique({ where: { id } });
   if (!before) return { error: 'Hewan tidak ditemukan' };
@@ -101,6 +104,9 @@ export async function updateLivestock(id: string, formData: FormData) {
       : null,
     hargaJual: formData.get('hargaJual')
       ? Number(formData.get('hargaJual'))
+      : null,
+    hargaModal: formData.get('hargaModal')
+      ? Number(formData.get('hargaModal'))
       : null,
     tag: (formData.get('tag') as string) || null,
     photoUrl: (formData.get('photoUrl') as string) || null,
@@ -133,7 +139,7 @@ export async function updateLivestock(id: string, formData: FormData) {
  * @returns { success }
  */
 export async function deleteLivestock(id: string) {
-  const actor = await requireRole('ADMIN', 'MANAGE');
+  const actor = await requireRole('ADMIN', 'MANAGE', 'SUPER_ADMIN');
 
   const before = await prisma.livestock.findUnique({ where: { id } });
   if (!before) return { error: 'Hewan tidak ditemukan' };

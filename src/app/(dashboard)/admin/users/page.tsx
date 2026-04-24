@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { requireAuth, isSuperAdmin } from "@/lib/auth";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { UserForm } from "@/components/dashboard/user-form";
 import { UserToggle } from "@/components/dashboard/user-toggle";
@@ -9,7 +10,10 @@ import { Plus, Pencil } from "lucide-react";
 import { formatDate } from "@/lib/format";
 
 export default async function UsersPage() {
+  const profile = await requireAuth();
+  const superAdmin = isSuperAdmin(profile.role);
   const users = await prisma.profile.findMany({
+    where: superAdmin ? undefined : { role: { not: 'SUPER_ADMIN' } },
     orderBy: { createdAt: "desc" },
     include: {
       _count: { select: { entries: true } },
@@ -22,6 +26,7 @@ export default async function UsersPage() {
       description={`${users.length} user terdaftar`}
       actions={
         <UserForm
+          isSuperAdmin={superAdmin}
           trigger={
             <Button>
               <Plus className="h-4 w-4 mr-2" />
@@ -72,6 +77,7 @@ export default async function UsersPage() {
                     <td className="p-3 text-right">
                       <UserForm
                         user={user}
+                        isSuperAdmin={superAdmin}
                         trigger={
                           <Button
                             variant="ghost"

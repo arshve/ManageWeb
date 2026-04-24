@@ -18,7 +18,12 @@ export default async function PublicLayout({
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b">
         <div className="max-w-7xl mx-auto flex items-center justify-between px-6 h-16">
           <Link href="/" className="flex items-center gap-2">
-            <Image src="/logo.png" alt="Millenials Farm" width={36} height={36} />
+            <Image
+              src="/logo.png"
+              alt="Millenials Farm"
+              width={36}
+              height={36}
+            />
             <span className="text-base font-bold tracking-tight">
               MILLENIALS FARM
             </span>
@@ -51,10 +56,7 @@ export default async function PublicLayout({
           </nav>
           <Link
             href={dashboardHref}
-            className={cn(
-              buttonVariants({ size: 'sm' }),
-              'rounded-full px-5',
-            )}
+            className={cn(buttonVariants({ size: 'sm' }), 'rounded-full px-5')}
           >
             {masukLabel}
           </Link>
@@ -69,7 +71,13 @@ export default async function PublicLayout({
           <div className="grid grid-cols-1 md:grid-cols-4 gap-10">
             <div className="md:col-span-2">
               <div className="flex items-center gap-2 mb-4">
-                <Image src="/logo.png" alt="Millenials Farm" width={32} height={32} className="brightness-0 invert" />
+                <Image
+                  src="/logo.png"
+                  alt="Millenials Farm"
+                  width={32}
+                  height={32}
+                  className="brightness-0 invert"
+                />
                 <h3 className="text-lg font-bold tracking-tight">
                   MILLENIALS FARM
                 </h3>
@@ -107,10 +115,11 @@ export default async function PublicLayout({
           <div className="border-t border-background/10 mt-12 pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-xs opacity-40">
             <p>
               &copy; {new Date().getFullYear()} Millenials Farm. All rights
-              reserved. Made with <span className="grayscale">❤️</span> by{' '}
-              <a href="https://www.instagram.com/farvnn/" target="_blank" rel="noopener noreferrer" className="hover:opacity-100 transition-opacity underline underline-offset-2">farvnn</a>
+              reserved.
+              {/* Made with <span className="grayscale">❤️</span> by{' '}
+              <a href="https://www.instagram.com/farvnn/" target="_blank" rel="noopener noreferrer" className="hover:opacity-100 transition-opacity underline underline-offset-2">farvnn</a> */}
             </p>
-            <div className="flex gap-6">
+            {/* <div className="flex gap-6">
               <Link
                 href="/catalogue"
                 className="hover:opacity-100 transition-opacity"
@@ -123,7 +132,7 @@ export default async function PublicLayout({
               >
                 Dashboard
               </Link>
-            </div>
+            </div> */}
           </div>
         </div>
       </footer>

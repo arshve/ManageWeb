@@ -58,7 +58,12 @@ import {
   deleteEntry,
 } from '@/app/actions/entries';
 import { toast } from 'sonner';
-import { formatRupiah, formatDateTime, formatPaymentStatus } from '@/lib/format';
+import {
+  formatRupiah,
+  formatDateTime,
+  formatPaymentStatus,
+  formatWeight,
+} from '@/lib/format';
 import { BuktiTransferUpload } from '@/components/dashboard/bukti-transfer-upload';
 import { PdfMenu } from '@/components/dashboard/pdf-menu';
 import { LivestockPhotoLink } from '@/components/dashboard/livestock-photo-link';
@@ -94,6 +99,8 @@ export interface EntryData {
     sku: string;
     type: string;
     grade: string | null;
+    weightMin: number | null;
+    weightMax: number | null;
     tag: string | null;
     photoUrl: string | null;
     condition: string;
@@ -111,6 +118,8 @@ export interface AvailableLivestock {
   sku: string;
   type: string;
   grade: string | null;
+  weightMin: number | null;
+  weightMax: number | null;
   tag: string | null;
 }
 
@@ -140,11 +149,13 @@ type SortDir = 'asc' | 'desc';
 export function EntryTable({
   entries,
   isAdmin = false,
+  canViewFinancials = false,
   availableLivestock = [],
   salesUsers = [],
 }: {
   entries: EntryData[];
   isAdmin?: boolean;
+  canViewFinancials?: boolean;
   availableLivestock?: AvailableLivestock[];
   salesUsers?: SalesUser[];
 }) {
@@ -259,7 +270,12 @@ export function EntryTable({
           >
             <SelectTrigger className="h-8 w-[140px] text-xs">
               <SelectValue>
-                {{ ALL: 'Semua Status', PENDING: 'Pending', APPROVED: 'Approved', REJECTED: 'Rejected' }[statusFilter] ?? statusFilter}
+                {{
+                  ALL: 'Semua Status',
+                  PENDING: 'Pending',
+                  APPROVED: 'Approved',
+                  REJECTED: 'Rejected',
+                }[statusFilter] ?? statusFilter}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
@@ -275,7 +291,12 @@ export function EntryTable({
           >
             <SelectTrigger className="h-8 w-[150px] text-xs">
               <SelectValue>
-                {{ ALL: 'Semua Bayar', BELUM_BAYAR: 'Belum Bayar', DP: 'DP', LUNAS: 'Lunas' }[paymentFilter] ?? paymentFilter}
+                {{
+                  ALL: 'Semua Bayar',
+                  BELUM_BAYAR: 'Belum Bayar',
+                  DP: 'DP',
+                  LUNAS: 'Lunas',
+                }[paymentFilter] ?? paymentFilter}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
@@ -291,7 +312,9 @@ export function EntryTable({
           >
             <SelectTrigger className="h-8 w-[140px] text-xs">
               <SelectValue>
-                {{ ALL: 'Semua Kirim', YES: 'Sudah Kirim', NO: 'Belum Kirim' }[sentFilter] ?? sentFilter}
+                {{ ALL: 'Semua Kirim', YES: 'Sudah Kirim', NO: 'Belum Kirim' }[
+                  sentFilter
+                ] ?? sentFilter}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
@@ -365,7 +388,7 @@ export function EntryTable({
                 </span>
               </th>
               <th className="text-center p-3 font-medium">Sales Cut</th>
-              {isAdmin && (
+              {canViewFinancials && (
                 <>
                   <th className="text-center p-3 font-medium">Modal</th>
                   <th
@@ -398,6 +421,7 @@ export function EntryTable({
                 key={entry.id}
                 entry={entry}
                 isAdmin={isAdmin}
+                canViewFinancials={canViewFinancials}
                 isEditing={editingId === entry.id}
                 onEdit={() => setEditingId(entry.id)}
                 onCancel={() => setEditingId(null)}
@@ -409,7 +433,7 @@ export function EntryTable({
             {filtered.length === 0 && (
               <tr>
                 <td
-                  colSpan={isAdmin ? 13 : 10}
+                  colSpan={isAdmin ? (canViewFinancials ? 13 : 11) : 10}
                   className="p-8 text-center text-muted-foreground"
                 >
                   {entries.length === 0
@@ -429,6 +453,7 @@ export function EntryTable({
             key={entry.id}
             entry={entry}
             isAdmin={isAdmin}
+            canViewFinancials={canViewFinancials}
             isEditing={editingId === entry.id}
             onEdit={() => setEditingId(entry.id)}
             onCancel={() => setEditingId(null)}
@@ -729,7 +754,9 @@ function EntryEditFields({
                   />
                 </div>
               </div>
-              <SelectItem value="__none__" label="Tetap — tidak diganti">Tetap — tidak diganti</SelectItem>
+              <SelectItem value="__none__" label="Tetap — tidak diganti">
+                Tetap — tidak diganti
+              </SelectItem>
               {filteredLivestock.map((l) => {
                 const typeLabel =
                   l.type.charAt(0) + l.type.slice(1).toLowerCase();
@@ -774,12 +801,15 @@ function EntryEditFields({
           >
             <SelectTrigger className="h-8 text-sm">
               <SelectValue>
-                {salesUsers.find((s) => s.id === form.salesId)?.name ?? form.salesId}
+                {salesUsers.find((s) => s.id === form.salesId)?.name ??
+                  form.salesId}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
               {salesUsers.map((s) => (
-                <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                <SelectItem key={s.id} value={s.id}>
+                  {s.name}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -883,7 +913,9 @@ function EntryEditFields({
         >
           <SelectTrigger className="h-8 text-sm">
             <SelectValue>
-              {form.pengiriman ? (PENGIRIMAN_LABEL[form.pengiriman] ?? form.pengiriman) : '— Tidak ada —'}
+              {form.pengiriman
+                ? (PENGIRIMAN_LABEL[form.pengiriman] ?? form.pengiriman)
+                : '— Tidak ada —'}
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
@@ -948,6 +980,7 @@ function EntryEditFields({
 function EntryRow({
   entry,
   isAdmin,
+  canViewFinancials,
   isEditing,
   onEdit,
   onCancel,
@@ -957,6 +990,7 @@ function EntryRow({
 }: {
   entry: EntryData;
   isAdmin: boolean;
+  canViewFinancials: boolean;
   isEditing: boolean;
   onEdit: () => void;
   onCancel: () => void;
@@ -984,14 +1018,26 @@ function EntryRow({
       ? 'bg-muted/30'
       : '';
 
+  const weightLabel =
+    entry.livestock.type === 'SAPI'
+      ? formatWeight(entry.livestock.weightMin, entry.livestock.weightMax)
+      : null;
+
   return (
     <>
       {/* Main row */}
       <tr className={`border-b last:border-0 transition-colors ${rowClass}`}>
         <td className="p-3 font-mono text-xs">{entry.invoiceNo}</td>
         <td className="p-3">
-          {entry.livestock.type}
-          {entry.livestock.grade ? ' ' + entry.livestock.grade : ''}
+          <span>
+            {entry.livestock.type}
+            {entry.livestock.grade ? ' ' + entry.livestock.grade : ''}
+          </span>
+          {weightLabel && (
+            <span className="ml-1.5 inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded bg-muted text-muted-foreground align-middle">
+              {weightLabel}
+            </span>
+          )}
           <div className="text-xs text-muted-foreground">
             <LivestockPhotoLink
               photoUrl={entry.livestock.photoUrl}
@@ -1014,7 +1060,7 @@ function EntryRow({
         <td className="p-3 text-center">
           {entry.resellerCut ? formatRupiah(entry.resellerCut) : '-'}
         </td>
-        {isAdmin && (
+        {canViewFinancials && (
           <>
             <td className="p-3 text-center">
               {entry.hargaModal ? formatRupiah(entry.hargaModal) : '-'}
@@ -1150,6 +1196,7 @@ function EntryRow({
 function MobileEntryCard({
   entry,
   isAdmin,
+  canViewFinancials,
   isEditing,
   onEdit,
   onCancel,
@@ -1159,6 +1206,7 @@ function MobileEntryCard({
 }: {
   entry: EntryData;
   isAdmin: boolean;
+  canViewFinancials: boolean;
   isEditing: boolean;
   onEdit: () => void;
   onCancel: () => void;
@@ -1185,6 +1233,10 @@ function MobileEntryCard({
   const cardClass = isMati
     ? 'bg-zinc-300 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-200'
     : 'bg-card';
+  const weightLabel =
+    entry.livestock.type === 'SAPI'
+      ? formatWeight(entry.livestock.weightMin, entry.livestock.weightMax)
+      : null;
 
   return (
     <div className={`rounded-lg border shadow-sm overflow-hidden ${cardClass}`}>
@@ -1208,6 +1260,11 @@ function MobileEntryCard({
             {entry.livestock.type}
             {entry.livestock.grade ? ' ' + entry.livestock.grade : ''}
           </span>
+          {weightLabel && (
+            <span className="ml-1.5 inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded bg-muted text-muted-foreground align-middle">
+              {weightLabel}
+            </span>
+          )}
           <LivestockPhotoLink
             photoUrl={entry.livestock.photoUrl}
             alt={`${entry.livestock.type} ${entry.livestock.grade ?? ''} - ${entry.livestock.sku}`}
@@ -1275,6 +1332,11 @@ function MobileEntryCard({
                     <>
                       {entry.livestock.type}
                       {entry.livestock.grade ? ' ' + entry.livestock.grade : ''}
+                      {weightLabel && (
+                        <span className="ml-1.5 inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded bg-muted text-muted-foreground align-middle">
+                          {weightLabel}
+                        </span>
+                      )}
                       <LivestockPhotoLink
                         photoUrl={entry.livestock.photoUrl}
                         alt={`${entry.livestock.type} ${entry.livestock.grade ?? ''} - ${entry.livestock.sku}`}
@@ -1309,7 +1371,7 @@ function MobileEntryCard({
                     entry.resellerCut ? formatRupiah(entry.resellerCut) : '-'
                   }
                 />
-                {isAdmin && (
+                {canViewFinancials && (
                   <>
                     <CardRow
                       label="Modal"

@@ -39,7 +39,7 @@ import { useRouter } from 'next/navigation';
 import { ChangePasswordButton } from '@/components/dashboard/change-password-form';
 
 interface SidebarProps {
-  role: 'ADMIN' | 'SALES' | 'MANAGE' | 'DRIVER';
+  role: 'SUPER_ADMIN' | 'ADMIN' | 'SALES' | 'MANAGE' | 'DRIVER';
   userName: string;
 }
 
@@ -50,6 +50,9 @@ const adminLinks = [
   { href: '/admin/deliveries', label: 'Delivery', icon: Truck },
   { href: '/admin/users', label: 'Kelola User', icon: Users },
   { href: '/admin/pricing', label: 'Harga', icon: DollarSign },
+];
+
+const superAdminExtras = [
   { href: '/admin/finance', label: 'Keuangan', icon: Wallet },
   { href: '/admin/logs', label: 'Log Aktivitas', icon: History },
 ];
@@ -72,13 +75,15 @@ export function Sidebar({ role, userName }: SidebarProps) {
   const [open, setOpen] = useState(false); // Mobile menu state
   const router = useRouter();
   const links =
-    role === 'ADMIN'
-      ? adminLinks
-      : role === 'MANAGE'
-        ? manageLinks
-        : role === 'DRIVER'
-          ? driverLinks
-          : salesLinks;
+    role === 'SUPER_ADMIN'
+      ? [...adminLinks, ...superAdminExtras]
+      : role === 'ADMIN'
+        ? adminLinks
+        : role === 'MANAGE'
+          ? manageLinks
+          : role === 'DRIVER'
+            ? driverLinks
+            : salesLinks;
 
   /**
    * Handles logout: calls the logout API to clear the session cookie,
@@ -168,7 +173,7 @@ export function Sidebar({ role, userName }: SidebarProps) {
             <ChevronLeft className="h-4 w-4" />
             Ke Website
           </Link> */}
-          {role !== 'ADMIN' && <ChangePasswordButton />}
+          {role !== 'ADMIN' && role !== 'SUPER_ADMIN' && <ChangePasswordButton />}
           <Button
             variant="ghost"
             onClick={handleLogout}

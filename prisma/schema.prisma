@@ -11,6 +11,7 @@ datasource db {
 }
 
 enum Role {
+  SUPER_ADMIN
   ADMIN
   SALES
   MANAGE
@@ -94,6 +95,7 @@ model Livestock {
   weightMin Float?
   weightMax Float?
   hargaJual Float?
+  hargaModal Float?
   tag       String?
   photoUrl  String?
   notes     String?

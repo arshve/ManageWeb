@@ -27,6 +27,7 @@ export async function GET() {
         grade: true,
         tag: true,
         hargaJual: true,
+        hargaModal: true,
         weightMin: true,
         weightMax: true,
         condition: true,

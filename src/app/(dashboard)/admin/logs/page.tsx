@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { requireRole } from '@/lib/auth';
 import { DashboardShell } from '@/components/dashboard/dashboard-shell';
 import { Card, CardContent } from '@/components/ui/card';
 import { LogsClient } from '@/components/dashboard/logs-client';
@@ -21,6 +22,7 @@ export default async function AdminLogsPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
+  await requireRole('SUPER_ADMIN');
   const params = await searchParams;
 
   const where: Prisma.AuditLogWhereInput = {};
@@ -71,7 +73,7 @@ export default async function AdminLogsPage({
     }),
     prisma.auditLog.count({ where }),
     prisma.profile.findMany({
-      where: { role: { in: ['ADMIN', 'MANAGE', 'SALES'] } },
+      where: { role: { in: ['SUPER_ADMIN', 'ADMIN', 'MANAGE', 'SALES'] } },
       select: { id: true, name: true, username: true },
       orderBy: { name: 'asc' },
     }),

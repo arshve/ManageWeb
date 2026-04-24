@@ -7,7 +7,7 @@ export default async function ManageLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const profile = await requireRole('ADMIN', 'MANAGE');
+  const profile = await requireRole('ADMIN', 'MANAGE', 'SUPER_ADMIN');
 
   return (
     <div className="flex h-screen overflow-hidden">

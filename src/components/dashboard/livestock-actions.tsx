@@ -33,6 +33,7 @@ interface LivestockActionsProps {
     weightMin: number | null;
     weightMax: number | null;
     hargaJual: number | null;
+    hargaModal: number | null;
     tag: string | null;
     photoUrl: string | null;
     notes: string | null;

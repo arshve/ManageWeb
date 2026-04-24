@@ -34,7 +34,7 @@ export async function assignDeliveryDate(
   entryIds: string[],
   deliveryDate: string,
 ) {
-  const admin = await requireRole('ADMIN');
+  const admin = await requireRole('ADMIN', 'SUPER_ADMIN');
   if (entryIds.length === 0) return { error: 'Pilih minimal satu entry' };
   const date = parseDateOnly(deliveryDate);
   if (!date) return { error: 'Tanggal tidak valid' };
@@ -68,7 +68,7 @@ export async function assignDeliveryDate(
 }
 
 export async function unassignDeliveryDate(entryIds: string[]) {
-  const admin = await requireRole('ADMIN');
+  const admin = await requireRole('ADMIN', 'SUPER_ADMIN');
   if (entryIds.length === 0) return { error: 'Pilih minimal satu entry' };
 
   const inFlight = await prisma.delivery.findMany({
@@ -111,7 +111,7 @@ export async function unassignDeliveryDate(entryIds: string[]) {
 }
 
 export async function resetRoutes(deliveryDate: string) {
-  const admin = await requireRole('ADMIN');
+  const admin = await requireRole('ADMIN', 'SUPER_ADMIN');
   const date = parseDateOnly(deliveryDate);
   if (!date) return { error: 'Tanggal tidak valid' };
 
@@ -137,7 +137,7 @@ export async function resetRoutes(deliveryDate: string) {
 }
 
 export async function clearSchedule(deliveryDate: string) {
-  const admin = await requireRole('ADMIN');
+  const admin = await requireRole('ADMIN', 'SUPER_ADMIN');
   const date = parseDateOnly(deliveryDate);
   if (!date) return { error: 'Tanggal tidak valid' };
 
@@ -190,7 +190,7 @@ export async function generateRoutes(
   driverCount: number,
   startInput?: string,
 ) {
-  const admin = await requireRole('ADMIN');
+  const admin = await requireRole('ADMIN', 'SUPER_ADMIN');
   const date = parseDateOnly(deliveryDate);
   if (!date) return { error: 'Tanggal tidak valid' };
   if (driverCount <= 0) return { error: 'driverCount harus > 0' };
@@ -289,7 +289,7 @@ export async function assignDriversToBuckets(
   deliveryDate: string,
   buckets: { driverId: string; entryIds: string[] }[],
 ) {
-  const admin = await requireRole('ADMIN');
+  const admin = await requireRole('ADMIN', 'SUPER_ADMIN');
   const date = parseDateOnly(deliveryDate);
   if (!date) return { error: 'Tanggal tidak valid' };
 
@@ -325,7 +325,7 @@ export async function assignDriversToBuckets(
 }
 
 export async function unassignDriver(deliveryIds: string[]) {
-  await requireRole('ADMIN');
+  await requireRole('ADMIN', 'SUPER_ADMIN');
   await prisma.delivery.updateMany({
     where: { id: { in: deliveryIds }, status: { in: ['ASSIGNED', 'PENDING'] } },
     data: { driverId: null, status: 'PENDING' },
@@ -341,7 +341,7 @@ async function requireDriverOwnership(deliveryId: string) {
     include: { entry: { select: { invoiceNo: true } } },
   });
   if (!delivery) return { error: 'Delivery tidak ditemukan' as const };
-  if (profile.role !== 'ADMIN' && delivery.driverId !== profile.id) {
+  if (profile.role !== 'ADMIN' && profile.role !== 'SUPER_ADMIN' && delivery.driverId !== profile.id) {
     return { error: 'Bukan delivery Anda' as const };
   }
   return { profile, delivery } as const;
@@ -433,7 +433,7 @@ export async function updateEntryCoordinates(
   lat: number | null,
   lng: number | null,
 ) {
-  await requireRole('ADMIN');
+  await requireRole('ADMIN', 'SUPER_ADMIN');
   if (lat !== null && (lat < -90 || lat > 90))
     return { error: 'Latitude tidak valid' };
   if (lng !== null && (lng < -180 || lng > 180))
@@ -449,7 +449,7 @@ export async function updateEntryCoordinates(
 }
 
 export async function backfillCoordinates(entryIds?: string[]) {
-  await requireRole('ADMIN');
+  await requireRole('ADMIN', 'SUPER_ADMIN');
 
   const entries = await prisma.entry.findMany({
     where: {

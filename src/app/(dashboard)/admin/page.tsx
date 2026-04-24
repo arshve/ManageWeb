@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { requireAuth, isSuperAdmin } from '@/lib/auth';
 import { formatRupiah } from '@/lib/format';
 import { DashboardShell } from '@/components/dashboard/dashboard-shell';
 import { EntryTable } from '@/components/dashboard/entry-table';
@@ -9,6 +10,8 @@ import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 export default async function AdminDashboardPage() {
+  const profile = await requireAuth();
+  const superAdmin = isSuperAdmin(profile.role);
   const totalLivestock = await prisma.livestock.count();
   const soldLivestock = await prisma.livestock.count({
     where: { isSold: true },
@@ -51,11 +54,13 @@ export default async function AdminDashboardPage() {
         sku: true,
         type: true,
         grade: true,
+        weightMin: true,
+        weightMax: true,
         tag: true,
       },
     }),
     prisma.profile.findMany({
-      where: { role: { in: ['SALES', 'ADMIN'] }, isActive: true },
+      where: { role: { in: ['SALES', 'ADMIN', 'SUPER_ADMIN'] }, isActive: true },
       select: { id: true, name: true },
       orderBy: { name: 'asc' },
     }),
@@ -99,6 +104,8 @@ export default async function AdminDashboardPage() {
       sku: entry.livestock.sku,
       type: entry.livestock.type,
       grade: entry.livestock.grade,
+      weightMin: entry.livestock.weightMin,
+      weightMax: entry.livestock.weightMax,
       tag: entry.livestock.tag,
       photoUrl: entry.livestock.photoUrl,
       condition: entry.livestock.condition,
@@ -122,16 +129,20 @@ export default async function AdminDashboardPage() {
       sub: `${pendingEntries} menunggu approval`,
       icon: ClipboardList,
     },
-    {
-      title: 'Total Revenue',
-      value: formatRupiah(totalRevenue),
-      sub: `Modal: ${formatRupiah(totalModal)}`,
-      icon: DollarSign,
-    },
+    ...(superAdmin
+      ? [
+          {
+            title: 'Total Revenue',
+            value: formatRupiah(totalRevenue),
+            sub: `Modal: ${formatRupiah(totalModal)}`,
+            icon: DollarSign,
+          },
+        ]
+      : []),
     {
       title: 'Sales Aktif',
       value: totalSales,
-      sub: 'Keuangan di menu terpisah',
+      sub: superAdmin ? 'Keuangan di menu terpisah' : '',
       icon: Users,
     },
   ];
@@ -175,6 +186,7 @@ export default async function AdminDashboardPage() {
           <EntryTable
             entries={serialized}
             isAdmin={true}
+            canViewFinancials={superAdmin}
             availableLivestock={availableLivestock}
             salesUsers={salesUsers}
           />

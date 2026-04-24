@@ -6,6 +6,7 @@
  */
 
 import { prisma } from '@/lib/prisma';
+import { requireAuth, isSuperAdmin } from '@/lib/auth';
 import { DashboardShell } from '@/components/dashboard/dashboard-shell';
 import { LivestockForm } from '@/components/dashboard/livestock-form';
 import { Button } from '@/components/ui/button';
@@ -18,6 +19,8 @@ export async function LivestockTable({
 }: {
   readOnly?: boolean;
 } = {}) {
+  const profile = await requireAuth();
+  const superAdmin = isSuperAdmin(profile.role);
   const livestock = await prisma.livestock.findMany({
     orderBy: { createdAt: 'desc' },
     include: {
@@ -68,6 +71,7 @@ export async function LivestockTable({
     weightMin: item.weightMin,
     weightMax: item.weightMax,
     hargaJual: item.hargaJual,
+    hargaModal: item.hargaModal,
     tag: item.tag,
     photoUrl: item.photoUrl,
     notes: item.notes,
@@ -118,7 +122,7 @@ export async function LivestockTable({
       </div>
 
       {/* Filterable table */}
-      <LivestockTableClient livestock={serialized} readOnly={readOnly} />
+      <LivestockTableClient livestock={serialized} readOnly={readOnly} canViewFinancials={superAdmin} />
     </DashboardShell>
   );
 }

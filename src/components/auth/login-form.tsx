@@ -18,6 +18,7 @@ import {
 
 function dashboardUrlForRole(role: string): string {
   switch (role) {
+    case 'SUPER_ADMIN':
     case 'ADMIN':
       return '/admin';
     case 'MANAGE':

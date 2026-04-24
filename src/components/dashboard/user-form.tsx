@@ -42,9 +42,10 @@ interface UserFormProps {
     isActive: boolean;
   };
   trigger: React.ReactNode;
+  isSuperAdmin?: boolean;
 }
 
-export function UserForm({ user, trigger }: UserFormProps) {
+export function UserForm({ user, trigger, isSuperAdmin = false }: UserFormProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const isEdit = !!user;
@@ -169,10 +170,11 @@ export function UserForm({ user, trigger }: UserFormProps) {
               >
                 <SelectTrigger>
                   <SelectValue>
-                    {{ ADMIN: 'Admin', SALES: 'Sales', MANAGE: 'Manage', DRIVER: 'Driver' }[role] ?? role}
+                    {{ SUPER_ADMIN: 'Super Admin', ADMIN: 'Admin', SALES: 'Sales', MANAGE: 'Manage', DRIVER: 'Driver' }[role] ?? role}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
+                  {isSuperAdmin && <SelectItem value="SUPER_ADMIN">Super Admin</SelectItem>}
                   <SelectItem value="ADMIN">Admin</SelectItem>
                   <SelectItem value="SALES">Sales</SelectItem>
                   <SelectItem value="MANAGE">Manage</SelectItem>

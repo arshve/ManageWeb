@@ -16,7 +16,7 @@ export async function setDriverAvailability(
   deliveryDate: string,
   isActive: boolean,
 ) {
-  const admin = await requireRole('ADMIN');
+  const admin = await requireRole('ADMIN', 'SUPER_ADMIN');
   const date = parseDateOnly(deliveryDate);
   if (!date) return { error: 'Tanggal tidak valid' };
 
@@ -44,7 +44,7 @@ export async function setDriverAvailability(
 }
 
 export async function listAvailableDrivers(deliveryDate: string) {
-  await requireRole('ADMIN');
+  await requireRole('ADMIN', 'SUPER_ADMIN');
   const date = parseDateOnly(deliveryDate);
   if (!date) return [];
   return prisma.profile.findMany({

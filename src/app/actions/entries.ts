@@ -95,7 +95,9 @@ export async function createEntry(formData: FormData) {
     livestock.hargaJual ||
     pricing?.hargaJual ||
     0;
-  const hargaModal = pricing?.hargaBeli ?? null;
+  const hargaModal = formData.get('hargaModal')
+    ? Number(formData.get('hargaModal'))
+    : (livestock.hargaModal ?? pricing?.hargaBeli ?? null);
   const resellerCut = formData.get('resellerCut')
     ? Number(formData.get('resellerCut'))
     : null;
@@ -107,7 +109,7 @@ export async function createEntry(formData: FormData) {
   let approvedAt: Date | null = null;
   let approvedBy: string | null = null;
 
-  if (profile.role === 'ADMIN') {
+  if ((profile.role === 'ADMIN' || profile.role === 'SUPER_ADMIN')) {
     const adminSelectedSalesId = formData.get('salesId')?.toString().trim();
 
     // FIX: Jika Admin memilih sales, gunakan ID Sales tersebut.
@@ -169,6 +171,7 @@ export async function createEntry(formData: FormData) {
     });
 
     const livestockUpdate: Record<string, unknown> = { tag: livestockTag };
+    if (hargaModal !== null) livestockUpdate.hargaModal = hargaModal;
     if (status === 'APPROVED') {
       livestockUpdate.isSold = true;
     }
@@ -209,7 +212,7 @@ export async function createEntry(formData: FormData) {
  * @returns { success } or { error }
  */
 export async function approveEntry(id: string) {
-  const admin = await requireRole('ADMIN');
+  const admin = await requireRole('ADMIN', 'SUPER_ADMIN');
 
   const entry = await prisma.entry.findUnique({ where: { id } });
   if (!entry) return { error: 'Entry tidak ditemukan' };
@@ -254,7 +257,7 @@ export async function approveEntry(id: string) {
  * @returns { success } or { error }
  */
 export async function rejectEntry(id: string) {
-  const admin = await requireRole('ADMIN');
+  const admin = await requireRole('ADMIN', 'SUPER_ADMIN');
 
   const entry = await prisma.entry.findUnique({ where: { id } });
   if (!entry) return { error: 'Entry tidak ditemukan' };
@@ -297,7 +300,7 @@ export async function updateEntry(id: string, formData: FormData) {
   });
   if (!entry) return { error: 'Entry tidak ditemukan' };
 
-  if (profile.role !== 'ADMIN' && entry.salesId !== profile.id) {
+  if ((profile.role !== 'ADMIN' && profile.role !== 'SUPER_ADMIN') && entry.salesId !== profile.id) {
     return { error: 'Anda tidak berhak mengubah entry ini' };
   }
 
@@ -380,7 +383,7 @@ export async function updateEntry(id: string, formData: FormData) {
     isSent: formData.get('isSent') === 'true',
     buktiTransfer,
     ...(swapLivestockId ? { livestockId: swapLivestockId } : {}),
-    ...(profile.role === 'ADMIN' && formData.get('salesId')
+    ...((profile.role === 'ADMIN' || profile.role === 'SUPER_ADMIN') && formData.get('salesId')
       ? { salesId: formData.get('salesId') as string }
       : {}),
   };
@@ -393,10 +396,10 @@ export async function updateEntry(id: string, formData: FormData) {
       data: entryData,
     });
 
-    // Update livestock tag
+    // Update livestock tag + sync hargaModal
     await tx.livestock.update({
       where: { id: targetLivestockId },
-      data: { tag: livestockTag },
+      data: { tag: livestockTag, hargaModal },
     });
 
     if (swapLivestockId && entry.status === 'APPROVED') {
@@ -448,7 +451,7 @@ export async function deleteEntry(id: string) {
   const entry = await prisma.entry.findUnique({ where: { id } });
   if (!entry) return { error: 'Entry tidak ditemukan' };
 
-  if (profile.role !== 'ADMIN' && entry.salesId !== profile.id) {
+  if ((profile.role !== 'ADMIN' && profile.role !== 'SUPER_ADMIN') && entry.salesId !== profile.id) {
     return { error: 'Anda tidak berhak mengubah entry ini' };
   }
 

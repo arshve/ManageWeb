@@ -32,6 +32,7 @@ export interface LivestockItem {
   weightMin: number | null;
   weightMax: number | null;
   hargaJual: number | null;
+  hargaModal: number | null;
   tag: string | null;
   photoUrl: string | null;
   notes: string | null;
@@ -82,9 +83,11 @@ function StatusIcon({ isSold }: { isSold: boolean }) {
 export function LivestockTableClient({
   livestock,
   readOnly = false,
+  canViewFinancials = false,
 }: {
   livestock: LivestockItem[];
   readOnly?: boolean;
+  canViewFinancials?: boolean;
 }) {
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -296,8 +299,10 @@ export function LivestockTableClient({
                   <th className="p-3 font-medium text-left">SKU</th>
                   <th className="p-3 font-medium text-left">Tag</th>
                   <th className="p-3 font-medium text-left">Jenis</th>
-                  <th className="p-3 font-medium text-center">Grade</th>
-                  <th className="p-3 font-medium text-right">Berat</th>
+                  <th className="p-3 font-medium text-center">Grade/Berat</th>
+                  {canViewFinancials && (
+                    <th className="p-3 font-medium text-right">Modal</th>
+                  )}
                   <th className="p-3 font-medium text-right">Harga</th>
                   <th className="p-3 font-medium text-center w-12">Kondisi</th>
                   <th className="p-3 font-medium text-center w-12">Status</th>
@@ -340,13 +345,15 @@ export function LivestockTableClient({
                       <td className="p-3 whitespace-nowrap">
                         {item.type.charAt(0) + item.type.slice(1).toLowerCase()}
                       </td>
-                      <td className="p-3 text-center">
-                        {item.grade ? (
+                      <td className="p-3 text-center whitespace-nowrap">
+                        {item.type === 'SAPI' ? (
+                          <span className="tabular-nums">
+                            {formatWeight(item.weightMin, item.weightMax) ?? '—'}
+                          </span>
+                        ) : item.grade ? (
                           <Badge
                             variant="outline"
-                            className={
-                              isMati ? 'border-white/40 text-white' : ''
-                            }
+                            className={isMati ? 'border-white/40 text-white' : ''}
                           >
                             {item.grade}
                           </Badge>
@@ -354,9 +361,11 @@ export function LivestockTableClient({
                           <span className={mutedClass}>—</span>
                         )}
                       </td>
-                      <td className="p-3 text-right tabular-nums whitespace-nowrap">
-                        {formatWeight(item.weightMin, item.weightMax) ?? '—'}
-                      </td>
+                      {canViewFinancials && (
+                        <td className="p-3 text-right tabular-nums whitespace-nowrap text-muted-foreground">
+                          {item.hargaModal ? formatRupiah(item.hargaModal) : '—'}
+                        </td>
+                      )}
                       <td className="p-3 text-right tabular-nums whitespace-nowrap">
                         {item.hargaJual ? formatRupiah(item.hargaJual) : '—'}
                       </td>
@@ -408,7 +417,7 @@ export function LivestockTableClient({
                 {filtered.length === 0 && (
                   <tr>
                     <td
-                      colSpan={readOnly ? 12 : 13}
+                      colSpan={(readOnly ? 11 : 12) + (canViewFinancials ? 1 : 0)}
                       className="p-8 text-center text-muted-foreground"
                     >
                       {livestock.length === 0
@@ -428,6 +437,7 @@ export function LivestockTableClient({
                 key={item.id}
                 item={item}
                 readOnly={readOnly}
+                canViewFinancials={canViewFinancials}
               />
             ))}
             {filtered.length === 0 && (
@@ -447,13 +457,16 @@ export function LivestockTableClient({
 function MobileLivestockCard({
   item,
   readOnly,
+  canViewFinancials,
 }: {
   item: LivestockItem;
   readOnly: boolean;
+  canViewFinancials: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
 
   const typeLabel = item.type.charAt(0) + item.type.slice(1).toLowerCase();
+  const weightLabel = formatWeight(item.weightMin, item.weightMax);
 
   const cardClass =
     item.condition === 'MATI'
@@ -480,7 +493,9 @@ function MobileLivestockCard({
             <span className="mx-2 text-muted-foreground">|</span>
             <span className="font-medium">
               {typeLabel}
-              {item.grade ? ' ' + item.grade : ''}
+              {item.type === 'SAPI'
+                ? weightLabel ? ' ' + weightLabel : ''
+                : item.grade ? ' ' + item.grade : ''}
             </span>
           </div>
           <ConditionIcon condition={item.condition} />
@@ -503,16 +518,25 @@ function MobileLivestockCard({
             />
             <LivestockCardRow label="Tag" value={item.tag || '—'} />
             <LivestockCardRow label="Jenis" value={typeLabel} />
-            <LivestockCardRow
-              label="Grade"
-              value={
-                item.grade ? <Badge variant="outline">{item.grade}</Badge> : '—'
-              }
-            />
-            <LivestockCardRow
-              label="Berat"
-              value={formatWeight(item.weightMin, item.weightMax) ?? '—'}
-            />
+            {item.type === 'SAPI' ? (
+              <LivestockCardRow
+                label="Berat"
+                value={formatWeight(item.weightMin, item.weightMax) ?? '—'}
+              />
+            ) : (
+              <LivestockCardRow
+                label="Grade"
+                value={
+                  item.grade ? <Badge variant="outline">{item.grade}</Badge> : '—'
+                }
+              />
+            )}
+            {canViewFinancials && (
+              <LivestockCardRow
+                label="Modal"
+                value={item.hargaModal ? formatRupiah(item.hargaModal) : '—'}
+              />
+            )}
             <LivestockCardRow
               label="Harga"
               value={item.hargaJual ? formatRupiah(item.hargaJual) : '—'}

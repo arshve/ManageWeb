@@ -7,7 +7,7 @@
  *
  * Usage pattern in pages/actions:
  *   const profile = await requireAuth();              // redirects to /login if not logged in
- *   const admin = await requireRole("ADMIN");          // redirects to /unauthorized if not admin
+ *   const admin = await requireRole("ADMIN", "SUPER_ADMIN");          // redirects to /unauthorized if not admin
  *   const u = await requireRole("ADMIN", "MANAGE");   // accepts either role
  */
 
@@ -41,7 +41,7 @@ export async function requireAuth() {
  * @returns The authenticated user's Profile object
  *
  * @example
- * await requireRole("ADMIN");               // admin only
+ * await requireRole("ADMIN", "SUPER_ADMIN");               // admin only
  * await requireRole("ADMIN", "MANAGE");     // admin or manage
  */
 export async function requireRole(...roles: Role[]) {
@@ -52,6 +52,7 @@ export async function requireRole(...roles: Role[]) {
 
 export function dashboardUrlForRole(role: Role | string): string {
   switch (role) {
+    case 'SUPER_ADMIN':
     case 'ADMIN':
       return '/admin';
     case 'MANAGE':
@@ -61,4 +62,12 @@ export function dashboardUrlForRole(role: Role | string): string {
     default:
       return '/sales';
   }
+}
+
+export function isAdminRole(role: Role | string): boolean {
+  return role === 'ADMIN' || role === 'SUPER_ADMIN';
+}
+
+export function isSuperAdmin(role: Role | string): boolean {
+  return role === 'SUPER_ADMIN';
 }

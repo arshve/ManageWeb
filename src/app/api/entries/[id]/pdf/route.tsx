@@ -31,7 +31,7 @@ export async function GET(
     return NextResponse.json({ error: 'Entry tidak ditemukan' }, { status: 404 });
   }
 
-  if (profile.role !== 'ADMIN' && entry.salesId !== profile.id) {
+  if (profile.role !== 'ADMIN' && profile.role !== 'SUPER_ADMIN' && entry.salesId !== profile.id) {
     return NextResponse.json({ error: 'Tidak berhak' }, { status: 403 });
   }
 

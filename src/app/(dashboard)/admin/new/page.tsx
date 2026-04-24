@@ -32,6 +32,7 @@ interface AvailableLivestock {
   condition: string;
   photoUrl: string | null;
   hargaJual: number | null;
+  hargaModal: number | null;
   tag: string | null;
 }
 
@@ -69,6 +70,7 @@ export default function AdminNewEntryPage() {
   const [pengiriman, setPengiriman] = useState('HARI_H');
   const [paymentStatus, setPaymentStatus] = useState('BELUM_BAYAR');
   const [hargaJual, setHargaJual] = useState<string>('');
+  const [hargaModal, setHargaModal] = useState<string>('');
   const [livestockTag, setLivestockTag] = useState('');
 
   const [buktiTransferUrls, setBuktiTransferUrls] = useState<string[]>([]);
@@ -99,9 +101,11 @@ export default function AdminNewEntryPage() {
   useEffect(() => {
     if (selected) {
       setHargaJual(selected.hargaJual?.toString() ?? '');
+      setHargaModal(selected.hargaModal?.toString() ?? '');
       setLivestockTag(selected.tag ?? '');
     } else {
       setHargaJual('');
+      setHargaModal('');
       setLivestockTag('');
     }
   }, [selected]);
@@ -275,6 +279,16 @@ export default function AdminNewEntryPage() {
               onValueChange={setHargaJual}
               required
               placeholder="3500000"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="hargaModal">Modal</Label>
+            <RupiahInput
+              id="hargaModal"
+              name="hargaModal"
+              value={hargaModal}
+              onValueChange={setHargaModal}
+              placeholder="2500000"
             />
           </div>
           <div className="space-y-1.5">

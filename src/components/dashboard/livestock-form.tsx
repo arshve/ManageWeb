@@ -46,6 +46,7 @@ interface LivestockFormProps {
     weightMin: number | null;
     weightMax: number | null;
     hargaJual: number | null;
+    hargaModal: number | null;
     tag: string | null;
     photoUrl: string | null;
     notes: string | null;
@@ -71,6 +72,9 @@ export function LivestockForm({ livestock, trigger }: LivestockFormProps) {
   const [hargaJual, setHargaJual] = useState(
     livestock?.hargaJual?.toString() ?? '',
   );
+  const [hargaModal, setHargaModal] = useState(
+    livestock?.hargaModal?.toString() ?? '',
+  );
   const [tag, setTag] = useState(livestock?.tag ?? '');
   const [notes, setNotes] = useState(livestock?.notes ?? '');
 
@@ -94,6 +98,7 @@ export function LivestockForm({ livestock, trigger }: LivestockFormProps) {
         )?.replace(' kg', '') ?? '',
       );
       setHargaJual(livestock?.hargaJual?.toString() ?? '');
+      setHargaModal(livestock?.hargaModal?.toString() ?? '');
       setTag(livestock?.tag ?? '');
       setNotes(livestock?.notes ?? '');
       setPhotoUrl(livestock?.photoUrl ?? '');
@@ -193,6 +198,7 @@ export function LivestockForm({ livestock, trigger }: LivestockFormProps) {
       if (weightMin !== null) formData.set('weightMin', weightMin.toString());
       if (weightMax !== null) formData.set('weightMax', weightMax.toString());
       formData.set('hargaJual', hargaJual);
+      formData.set('hargaModal', hargaModal);
       formData.set('tag', tag);
       formData.set('photoUrl', finalPhotoUrl);
       formData.set('notes', notes);
@@ -320,6 +326,16 @@ export function LivestockForm({ livestock, trigger }: LivestockFormProps) {
                   placeholder="3500000"
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="hargaModal">Modal</Label>
+              <RupiahInput
+                id="hargaModal"
+                value={hargaModal}
+                onValueChange={setHargaModal}
+                placeholder="2500000"
+              />
             </div>
 
             <div className="space-y-2">

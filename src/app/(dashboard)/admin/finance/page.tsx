@@ -1,10 +1,12 @@
 import { prisma } from '@/lib/prisma';
+import { requireRole } from '@/lib/auth';
 import { DashboardShell } from '@/components/dashboard/dashboard-shell';
 import { FinanceView } from '@/components/admin/finance-view';
 import { Button } from '@/components/ui/button';
 import { CalendarDays } from 'lucide-react';
 
 export default async function FinancePage() {
+  await requireRole('SUPER_ADMIN');
   const [entries, salesUsers] = await Promise.all([
     prisma.entry.findMany({
       where: { status: 'APPROVED' },
@@ -28,7 +30,7 @@ export default async function FinancePage() {
       },
     }),
     prisma.profile.findMany({
-      where: { role: { in: ['SALES', 'ADMIN'] }, isActive: true },
+      where: { role: { in: ['SALES', 'ADMIN', 'SUPER_ADMIN'] }, isActive: true },
       select: {
         id: true,
         name: true,

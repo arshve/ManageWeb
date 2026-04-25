@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { cn } from '@/lib/utils';
 
 interface SiteHeaderProps {
@@ -38,44 +39,18 @@ export function SiteHeader({ dashboardHref, masukLabel }: SiteHeaderProps) {
           isScrolled ? 'text-[#1a1a14]' : 'text-white',
         )}
       >
-        <svg
-          viewBox="0 0 36 36"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          className="w-9 h-9"
-        >
-          <rect
-            width="36"
-            height="36"
-            rx="8"
-            fill={isScrolled ? 'rgba(26,47,26,0.1)' : 'rgba(255,255,255,0.15)'}
-            className="transition-colors duration-500"
-          />
-          <path
-            d="M8 26c0-5.523 4.477-10 10-10s10 4.477 10 10"
-            stroke={isScrolled ? '#1a2f1a' : 'white'}
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            className="transition-colors duration-500"
-          />
-          <circle
-            cx="18"
-            cy="13"
-            r="4"
-            fill="none"
-            stroke={isScrolled ? '#1a2f1a' : 'white'}
-            strokeWidth="1.5"
-            className="transition-colors duration-500"
-          />
-          <path
-            d="M14 20l-4 6M22 20l4 6"
-            stroke={isScrolled ? '#1a2f1a' : 'white'}
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            opacity="0.6"
-            className="transition-colors duration-500"
-          />
-        </svg>
+        <Image
+          src="/logofix.png"
+          alt="Millenials Farm"
+          width={36}
+          height={36}
+          className={cn(
+            'transition-all duration-500',
+            // If your logo.png is white, this turns it black when scrolling.
+            // If your logo is naturally black, change this to: !isScrolled && "brightness-0 invert"
+            isScrolled && 'brightness-0',
+          )}
+        />
         Millenials Farm
       </Link>
 

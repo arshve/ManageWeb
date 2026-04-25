@@ -19,6 +19,7 @@ export default async function FinancePage() {
         profit: true,
         paymentStatus: true,
         buyerName: true,
+        buyerAddress: true,
         salesId: true,
         livestock: {
           select: {
@@ -52,6 +53,7 @@ export default async function FinancePage() {
     profit: e.profit ?? 0,
     paymentStatus: e.paymentStatus,
     buyerName: e.buyerName,
+    buyerAddress: e.buyerAddress,
     salesId: e.salesId,
     livestock: {
       sku: e.livestock.sku,

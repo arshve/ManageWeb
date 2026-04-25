@@ -7,7 +7,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { RupiahInput } from '@/components/ui/rupiah-input';
-import { LivestockPhoto } from '@/components/dashboard/livestock-photo';
 import { formatRupiah } from '@/lib/format';
 import {
   ChevronDown,
@@ -32,6 +31,7 @@ interface EntryData {
   profit: number;
   paymentStatus: 'BELUM_BAYAR' | 'DP' | 'LUNAS';
   buyerName: string;
+  buyerAddress: string | null;
   salesId: string;
   livestock: {
     sku: string;
@@ -736,11 +736,10 @@ function SalesCard({
 
       {/* Expanded content */}
       {isOpen && (
-        <div className="border-t">
-          {/* Desktop grid table */}
-          <div className="hidden sm:block">
+        <div className="border-t overflow-x-auto">
+          <div className="min-w-[760px]">
             <div
-              className="grid grid-cols-[1fr_80px_80px_100px_110px_80px] px-4 bg-muted/40 items-center"
+              className="grid grid-cols-[1fr_80px_100px_140px_100px_110px_80px] bg-muted/40 items-center"
               style={{
                 padding: '7px 16px',
                 gap: 8,
@@ -754,6 +753,7 @@ function SalesCard({
               <span>SKU</span>
               <span>Tag</span>
               <span>Pembeli</span>
+              <span>Alamat</span>
               <span style={{ textAlign: 'right' }}>Modal</span>
               <span style={{ textAlign: 'right' }}>Harga / Fee</span>
               <span style={{ textAlign: 'center' }}>Status</span>
@@ -761,7 +761,7 @@ function SalesCard({
             {record.entries.map((e) => (
               <div
                 key={e.id}
-                className="grid grid-cols-[1fr_80px_80px_100px_110px_80px] border-t items-center"
+                className="grid grid-cols-[1fr_80px_100px_140px_100px_110px_80px] border-t items-center"
                 style={{ padding: '11px 16px', gap: 8 }}
               >
                 <span style={{ fontSize: 12, fontWeight: 500 }}>
@@ -781,6 +781,13 @@ function SalesCard({
                 </span>
                 <span style={{ fontSize: 12, color: FC.text2 }}>
                   {e.buyerName}
+                </span>
+                <span
+                  className="truncate"
+                  title={e.buyerAddress ?? undefined}
+                  style={{ fontSize: 11, color: FC.text3 }}
+                >
+                  {e.buyerAddress ?? '—'}
                 </span>
                 <span
                   style={{ textAlign: 'right', fontSize: 12, color: FC.text2 }}
@@ -803,47 +810,6 @@ function SalesCard({
                 </div>
                 <div className="flex justify-center">
                   <StatusBadge status={e.paymentStatus} />
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Mobile cards */}
-          <div className="sm:hidden divide-y">
-            {record.entries.map((e) => (
-              <div key={e.id} className="p-3 flex gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="font-mono text-xs font-medium truncate">
-                      {e.livestock.sku}
-                    </p>
-                    <StatusBadge status={e.paymentStatus} />
-                  </div>
-                  {e.livestock.tag && (
-                    <span
-                      className="text-[10px] px-1.5 py-0.5 rounded inline-block mt-0.5 font-bold"
-                      style={{ background: hex + '18', color: hex }}
-                    >
-                      {e.livestock.tag}
-                    </span>
-                  )}
-                  <p className="text-xs text-muted-foreground truncate mt-0.5">
-                    {e.buyerName}
-                  </p>
-                  <div className="flex items-center justify-between mt-1.5">
-                    <span className="text-xs font-semibold">
-                      {formatRupiah(e.hargaJual)}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: 11,
-                        color: e.resellerCut > 0 ? FC.amber : FC.text3,
-                      }}
-                    >
-                      Fee:{' '}
-                      {e.resellerCut > 0 ? formatRupiah(e.resellerCut) : '—'}
-                    </span>
-                  </div>
                 </div>
               </div>
             ))}

@@ -1,8 +1,16 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import { buttonVariants } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import { DM_Sans, DM_Serif_Display } from 'next/font/google';
 import { getProfile, dashboardUrlForRole } from '@/lib/auth';
+import { SiteHeader } from '@/components/layout/site-header';
+
+// Load the custom fonts matching the HTML design
+const dmSans = DM_Sans({ subsets: ['latin'], variable: '--font-sans' });
+const dmSerif = DM_Serif_Display({
+  weight: '400',
+  subsets: ['latin'],
+  variable: '--font-serif',
+});
 
 export default async function PublicLayout({
   children,
@@ -12,60 +20,15 @@ export default async function PublicLayout({
   const profile = await getProfile();
   const dashboardHref = profile ? dashboardUrlForRole(profile.role) : '/login';
   const masukLabel = profile ? 'Dashboard' : 'Masuk';
+
   return (
-    <>
-      {/* Header — clean, minimal, Squarespace-style */}
-      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b">
-        <div className="max-w-7xl mx-auto flex items-center justify-between px-6 h-16">
-          <Link href="/" className="flex items-center gap-2">
-            <Image
-              src="/logo.png"
-              alt="Millenials Farm"
-              width={36}
-              height={36}
-            />
-            <span className="text-base font-bold tracking-tight">
-              MILLENIALS FARM
-            </span>
-          </Link>
-          <nav className="hidden md:flex items-center gap-8 text-sm">
-            <Link
-              href="/"
-              className="text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Beranda
-            </Link>
-            <Link
-              href="/catalogue"
-              className="text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Katalog
-            </Link>
-            <Link
-              href="#about"
-              className="text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Tentang
-            </Link>
-            <Link
-              href="#contact"
-              className="text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Kontak
-            </Link>
-          </nav>
-          <Link
-            href={dashboardHref}
-            className={cn(buttonVariants({ size: 'sm' }), 'rounded-full px-5')}
-          >
-            {masukLabel}
-          </Link>
-        </div>
-      </header>
+    <div className={`${dmSans.variable} ${dmSerif.variable} font-sans`}>
+      {/* Header is now a Client Component handling its own scroll state */}
+      <SiteHeader dashboardHref={dashboardHref} masukLabel={masukLabel} />
 
       {children}
 
-      {/* Footer — dark, clean, Squarespace-style */}
+      {/* Footer remains unchanged */}
       <footer className="bg-foreground text-background">
         <div className="max-w-7xl mx-auto px-6 py-16">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-10">
@@ -116,26 +79,10 @@ export default async function PublicLayout({
             <p>
               &copy; {new Date().getFullYear()} Millenials Farm. All rights
               reserved.
-              {/* Made with <span className="grayscale">❤️</span> by{' '}
-              <a href="https://www.instagram.com/farvnn/" target="_blank" rel="noopener noreferrer" className="hover:opacity-100 transition-opacity underline underline-offset-2">farvnn</a> */}
             </p>
-            {/* <div className="flex gap-6">
-              <Link
-                href="/catalogue"
-                className="hover:opacity-100 transition-opacity"
-              >
-                Katalog
-              </Link>
-              <Link
-                href={dashboardHref}
-                className="hover:opacity-100 transition-opacity"
-              >
-                Dashboard
-              </Link>
-            </div> */}
           </div>
         </div>
       </footer>
-    </>
+    </div>
   );
 }

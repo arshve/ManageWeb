@@ -340,7 +340,7 @@ export function FinanceView({
       </div>
 
       {/* ── 2. Secondary Mini-Stats ──────────────────────────────────────── */}
-      <div className="flex flex-wrap gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
         <MiniStat
           label="Rata-rata/transaksi"
           value={formatRupiah(totals.avg)}
@@ -608,7 +608,7 @@ function MiniStat({
   color?: string;
 }) {
   return (
-    <Card className="flex-1 min-w-[120px] py-0 rounded-xl">
+    <Card className="py-0 rounded-xl">
       <CardContent className="py-[11px] px-[15px]">
         <p
           className="text-[10px] uppercase text-muted-foreground mb-1"
@@ -715,7 +715,8 @@ function SalesCard({
         <button
           onClick={(e) => {
             e.stopPropagation();
-            toast.success(`Generating payslip untuk ${record.user.name}...`);
+            // Open the new specific PDF route
+            window.open(`/api/payslip/${record.user.id}`, '_blank');
           }}
           title="Generate payslip"
           className="w-[30px] h-[30px] rounded-[7px] border border-border bg-muted flex items-center justify-center shrink-0 cursor-pointer transition-colors hover:bg-accent"
@@ -739,7 +740,7 @@ function SalesCard({
         <div className="border-t overflow-x-auto">
           <div className="min-w-[760px]">
             <div
-              className="grid grid-cols-[1fr_80px_100px_140px_100px_110px_80px] bg-muted/40 items-center"
+              className="grid grid-cols-[140px_70px_100px_1fr_90px_110px_70px] bg-muted/40 items-center"
               style={{
                 padding: '7px 16px',
                 gap: 8,
@@ -761,7 +762,7 @@ function SalesCard({
             {record.entries.map((e) => (
               <div
                 key={e.id}
-                className="grid grid-cols-[1fr_80px_100px_140px_100px_110px_80px] border-t items-center"
+                className="grid grid-cols-[140px_70px_100px_1fr_90px_110px_70px] border-t items-center"
                 style={{ padding: '11px 16px', gap: 8 }}
               >
                 <span style={{ fontSize: 12, fontWeight: 500 }}>

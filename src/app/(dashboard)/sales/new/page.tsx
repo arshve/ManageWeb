@@ -17,20 +17,15 @@ import {
 import { DashboardShell } from '@/components/dashboard/dashboard-shell';
 import { createEntry } from '@/app/actions/entries';
 import { toast } from 'sonner';
-import { LivestockPicker } from '@/components/dashboard/livestock-picker';
+import { LivestockPicker, type PickerLivestock } from '@/components/dashboard/livestock-picker';
 import { BuktiTransferUpload } from '@/components/dashboard/bukti-transfer-upload';
+import { formatRupiah, formatWeight } from '@/lib/format';
+import { X } from 'lucide-react';
 
-interface AvailableLivestock {
-  id: string;
-  sku: string;
-  type: string;
-  grade: string | null;
-  tag: string | null;
-  hargaJual: number | null;
-  weightMin: number | null;
-  weightMax: number | null;
-  condition: string;
-  photoUrl: string | null;
+interface SelectedItem {
+  livestock: PickerLivestock;
+  hargaJual: string;
+  tag: string;
 }
 
 const PENGIRIMAN_OPTIONS = [
@@ -52,12 +47,10 @@ const PAYMENT_LABEL: Record<string, string> = {
 };
 
 export default function NewEntryPage() {
-  const [livestock, setLivestock] = useState<AvailableLivestock[]>([]);
-  const [selectedId, setSelectedId] = useState('');
-  const [livestockTag, setLivestockTag] = useState('');
+  const [livestock, setLivestock] = useState<PickerLivestock[]>([]);
+  const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
   const [pengiriman, setPengiriman] = useState('HARI_H');
   const [paymentStatus, setPaymentStatus] = useState('BELUM_BAYAR');
-  const [hargaJual, setHargaJual] = useState<string>('');
   const [buktiTransferUrls, setBuktiTransferUrls] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -72,32 +65,49 @@ export default function NewEntryPage() {
       .catch(() => toast.error('Gagal memuat data hewan'));
   }, []);
 
-  const selected = livestock.find((l) => l.id === selectedId);
+  const selectedIds = selectedItems.map((i) => i.livestock.id);
+  const totalHargaJual = selectedItems.reduce((s, i) => s + (Number(i.hargaJual) || 0), 0);
 
-  useEffect(() => {
-    if (selected) {
-      setHargaJual(selected.hargaJual?.toString() ?? '');
-      setLivestockTag(selected.tag ?? '');
+  function handleToggle(id: string) {
+    const existing = selectedItems.find((i) => i.livestock.id === id);
+    if (existing) {
+      setSelectedItems((prev) => prev.filter((i) => i.livestock.id !== id));
     } else {
-      setHargaJual('');
-      setLivestockTag('');
+      const lv = livestock.find((l) => l.id === id);
+      if (!lv) return;
+      setSelectedItems((prev) => [
+        ...prev,
+        { livestock: lv, hargaJual: lv.hargaJual?.toString() ?? '', tag: lv.tag ?? '' },
+      ]);
     }
-  }, [selected]);
+  }
 
+  function updateItem(id: string, field: 'hargaJual' | 'tag', value: string) {
+    setSelectedItems((prev) =>
+      prev.map((i) => (i.livestock.id === id ? { ...i, [field]: value } : i)),
+    );
+  }
 
   async function handleSubmit(formData: FormData) {
-    if (!selectedId) {
-      toast.error('Pilih hewan terlebih dahulu');
+    if (selectedItems.length === 0) {
+      toast.error('Pilih minimal satu hewan');
       return;
     }
-    formData.set('livestockId', selectedId);
+
+    formData.set(
+      'items',
+      JSON.stringify(
+        selectedItems.map((i) => ({
+          livestockId: i.livestock.id,
+          hargaJual: Number(i.hargaJual) || 0,
+          tag: i.tag || null,
+        })),
+      ),
+    );
     formData.set('paymentStatus', paymentStatus);
-
-    // Lunas: auto-set totalBayar = hargaJual
     if (paymentStatus === 'LUNAS') {
-      formData.set('totalBayar', hargaJual);
+      formData.set('totalBayar', String(totalHargaJual));
     }
-
     buktiTransferUrls.forEach((url) => formData.append('buktiTransfer', url));
 
     setLoading(true);
@@ -122,20 +132,65 @@ export default function NewEntryPage() {
           <h3 className="font-semibold text-sm">Pilih Hewan</h3>
           <LivestockPicker
             livestock={livestock}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
+            selectedIds={selectedIds}
+            onToggle={handleToggle}
           />
 
-          {selected && (
-            <div className="space-y-1.5 pt-2 border-t">
-              <Label htmlFor="livestockTag">Tag Hewan</Label>
-              <Input
-                id="livestockTag"
-                name="livestockTag"
-                value={livestockTag}
-                onChange={(e) => setLivestockTag(e.target.value)}
-                placeholder="MF-00X | RQ-00X | QB-00X"
-              />
+          {/* Selected items list */}
+          {selectedItems.length > 0 && (
+            <div className="border-t pt-3 space-y-2">
+              <p className="text-xs font-medium text-muted-foreground">
+                {selectedItems.length} hewan dipilih
+              </p>
+              {selectedItems.map((item) => {
+                const lv = item.livestock;
+                const typeLabel = lv.type.charAt(0) + lv.type.slice(1).toLowerCase();
+                const weightStr = formatWeight(lv.weightMin, lv.weightMax);
+                return (
+                  <div
+                    key={lv.id}
+                    className="flex items-start gap-2 p-2 rounded-lg border bg-muted/30"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium truncate">
+                        {typeLabel}{lv.grade ? ` · ${lv.grade}` : ''}{weightStr ? ` · ${weightStr}` : ''}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground font-mono">{lv.sku}</p>
+                      <div className="flex gap-2 mt-1.5">
+                        <div className="flex-1 space-y-0.5">
+                          <Label className="text-[10px]">Tag</Label>
+                          <Input
+                            value={item.tag}
+                            onChange={(e) => updateItem(lv.id, 'tag', e.target.value)}
+                            placeholder="MF-00X"
+                            className="h-7 text-xs"
+                          />
+                        </div>
+                        <div className="flex-1 space-y-0.5">
+                          <Label className="text-[10px]">Harga Jual *</Label>
+                          <RupiahInput
+                            value={item.hargaJual}
+                            onValueChange={(v) => updateItem(lv.id, 'hargaJual', v)}
+                            className="h-7 text-xs"
+                            placeholder="3500000"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleToggle(lv.id)}
+                      className="text-muted-foreground hover:text-destructive mt-0.5 shrink-0"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                );
+              })}
+              <div className="flex justify-between items-center pt-1 text-sm font-medium">
+                <span>Total</span>
+                <span>{formatRupiah(totalHargaJual)}</span>
+              </div>
             </div>
           )}
         </section>
@@ -157,11 +212,7 @@ export default function NewEntryPage() {
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="buyerMaps">Link Google Maps</Label>
-            <Input
-              id="buyerMaps"
-              name="buyerMaps"
-              placeholder="https://maps.google.com/..."
-            />
+            <Input id="buyerMaps" name="buyerMaps" placeholder="https://maps.google.com/..." />
           </div>
         </section>
 
@@ -169,20 +220,13 @@ export default function NewEntryPage() {
         <section className="rounded-xl border bg-card p-4 space-y-4">
           <h3 className="font-semibold text-sm">Pengiriman</h3>
           <input type="hidden" name="pengiriman" value={pengiriman} />
-          <Select
-            value={pengiriman}
-            onValueChange={(val) => setPengiriman(val ?? 'HARI_H')}
-          >
+          <Select value={pengiriman} onValueChange={(val) => setPengiriman(val ?? 'HARI_H')}>
             <SelectTrigger>
-              <SelectValue>
-                {PENGIRIMAN_LABEL[pengiriman] ?? pengiriman}
-              </SelectValue>
+              <SelectValue>{PENGIRIMAN_LABEL[pengiriman] ?? pengiriman}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               {PENGIRIMAN_OPTIONS.map((o) => (
-                <SelectItem key={o.value} value={o.value}>
-                  {o.label}
-                </SelectItem>
+                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -191,27 +235,20 @@ export default function NewEntryPage() {
         {/* ── Pembayaran ── */}
         <section className="rounded-xl border bg-card p-4 space-y-4">
           <h3 className="font-semibold text-sm">Pembayaran</h3>
+          {totalHargaJual > 0 && (
+            <div className="flex justify-between text-sm text-muted-foreground border-b pb-2">
+              <span>Total Harga Jual</span>
+              <span className="font-medium text-foreground">{formatRupiah(totalHargaJual)}</span>
+            </div>
+          )}
           <div className="space-y-1.5">
-            <Label htmlFor="hargaJual">Harga Jual *</Label>
-            <RupiahInput
-              id="hargaJual"
-              name="hargaJual"
-              value={hargaJual}
-              onValueChange={setHargaJual}
-              required
-              placeholder="3500000"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Pembayaran</Label>
+            <Label>Status Pembayaran</Label>
             <Select
               value={paymentStatus}
               onValueChange={(val) => setPaymentStatus(val ?? 'BELUM_BAYAR')}
             >
               <SelectTrigger>
-                <SelectValue>
-                  {PAYMENT_LABEL[paymentStatus] ?? paymentStatus}
-                </SelectValue>
+                <SelectValue>{PAYMENT_LABEL[paymentStatus] ?? paymentStatus}</SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="BELUM_BAYAR">Belum Bayar</SelectItem>
@@ -238,11 +275,7 @@ export default function NewEntryPage() {
           <Textarea name="notes" rows={2} placeholder="Catatan tambahan..." />
         </section>
 
-        <Button
-          type="submit"
-          className="w-full h-12 text-base"
-          disabled={loading}
-        >
+        <Button type="submit" className="w-full h-12 text-base" disabled={loading}>
           {loading ? 'Menyimpan...' : 'Kirim Entry'}
         </Button>
       </form>

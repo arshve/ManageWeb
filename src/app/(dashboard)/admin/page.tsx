@@ -13,50 +13,24 @@ export default async function AdminDashboardPage() {
   const profile = await requireAuth();
   const superAdmin = isSuperAdmin(profile.role);
   const totalLivestock = await prisma.livestock.count();
-  const soldLivestock = await prisma.livestock.count({
-    where: { isSold: true },
-  });
+  const soldLivestock = await prisma.livestock.count({ where: { isSold: true } });
   const totalEntries = await prisma.entry.count();
-  const pendingEntries = await prisma.entry.count({
-    where: { status: 'PENDING' },
-  });
-  const totalSales = await prisma.profile.count({
-    where: { role: 'SALES', isActive: true },
-  });
+  const pendingEntries = await prisma.entry.count({ where: { status: 'PENDING' } });
+  const totalSales = await prisma.profile.count({ where: { role: 'SALES', isActive: true } });
 
-  const [approvedEntries, allEntries, availableLivestock, salesUsers] = await Promise.all([
+  const [approvedEntries, allEntries, salesUsers] = await Promise.all([
     prisma.entry.findMany({
       where: { status: 'APPROVED' },
-      select: { hargaJual: true, hargaModal: true, profit: true },
+      include: { items: { select: { hargaJual: true, hargaModal: true, profit: true } } },
     }),
     prisma.entry.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
-        livestock: true,
+        items: { include: { livestock: true } },
         sales: { select: { id: true, name: true } },
         delivery: {
-          select: {
-            status: true,
-            driver: { select: { name: true } },
-          },
+          select: { status: true, driver: { select: { name: true } } },
         },
-      },
-    }),
-    prisma.livestock.findMany({
-      where: {
-        isSold: false,
-        entry: null,
-        condition: { not: 'MATI' },
-      },
-      orderBy: { createdAt: 'desc' },
-      select: {
-        id: true,
-        sku: true,
-        type: true,
-        grade: true,
-        weightMin: true,
-        weightMax: true,
-        tag: true,
       },
     }),
     prisma.profile.findMany({
@@ -66,85 +40,84 @@ export default async function AdminDashboardPage() {
     }),
   ]);
 
-  const totalRevenue = approvedEntries.reduce((sum, e) => sum + e.hargaJual, 0);
+  const totalRevenue = approvedEntries.reduce(
+    (sum, e) => sum + e.items.reduce((s, i) => s + i.hargaJual, 0),
+    0,
+  );
   const totalModal = approvedEntries.reduce(
-    (sum, e) => sum + (e.hargaModal ?? 0),
+    (sum, e) => sum + e.items.reduce((s, i) => s + (i.hargaModal ?? 0), 0),
     0,
   );
 
-  const serialized = allEntries.map((entry) => ({
-    id: entry.id,
-    invoiceNo: entry.invoiceNo,
-    status: entry.status,
-    hargaJual: entry.hargaJual,
-    hargaModal: entry.hargaModal,
-    resellerCut: entry.resellerCut,
-    hpp: entry.hpp,
-    profit: entry.profit,
-    dp: entry.dp,
-    totalBayar: entry.totalBayar,
-    paymentStatus: entry.paymentStatus,
-    buyerName: entry.buyerName,
-    buyerPhone: entry.buyerPhone,
-    buyerAddress: entry.buyerAddress,
-    buyerMaps: entry.buyerMaps,
-    pengiriman: entry.pengiriman,
-    buktiTransfer: entry.buktiTransfer,
-    notes: entry.notes,
-    isSent: entry.isSent,
-    createdAt: entry.createdAt.toISOString(),
-    delivery: entry.delivery
-      ? {
-          status: entry.delivery.status,
-          driverName: entry.delivery.driver?.name ?? null,
-        }
-      : null,
-    livestock: {
-      id: entry.livestock.id,
-      sku: entry.livestock.sku,
-      type: entry.livestock.type,
-      grade: entry.livestock.grade,
-      weightMin: entry.livestock.weightMin,
-      weightMax: entry.livestock.weightMax,
-      tag: entry.livestock.tag,
-      photoUrl: entry.livestock.photoUrl,
-      condition: entry.livestock.condition,
-    },
-    sales: {
-      id: entry.sales.id,
-      name: entry.sales.name,
-    },
-  }));
+  const serialized = allEntries.map((entry) => {
+    const first = entry.items[0]?.livestock;
+    return {
+      id: entry.id,
+      invoiceNo: entry.invoiceNo,
+      status: entry.status,
+      hargaJual: entry.items.reduce((s, i) => s + i.hargaJual, 0),
+      hargaModal: entry.items.reduce((s, i) => s + (i.hargaModal ?? 0), 0),
+      resellerCut: entry.items.reduce((s, i) => s + (i.resellerCut ?? 0), 0),
+      hpp: entry.items.reduce((s, i) => s + (i.hpp ?? 0), 0),
+      profit: entry.items.reduce((s, i) => s + (i.profit ?? 0), 0),
+      dp: entry.dp,
+      totalBayar: entry.totalBayar,
+      paymentStatus: entry.paymentStatus,
+      buyerName: entry.buyerName,
+      buyerPhone: entry.buyerPhone,
+      buyerAddress: entry.buyerAddress,
+      buyerMaps: entry.buyerMaps,
+      pengiriman: entry.pengiriman,
+      buktiTransfer: entry.buktiTransfer,
+      notes: entry.notes,
+      isSent: entry.isSent,
+      createdAt: entry.createdAt.toISOString(),
+      delivery: entry.delivery
+        ? { status: entry.delivery.status, driverName: entry.delivery.driver?.name ?? null }
+        : null,
+      items: entry.items.map((i) => ({
+        id: i.id,
+        hargaJual: i.hargaJual,
+        hargaModal: i.hargaModal,
+        resellerCut: i.resellerCut,
+        hpp: i.hpp,
+        profit: i.profit,
+        livestock: {
+          id: i.livestock.id,
+          sku: i.livestock.sku,
+          type: i.livestock.type,
+          grade: i.livestock.grade,
+          weightMin: i.livestock.weightMin,
+          weightMax: i.livestock.weightMax,
+          tag: i.livestock.tag,
+          photoUrl: i.livestock.photoUrl,
+          condition: i.livestock.condition,
+        },
+      })),
+      livestock: first
+        ? {
+            id: first.id,
+            sku: first.sku,
+            type: first.type,
+            grade: first.grade,
+            weightMin: first.weightMin,
+            weightMax: first.weightMax,
+            tag: first.tag,
+            photoUrl: first.photoUrl,
+            condition: first.condition,
+          }
+        : null,
+      sales: { id: entry.sales.id, name: entry.sales.name },
+    };
+  });
 
   const stats = [
-    {
-      title: 'Total Hewan',
-      value: totalLivestock,
-      sub: `${soldLivestock} terjual`,
-      icon: Beef,
-    },
-    {
-      title: 'Entry Penjualan',
-      value: totalEntries,
-      sub: `${pendingEntries} menunggu approval`,
-      icon: ClipboardList,
-    },
+    { title: 'Total Hewan', value: totalLivestock, sub: `${soldLivestock} terjual`, icon: Beef },
+    { title: 'Entry Penjualan', value: totalEntries, sub: `${pendingEntries} menunggu approval`, icon: ClipboardList },
     ...(superAdmin
-      ? [
-          {
-            title: 'Total Revenue',
-            value: formatRupiah(totalRevenue),
-            sub: `Modal: ${formatRupiah(totalModal)}`,
-            icon: DollarSign,
-          },
-        ]
+      ? [{ title: 'Total Revenue', value: formatRupiah(totalRevenue), sub: `Modal: ${formatRupiah(totalModal)}`, icon: DollarSign }]
       : []),
-    {
-      title: 'Sales Aktif',
-      value: totalSales,
-      sub: superAdmin ? 'Keuangan di menu terpisah' : '',
-      icon: Users,
-    },
+    { title: 'Sales Aktif', value: totalSales, sub: superAdmin ? 'Keuangan di menu terpisah' : '', icon: Users },
   ];
 
   return (
@@ -152,10 +125,7 @@ export default async function AdminDashboardPage() {
       title="Dashboard"
       description="Ringkasan data Millenials Farm"
       actions={
-        <Link
-          href="/admin/new"
-          className={cn(buttonVariants({ size: 'sm' }), 'gap-1')}
-        >
+        <Link href="/admin/new" className={cn(buttonVariants({ size: 'sm' }), 'gap-1')}>
           <Plus className="h-4 w-4" />
           Tambah Entry
         </Link>
@@ -165,9 +135,7 @@ export default async function AdminDashboardPage() {
         {stats.map((stat) => (
           <Card key={stat.title}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {stat.title}
-              </CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">{stat.title}</CardTitle>
               <stat.icon className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -187,7 +155,6 @@ export default async function AdminDashboardPage() {
             entries={serialized}
             isAdmin={true}
             canViewFinancials={superAdmin}
-            availableLivestock={availableLivestock}
             salesUsers={salesUsers}
           />
         </CardContent>

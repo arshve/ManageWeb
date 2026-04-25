@@ -59,6 +59,7 @@ type ScheduledEntry = {
   sku: string | undefined;
   animalType?: string;
   animalGrade?: string | null;
+  items: { sku: string | undefined; tag: string | null | undefined; type: string | undefined; grade: string | null | undefined }[];
   salesName?: string;
   buyerName: string;
   buyerAddress: string | null;
@@ -79,6 +80,7 @@ type ScheduledEntry = {
 type UnscheduledEntry = {
   id: string;
   sku: string | undefined;
+  items: { sku: string | undefined; tag: string | null | undefined; type: string | undefined; grade: string | null | undefined; weightMin: number | null | undefined; weightMax: number | null | undefined }[];
   buyerName: string;
   buyerAddress: string | null;
   buyerLat: number | null;
@@ -237,12 +239,16 @@ export function DeliveriesAdminView({
   const [unscheduledSearch, setUnscheduledSearch] = useState('');
   const [unscheduledCoordFilter, setUnscheduledCoordFilter] = useState<'ALL' | 'HAS_COORDS' | 'NO_COORDS'>('ALL');
   const [unscheduledPengirimanFilter, setUnscheduledPengirimanFilter] = useState('ALL');
+  const [unscheduledJenisFilter, setUnscheduledJenisFilter] = useState('ALL');
+  const [unscheduledPage, setUnscheduledPage] = useState(0);
+  const UNSCHEDULED_PAGE_SIZE = 25;
 
   const filteredUnscheduled = useMemo(() => {
     let list = unscheduled;
     if (unscheduledCoordFilter === 'HAS_COORDS') list = list.filter((e) => e.hasCoords);
     else if (unscheduledCoordFilter === 'NO_COORDS') list = list.filter((e) => !e.hasCoords);
     if (unscheduledPengirimanFilter !== 'ALL') list = list.filter((e) => e.pengiriman === unscheduledPengirimanFilter);
+    if (unscheduledJenisFilter !== 'ALL') list = list.filter((e) => e.items.some((i) => i.type === unscheduledJenisFilter));
     if (unscheduledSearch.trim()) {
       const q = unscheduledSearch.trim().toLowerCase();
       list = list.filter(
@@ -253,7 +259,14 @@ export function DeliveriesAdminView({
       );
     }
     return list;
-  }, [unscheduled, unscheduledSearch, unscheduledCoordFilter, unscheduledPengirimanFilter]);
+  }, [unscheduled, unscheduledSearch, unscheduledCoordFilter, unscheduledPengirimanFilter, unscheduledJenisFilter]);
+
+  const unscheduledTotalPages = Math.max(1, Math.ceil(filteredUnscheduled.length / UNSCHEDULED_PAGE_SIZE));
+  const unscheduledSafePage = Math.min(unscheduledPage, unscheduledTotalPages - 1);
+  const pagedUnscheduled = filteredUnscheduled.slice(
+    unscheduledSafePage * UNSCHEDULED_PAGE_SIZE,
+    (unscheduledSafePage + 1) * UNSCHEDULED_PAGE_SIZE,
+  );
 
   const deliveredCount = scheduled.filter(
     (e) => e.delivery?.status === 'DELIVERED',
@@ -606,14 +619,14 @@ export function DeliveriesAdminView({
             <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
             <Input
               value={unscheduledSearch}
-              onChange={(ev) => setUnscheduledSearch(ev.target.value)}
+              onChange={(ev) => { setUnscheduledSearch(ev.target.value); setUnscheduledPage(0); }}
               placeholder="Cari nama / SKU / alamat"
               className="h-8 text-xs pl-8"
             />
           </div>
           <select
             value={unscheduledPengirimanFilter}
-            onChange={(ev) => setUnscheduledPengirimanFilter(ev.target.value)}
+            onChange={(ev) => { setUnscheduledPengirimanFilter(ev.target.value); setUnscheduledPage(0); }}
             className="h-8 rounded-md border border-gray-300 bg-white px-2 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400"
           >
             <option value="ALL">Semua Pengiriman</option>
@@ -624,18 +637,28 @@ export function DeliveriesAdminView({
             <option value="TITIP_POTONG">{formatPengiriman('TITIP_POTONG')}</option>
           </select>
           <select
+            value={unscheduledJenisFilter}
+            onChange={(ev) => { setUnscheduledJenisFilter(ev.target.value); setUnscheduledPage(0); }}
+            className="h-8 rounded-md border border-gray-300 bg-white px-2 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400"
+          >
+            <option value="ALL">Semua Jenis</option>
+            <option value="KAMBING">Kambing</option>
+            <option value="DOMBA">Domba</option>
+            <option value="SAPI">Sapi</option>
+          </select>
+          <select
             value={unscheduledCoordFilter}
-            onChange={(ev) => setUnscheduledCoordFilter(ev.target.value as 'ALL' | 'HAS_COORDS' | 'NO_COORDS')}
+            onChange={(ev) => { setUnscheduledCoordFilter(ev.target.value as 'ALL' | 'HAS_COORDS' | 'NO_COORDS'); setUnscheduledPage(0); }}
             className="h-8 rounded-md border border-gray-300 bg-white px-2 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400"
           >
             <option value="ALL">Semua Koordinat</option>
             <option value="HAS_COORDS">Punya Koordinat</option>
             <option value="NO_COORDS">Belum Ada Koordinat</option>
           </select>
-          {(unscheduledSearch || unscheduledCoordFilter !== 'ALL' || unscheduledPengirimanFilter !== 'ALL') && (
+          {(unscheduledSearch || unscheduledCoordFilter !== 'ALL' || unscheduledPengirimanFilter !== 'ALL' || unscheduledJenisFilter !== 'ALL') && (
             <button
               type="button"
-              onClick={() => { setUnscheduledSearch(''); setUnscheduledCoordFilter('ALL'); setUnscheduledPengirimanFilter('ALL'); }}
+              onClick={() => { setUnscheduledSearch(''); setUnscheduledCoordFilter('ALL'); setUnscheduledPengirimanFilter('ALL'); setUnscheduledJenisFilter('ALL'); setUnscheduledPage(0); }}
               className="text-xs text-gray-400 hover:text-gray-700 underline underline-offset-2"
             >
               Reset
@@ -686,7 +709,8 @@ export function DeliveriesAdminView({
                         className="h-4 w-4 rounded border-gray-300 accent-gray-800 cursor-pointer"
                       />
                     </th>
-                    <th className={cn(th, 'w-40')}>SKU</th>
+                    <th className={cn(th, 'w-32')}>Tag</th>
+                    <th className={cn(th, 'w-36')}>Hewan</th>
                     <th className={th}>Pembeli</th>
                     <th className={th}>Alamat</th>
                     <th className={cn(th, 'w-28')}>Pengiriman</th>
@@ -694,7 +718,7 @@ export function DeliveriesAdminView({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {filteredUnscheduled.map((e) => (
+                  {pagedUnscheduled.map((e) => (
                     <UnscheduledRow
                       key={e.id}
                       entry={e}
@@ -722,7 +746,7 @@ export function DeliveriesAdminView({
                 />
                 <span className="text-xs text-gray-500">Pilih semua</span>
               </div>
-              {filteredUnscheduled.map((e) => (
+              {pagedUnscheduled.map((e) => (
                 <UnscheduledCard
                   key={e.id}
                   entry={e}
@@ -733,6 +757,36 @@ export function DeliveriesAdminView({
                 />
               ))}
             </div>
+
+            {/* Pagination */}
+            {unscheduledTotalPages > 1 && (
+              <div className="flex items-center justify-between gap-2 border-t border-gray-100 px-4 sm:px-5 py-3">
+                <span className="text-xs text-gray-400">
+                  {unscheduledSafePage * UNSCHEDULED_PAGE_SIZE + 1}–{Math.min((unscheduledSafePage + 1) * UNSCHEDULED_PAGE_SIZE, filteredUnscheduled.length)} dari {filteredUnscheduled.length}
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    disabled={unscheduledSafePage === 0}
+                    onClick={() => setUnscheduledPage(unscheduledSafePage - 1)}
+                    className="px-2.5 py-1 text-xs rounded border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    ←
+                  </button>
+                  <span className="text-xs text-gray-500 px-1">
+                    {unscheduledSafePage + 1} / {unscheduledTotalPages}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={unscheduledSafePage >= unscheduledTotalPages - 1}
+                    onClick={() => setUnscheduledPage(unscheduledSafePage + 1)}
+                    className="px-2.5 py-1 text-xs rounded border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    →
+                  </button>
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>
@@ -854,10 +908,18 @@ export function DeliveriesAdminView({
                           <tr key={s.id} className="hover:bg-gray-50 transition-colors">
                             <td className={cn(td, 'pl-4 text-xs text-gray-400 font-mono')}>{(s.delivery?.sequence ?? 0) + 1}</td>
                             <td className={td}>
-                              <div className="font-medium text-gray-900 mb-0.5">
-                                {s.animalType ? s.animalType.charAt(0) + s.animalType.slice(1).toLowerCase() : ''}{s.animalGrade ? ` ${s.animalGrade}` : ''}
+                              <div className="space-y-1">
+                                {s.items.map((item) => (
+                                  <div key={item.sku ?? item.tag}>
+                                    <div className="font-medium text-gray-900 text-xs">
+                                      {item.type ? item.type.charAt(0) + item.type.slice(1).toLowerCase() : ''}{item.grade ? ` ${item.grade}` : ''}
+                                    </div>
+                                    <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">
+                                      {item.tag ?? item.sku}
+                                    </span>
+                                  </div>
+                                ))}
                               </div>
-                              <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">{s.sku}</span>
                             </td>
                             <td className={td}>
                               <span className="font-medium text-gray-900">{s.buyerName}</span>
@@ -897,11 +959,15 @@ export function DeliveriesAdminView({
                             )}
                           </div>
                         </div>
-                        <div className="flex items-center gap-2 text-xs">
-                          <span className="font-medium text-gray-700">
-                            {s.animalType ? s.animalType.charAt(0) + s.animalType.slice(1).toLowerCase() : ''}{s.animalGrade ? ` ${s.animalGrade}` : ''}
-                          </span>
-                          <span className="font-mono bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">{s.sku}</span>
+                        <div className="flex flex-wrap gap-1 text-xs">
+                          {s.items.map((item) => (
+                            <span key={item.sku ?? item.tag} className="inline-flex items-center gap-1">
+                              <span className="font-medium text-gray-700">
+                                {item.type ? item.type.charAt(0) + item.type.slice(1).toLowerCase() : ''}{item.grade ? ` ${item.grade}` : ''}
+                              </span>
+                              <span className="font-mono bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">{item.tag ?? item.sku}</span>
+                            </span>
+                          ))}
                         </div>
                         {s.buyerAddress && <p className="text-xs text-gray-500 line-clamp-2">{s.buyerAddress}</p>}
                         {s.buyerPhone && <p className="text-xs text-gray-400">{s.buyerPhone}</p>}
@@ -971,7 +1037,30 @@ function UnscheduledRow({
         <input type="checkbox" checked={selected} onChange={onToggle} className="h-4 w-4 rounded border-gray-300 accent-gray-800 cursor-pointer" />
       </td>
       <td className={td}>
-        <span className="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded">{e.sku}</span>
+        <div className="space-y-0.5">
+          {e.items.map((item) => (
+            <span key={item.sku ?? item.tag} className="block font-mono text-xs bg-gray-100 px-2 py-0.5 rounded">
+              {item.tag ?? item.sku ?? '—'}
+            </span>
+          ))}
+        </div>
+      </td>
+      <td className={td}>
+        <div className="space-y-0.5">
+          {e.items.map((item) => {
+            const typeLabel = item.type
+              ? item.type.charAt(0) + item.type.slice(1).toLowerCase()
+              : '—';
+            const detail = item.type === 'SAPI'
+              ? (item.weightMin && item.weightMax ? ` · ${item.weightMin}-${item.weightMax}kg` : '')
+              : (item.grade ? ` ${item.grade}` : '');
+            return (
+              <span key={item.sku ?? item.tag} className="block text-xs text-gray-700">
+                {typeLabel}{detail}
+              </span>
+            );
+          })}
+        </div>
       </td>
       <td className={cn(td, 'font-medium text-gray-900')}>{e.buyerName}</td>
       <td className={cn(td, 'text-xs text-gray-500 max-w-xs truncate')} title={e.buyerAddress ?? undefined}>
@@ -1061,8 +1150,25 @@ function UnscheduledCard({
         <div className="flex-1 min-w-0" onClick={onToggle}>
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-medium text-sm text-gray-900 truncate">{e.buyerName}</span>
-            <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded text-gray-600 shrink-0">{e.sku}</span>
             {e.pengiriman && <ColorBadge color="blue">{formatPengiriman(e.pengiriman)}</ColorBadge>}
+          </div>
+          <div className="mt-1 space-y-0.5">
+            {e.items.map((item) => {
+              const typeLabel = item.type
+                ? item.type.charAt(0) + item.type.slice(1).toLowerCase()
+                : '—';
+              const detail = item.type === 'SAPI'
+                ? (item.weightMin && item.weightMax ? ` · ${item.weightMin}-${item.weightMax}kg` : '')
+                : (item.grade ? ` ${item.grade}` : '');
+              return (
+                <div key={item.sku ?? item.tag} className="flex items-center gap-1.5">
+                  <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">
+                    {item.tag ?? item.sku ?? '—'}
+                  </span>
+                  <span className="text-xs text-gray-600">{typeLabel}{detail}</span>
+                </div>
+              );
+            })}
           </div>
           {e.buyerAddress && <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{e.buyerAddress}</p>}
         </div>

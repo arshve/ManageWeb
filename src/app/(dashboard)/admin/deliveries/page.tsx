@@ -65,17 +65,14 @@ export default async function AdminDeliveriesPage({
             driver: { select: { id: true, name: true } },
           },
         },
-        livestock: {
-          select: {
-            id: true,
-            sku: true,
-            type: true, // Fetch jenis hewan
-            grade: true, // Fetch tipe/grade hewan
+        items: {
+          include: {
+            livestock: { select: { id: true, sku: true, type: true, grade: true, tag: true } },
           },
         },
         sales: {
           select: {
-            name: true, // Fetch nama sales
+            name: true,
           },
         },
       },
@@ -87,11 +84,8 @@ export default async function AdminDeliveriesPage({
         invoiceNo: true,
         buyerName: true,
         buyerAddress: true,
-        livestock: {
-          select: {
-            id: true,
-            sku: true,
-          },
+        items: {
+          include: { livestock: { select: { id: true, sku: true, tag: true, type: true, grade: true, weightMin: true, weightMax: true } } },
         },
         buyerLat: true,
         buyerLng: true,
@@ -136,10 +130,16 @@ export default async function AdminDeliveriesPage({
     buyerName: e.buyerName,
     buyerAddress: e.buyerAddress,
     buyerPhone: e.buyerPhone,
-    sku: e.livestock?.sku,
-    animalType: e.livestock?.type, // Map jenis hewan
-    animalGrade: e.livestock?.grade, // Map tipe/grade hewan
-    salesName: e.sales?.name, // Map nama sales
+    sku: e.items[0]?.livestock?.sku,
+    animalType: e.items[0]?.livestock?.type,
+    animalGrade: e.items[0]?.livestock?.grade,
+    items: e.items.map((i) => ({
+      sku: i.livestock?.sku,
+      tag: i.livestock?.tag,
+      type: i.livestock?.type,
+      grade: i.livestock?.grade,
+    })),
+    salesName: e.sales?.name,
     buyerLat: e.buyerLat,
     buyerLng: e.buyerLng,
     buyerMaps: e.buyerMaps,
@@ -149,7 +149,15 @@ export default async function AdminDeliveriesPage({
   const unscheduled = unscheduledRaw.map((e) => ({
     id: e.id,
     invoiceNo: e.invoiceNo,
-    sku: e.livestock?.sku,
+    sku: e.items[0]?.livestock?.sku,
+    items: e.items.map((i) => ({
+      sku: i.livestock?.sku,
+      tag: i.livestock?.tag,
+      type: i.livestock?.type,
+      grade: i.livestock?.grade,
+      weightMin: i.livestock?.weightMin,
+      weightMax: i.livestock?.weightMax,
+    })),
     buyerName: e.buyerName,
     buyerAddress: e.buyerAddress,
     buyerLat: e.buyerLat,

@@ -69,6 +69,26 @@ import { PdfMenu } from '@/components/dashboard/pdf-menu';
 import { LivestockPhotoLink } from '@/components/dashboard/livestock-photo-link';
 import Image from 'next/image';
 
+export interface EntryItemData {
+  id: string;
+  hargaJual: number;
+  hargaModal: number | null;
+  resellerCut: number | null;
+  hpp: number | null;
+  profit: number | null;
+  livestock: {
+    id: string;
+    sku: string;
+    type: string;
+    grade: string | null;
+    weightMin: number | null;
+    weightMax: number | null;
+    tag: string | null;
+    photoUrl: string | null;
+    condition: string;
+  };
+}
+
 export interface EntryData {
   id: string;
   invoiceNo: string;
@@ -94,6 +114,7 @@ export interface EntryData {
     status: string;
     driverName: string | null;
   } | null;
+  items: EntryItemData[];
   livestock: {
     id: string;
     sku: string;
@@ -104,7 +125,7 @@ export interface EntryData {
     tag: string | null;
     photoUrl: string | null;
     condition: string;
-  };
+  } | null;
   sales: { id: string; name: string };
 }
 
@@ -150,13 +171,11 @@ export function EntryTable({
   entries,
   isAdmin = false,
   canViewFinancials = false,
-  availableLivestock = [],
   salesUsers = [],
 }: {
   entries: EntryData[];
   isAdmin?: boolean;
   canViewFinancials?: boolean;
-  availableLivestock?: AvailableLivestock[];
   salesUsers?: SalesUser[];
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -195,7 +214,7 @@ export function EntryTable({
         (e) =>
           e.invoiceNo.toLowerCase().includes(q) ||
           e.buyerName.toLowerCase().includes(q) ||
-          e.livestock.sku.toLowerCase().includes(q) ||
+          e.items.some((i) => i.livestock.sku.toLowerCase().includes(q)) ||
           e.sales.name.toLowerCase().includes(q) ||
           (e.buyerPhone && e.buyerPhone.includes(q)),
       );
@@ -426,7 +445,6 @@ export function EntryTable({
                 onEdit={() => setEditingId(entry.id)}
                 onCancel={() => setEditingId(null)}
                 onSaved={() => setEditingId(null)}
-                availableLivestock={availableLivestock}
                 salesUsers={salesUsers}
               />
             ))}
@@ -458,7 +476,6 @@ export function EntryTable({
             onEdit={() => setEditingId(entry.id)}
             onCancel={() => setEditingId(null)}
             onSaved={() => setEditingId(null)}
-            availableLivestock={availableLivestock}
             salesUsers={salesUsers}
           />
         ))}
@@ -562,6 +579,15 @@ function HoverBuktiTransfer({
   );
 }
 
+interface ItemPriceState {
+  id: string;
+  hargaJual: string;
+  hargaModal: string;
+  resellerCut: string;
+  tag: string;
+  livestock: EntryItemData['livestock'];
+}
+
 function useEntryRow(entry: EntryData, onSaved: () => void) {
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
@@ -569,53 +595,66 @@ function useEntryRow(entry: EntryData, onSaved: () => void) {
     buyerPhone: entry.buyerPhone ?? '',
     buyerAddress: entry.buyerAddress ?? '',
     buyerMaps: entry.buyerMaps ?? '',
-    hargaJual: entry.hargaJual.toString(),
-    hargaModal: entry.hargaModal?.toString() ?? '',
-    resellerCut: entry.resellerCut?.toString() ?? '',
     dp: entry.dp?.toString() ?? '',
-    totalBayar: entry.totalBayar?.toString() ?? '',
     paymentStatus: entry.paymentStatus,
     pengiriman: entry.pengiriman ?? '',
-    livestockTag: entry.livestock.tag ?? '',
     salesId: entry.sales.id,
     isSent: entry.isSent,
     notes: entry.notes ?? '',
   });
+  const [itemPrices, setItemPrices] = useState<ItemPriceState[]>(() =>
+    entry.items.map((i) => ({
+      id: i.id,
+      hargaJual: i.hargaJual.toString(),
+      hargaModal: i.hargaModal?.toString() ?? '',
+      resellerCut: i.resellerCut?.toString() ?? '',
+      tag: i.livestock.tag ?? '',
+      livestock: i.livestock,
+    })),
+  );
   const [buktiTransferUrls, setBuktiTransferUrls] = useState<string[]>(
     entry.buktiTransfer ?? [],
   );
-  const [newLivestockId, setNewLivestockId] = useState<string>('');
 
   function update(field: string, value: string | boolean) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
+  function updateItemPrice(id: string, field: keyof Omit<ItemPriceState, 'id' | 'livestock'>, value: string) {
+    setItemPrices((prev) =>
+      prev.map((ip) => (ip.id === id ? { ...ip, [field]: value } : ip)),
+    );
+  }
+
   async function handleSave() {
     setLoading(true);
     try {
+      const totalHargaJual = itemPrices.reduce((s, i) => s + (Number(i.hargaJual) || 0), 0);
       const formData = new FormData();
       formData.set('buyerName', form.buyerName);
       formData.set('buyerPhone', form.buyerPhone);
       formData.set('buyerAddress', form.buyerAddress);
       formData.set('buyerMaps', form.buyerMaps);
-      formData.set('hargaJual', form.hargaJual);
-      formData.set('hargaModal', form.hargaModal);
-      formData.set('resellerCut', form.resellerCut);
       formData.set('paymentStatus', form.paymentStatus);
       if (form.paymentStatus === 'DP') {
         formData.set('dp', form.dp);
       }
       if (form.paymentStatus === 'LUNAS') {
-        formData.set('totalBayar', form.hargaJual);
+        formData.set('totalBayar', String(totalHargaJual));
       }
       formData.set('pengiriman', form.pengiriman);
-      formData.set('livestockTag', form.livestockTag);
       formData.set('salesId', form.salesId);
       formData.set('isSent', form.isSent.toString());
       formData.set('notes', form.notes);
-      if (newLivestockId) {
-        formData.set('livestockId', newLivestockId);
-      }
+      formData.set('itemPrices', JSON.stringify(
+        itemPrices.map((ip) => ({
+          id: ip.id,
+          hargaJual: ip.hargaJual,
+          hargaModal: ip.hargaModal,
+          resellerCut: ip.resellerCut,
+          tag: ip.tag,
+        })),
+      ));
       buktiTransferUrls.forEach((url) => formData.append('buktiTransfer', url));
       if (buktiTransferUrls.length === 0) {
         formData.set('buktiTransferCleared', 'true');
@@ -657,11 +696,11 @@ function useEntryRow(entry: EntryData, onSaved: () => void) {
   return {
     form,
     update,
+    itemPrices,
+    updateItemPrice,
     loading,
     buktiTransferUrls,
     setBuktiTransferUrls,
-    newLivestockId,
-    setNewLivestockId,
     handleSave,
     handleApprove,
     handleReject,
@@ -674,304 +713,206 @@ function EntryEditFields({
   isAdmin,
   form,
   update,
+  itemPrices,
+  updateItemPrice,
   setBuktiTransferUrls,
-  availableLivestock,
-  newLivestockId,
-  setNewLivestockId,
   salesUsers,
 }: {
   entry: EntryData;
   isAdmin: boolean;
   form: ReturnType<typeof useEntryRow>['form'];
   update: ReturnType<typeof useEntryRow>['update'];
+  itemPrices: ItemPriceState[];
+  updateItemPrice: ReturnType<typeof useEntryRow>['updateItemPrice'];
   setBuktiTransferUrls: ReturnType<typeof useEntryRow>['setBuktiTransferUrls'];
-  availableLivestock: AvailableLivestock[];
-  newLivestockId: string;
-  setNewLivestockId: (id: string) => void;
   salesUsers: SalesUser[];
 }) {
-  const isMati = entry.livestock.condition === 'MATI';
-  const [livestockSearch, setLivestockSearch] = useState('');
-
-  const filteredLivestock = useMemo(() => {
-    const q = livestockSearch.toLowerCase();
-    if (!q) return availableLivestock;
-    return availableLivestock.filter(
-      (l) =>
-        l.sku.toLowerCase().includes(q) ||
-        (l.tag && l.tag.toLowerCase().includes(q)) ||
-        l.type.toLowerCase().includes(q) ||
-        (l.grade && l.grade.toLowerCase().includes(q)),
-    );
-  }, [availableLivestock, livestockSearch]);
-
-  const selectedLivestock = newLivestockId
-    ? availableLivestock.find((l) => l.id === newLivestockId)
-    : null;
-  const selectedLabel = selectedLivestock
-    ? [
-        selectedLivestock.sku,
-        selectedLivestock.type.charAt(0) +
-          selectedLivestock.type.slice(1).toLowerCase() +
-          (selectedLivestock.grade ? ' ' + selectedLivestock.grade : ''),
-      ].join(' — ')
-    : null;
-
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-      {isMati && (
-        <div className="col-span-2 md:col-span-4 space-y-1 p-3 rounded-md border border-destructive/40 bg-destructive/5">
-          <Label className="text-xs text-destructive">
-            Hewan saat ini berkondisi MATI — pilih pengganti
-          </Label>
-          <Select
-            value={newLivestockId || '__none__'}
-            onValueChange={(val) => {
-              setNewLivestockId(val === '__none__' ? '' : (val ?? ''));
-              if (val) setLivestockSearch('');
-            }}
-          >
-            <SelectTrigger className="h-8 text-sm">
-              <SelectValue placeholder="Pilih hewan pengganti">
-                {selectedLabel ?? 'Tetap — tidak diganti'}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {/* Search input inside dropdown */}
-              <div className="px-2 py-1.5 border-b">
-                <div className="relative">
-                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
-                  <input
-                    className="w-full pl-6 pr-2 py-1 text-xs rounded border bg-background focus:outline-none focus:ring-1 focus:ring-ring"
-                    placeholder="Cari SKU, tag, jenis..."
-                    value={livestockSearch}
-                    onChange={(e) => setLivestockSearch(e.target.value)}
-                    onKeyDown={(e) => {
-                      e.stopPropagation();
-                      e.nativeEvent.stopImmediatePropagation();
-                    }}
-                    onClick={(e) => e.stopPropagation()}
+    <div className="space-y-4">
+      {/* ── Per-item pricing ── */}
+      <div className="space-y-2">
+        <p className="text-xs font-medium text-muted-foreground">
+          Hewan ({itemPrices.length})
+        </p>
+        {itemPrices.map((ip) => {
+          const lv = ip.livestock;
+          const typeLabel = lv.type.charAt(0) + lv.type.slice(1).toLowerCase();
+          const isMatiItem = lv.condition === 'MATI';
+          return (
+            <div
+              key={ip.id}
+              className={`rounded-md border p-2 space-y-1.5 ${isMatiItem ? 'border-destructive/40 bg-destructive/5' : 'bg-muted/20'}`}
+            >
+              <p className="text-xs font-medium">
+                {typeLabel}{lv.grade ? ` · ${lv.grade}` : ''}
+                {isMatiItem && <span className="ml-2 text-destructive text-[10px] font-semibold">MATI</span>}
+                <span className="ml-2 text-muted-foreground font-mono text-[10px]">{lv.sku}</span>
+              </p>
+              <div className={`grid gap-1.5 ${isAdmin ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2'}`}>
+                <div className="space-y-0.5">
+                  <Label className="text-[10px]">Tag</Label>
+                  <Input
+                    value={ip.tag}
+                    onChange={(e) => updateItemPrice(ip.id, 'tag', e.target.value)}
+                    className="h-7 text-xs"
+                    placeholder="MF-00X"
                   />
                 </div>
+                <div className="space-y-0.5">
+                  <Label className="text-[10px]">Harga Jual</Label>
+                  <RupiahInput
+                    value={ip.hargaJual}
+                    onValueChange={(v) => updateItemPrice(ip.id, 'hargaJual', v)}
+                    className="h-7 text-xs"
+                  />
+                </div>
+                {isAdmin && (
+                  <>
+                    <div className="space-y-0.5">
+                      <Label className="text-[10px]">Modal</Label>
+                      <RupiahInput
+                        value={ip.hargaModal}
+                        onValueChange={(v) => updateItemPrice(ip.id, 'hargaModal', v)}
+                        className="h-7 text-xs"
+                      />
+                    </div>
+                    <div className="space-y-0.5">
+                      <Label className="text-[10px]">Reseller Cut</Label>
+                      <RupiahInput
+                        value={ip.resellerCut}
+                        onValueChange={(v) => updateItemPrice(ip.id, 'resellerCut', v)}
+                        className="h-7 text-xs"
+                      />
+                    </div>
+                  </>
+                )}
               </div>
-              <SelectItem value="__none__" label="Tetap — tidak diganti">
-                Tetap — tidak diganti
-              </SelectItem>
-              {filteredLivestock.map((l) => {
-                const typeLabel =
-                  l.type.charAt(0) + l.type.slice(1).toLowerCase();
-                const label = [
-                  l.tag ?? l.sku,
-                  typeLabel + (l.grade ? ' ' + l.grade : ''),
-                ].join(' — ');
-                return (
-                  <SelectItem key={l.id} value={l.id} label={label}>
-                    {label}
-                  </SelectItem>
-                );
-              })}
-              {filteredLivestock.length === 0 && (
-                <SelectItem value="__empty__" disabled>
-                  {livestockSearch
-                    ? `Tidak ada hasil untuk "${livestockSearch}"`
-                    : 'Tidak ada hewan tersedia'}
-                </SelectItem>
-              )}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
-      {/* Tag Hewan */}
-      <div className="space-y-1">
-        <Label className="text-xs">Tag Hewan</Label>
-        <Input
-          value={form.livestockTag}
-          onChange={(e) => update('livestockTag', e.target.value)}
-          className="h-8 text-sm"
-          placeholder="MF-00X | RQ-00X | QB-00X"
-        />
-      </div>
-      {/* Sales */}
-      {isAdmin && salesUsers.length > 0 && (
-        <div className="space-y-1">
-          <Label className="text-xs">Sales</Label>
-          <Select
-            value={form.salesId}
-            onValueChange={(val) => update('salesId', val ?? form.salesId)}
-          >
-            <SelectTrigger className="h-8 text-sm">
-              <SelectValue>
-                {salesUsers.find((s) => s.id === form.salesId)?.name ??
-                  form.salesId}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {salesUsers.map((s) => (
-                <SelectItem key={s.id} value={s.id}>
-                  {s.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
-      {/* Buyer */}
-      <div className="space-y-1">
-        <Label className="text-xs">Nama Pembeli</Label>
-        <Input
-          value={form.buyerName}
-          onChange={(e) => update('buyerName', e.target.value)}
-          className="h-8 text-sm"
-        />
-      </div>
-      <div className="space-y-1">
-        <Label className="text-xs">Telepon</Label>
-        <Input
-          value={form.buyerPhone}
-          onChange={(e) => update('buyerPhone', e.target.value)}
-          className="h-8 text-sm"
-        />
-      </div>
-      <div className="space-y-1">
-        <Label className="text-xs">Google Maps</Label>
-        <Input
-          value={form.buyerMaps}
-          onChange={(e) => update('buyerMaps', e.target.value)}
-          className="h-8 text-sm"
-        />
+            </div>
+          );
+        })}
+        {itemPrices.length > 1 && (
+          <div className="flex justify-between text-xs font-medium pt-1 border-t">
+            <span>Total Harga Jual</span>
+            <span>{formatRupiah(itemPrices.reduce((s, i) => s + (Number(i.hargaJual) || 0), 0))}</span>
+          </div>
+        )}
       </div>
 
-      {/* Pricing */}
-      <div className="space-y-1">
-        <Label className="text-xs">Harga Jual</Label>
-        <RupiahInput
-          value={form.hargaJual}
-          onValueChange={(v) => update('hargaJual', v)}
-          className="h-8 text-sm"
-        />
-      </div>
-      {isAdmin && (
-        <>
+      {/* ── Order-level fields ── */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {/* Sales */}
+        {isAdmin && salesUsers.length > 0 && (
           <div className="space-y-1">
-            <Label className="text-xs">Harga Modal</Label>
-            <RupiahInput
-              value={form.hargaModal}
-              onValueChange={(v) => update('hargaModal', v)}
-              className="h-8 text-sm"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Reseller Cut</Label>
-            <RupiahInput
-              value={form.resellerCut}
-              onValueChange={(v) => update('resellerCut', v)}
-              className="h-8 text-sm"
-            />
-          </div>
-        </>
-      )}
-
-      {/* Payment — DP only visible when paymentStatus = DP */}
-      {form.paymentStatus === 'DP' && (
-        <div className="space-y-1">
-          <Label className="text-xs">Jumlah DP</Label>
-          <RupiahInput
-            value={form.dp}
-            onValueChange={(v) => update('dp', v)}
-            className="h-8 text-sm"
-          />
-        </div>
-      )}
-      {isAdmin && (
-        <div className="space-y-1">
-          <Label className="text-xs">Sudah Dikirim</Label>
-          <div className="pt-1">
-            <Switch
-              checked={form.isSent}
-              onCheckedChange={(val) => update('isSent', val)}
-            />
-          </div>
-        </div>
-      )}
-      <div className="space-y-1">
-        <Label className="text-xs">Alamat</Label>
-        <Input
-          value={form.buyerAddress}
-          onChange={(e) => update('buyerAddress', e.target.value)}
-          className="h-8 text-sm"
-        />
-      </div>
-
-      {/* Pengiriman */}
-      <div className="space-y-1">
-        <Label className="text-xs">Pengiriman</Label>
-        <Select
-          value={form.pengiriman || '__none__'}
-          onValueChange={(val) =>
-            update('pengiriman', !val || val === '__none__' ? '' : val)
-          }
-        >
-          <SelectTrigger className="h-8 text-sm">
-            <SelectValue>
-              {form.pengiriman
-                ? (PENGIRIMAN_LABEL[form.pengiriman] ?? form.pengiriman)
-                : '— Tidak ada —'}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__none__">— Tidak ada —</SelectItem>
-            <SelectItem value="HARI_H">Hari H</SelectItem>
-            <SelectItem value="H_1">H-1</SelectItem>
-            <SelectItem value="H_2">H-2</SelectItem>
-            <SelectItem value="H_3">H-3</SelectItem>
-            <SelectItem value="TITIP_POTONG">Titip Potong</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Status Bayar + Bukti Transfer */}
-      <div className="col-span-2 md:col-span-4">
-        <div className="flex flex-wrap items-end gap-4">
-          <div className="space-y-1 w-[180px]">
-            <Label className="text-xs">Pembayaran</Label>
+            <Label className="text-xs">Sales</Label>
             <Select
-              value={form.paymentStatus}
-              onValueChange={(val) =>
-                update('paymentStatus', val ?? form.paymentStatus)
-              }
+              value={form.salesId}
+              onValueChange={(val) => update('salesId', val ?? form.salesId)}
             >
               <SelectTrigger className="h-8 text-sm">
                 <SelectValue>
-                  {PAYMENT_LABEL[form.paymentStatus] ?? form.paymentStatus}
+                  {salesUsers.find((s) => s.id === form.salesId)?.name ?? form.salesId}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="BELUM_BAYAR">Belum Bayar</SelectItem>
-                <SelectItem value="DP">DP</SelectItem>
-                <SelectItem value="LUNAS">Lunas</SelectItem>
+                {salesUsers.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1 flex-1 min-w-[200px]">
-            <Label className="text-xs">Bukti Transfer</Label>
-            <BuktiTransferUpload
-              key={entry.id + '-bukti'}
-              initialUrls={entry.buktiTransfer ?? []}
-              onChange={setBuktiTransferUrls}
-            />
+        )}
+        {/* Buyer */}
+        <div className="space-y-1">
+          <Label className="text-xs">Nama Pembeli</Label>
+          <Input value={form.buyerName} onChange={(e) => update('buyerName', e.target.value)} className="h-8 text-sm" />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">Telepon</Label>
+          <Input value={form.buyerPhone} onChange={(e) => update('buyerPhone', e.target.value)} className="h-8 text-sm" />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">Alamat</Label>
+          <Input value={form.buyerAddress} onChange={(e) => update('buyerAddress', e.target.value)} className="h-8 text-sm" />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">Google Maps</Label>
+          <Input value={form.buyerMaps} onChange={(e) => update('buyerMaps', e.target.value)} className="h-8 text-sm" />
+        </div>
+
+        {/* Pengiriman */}
+        <div className="space-y-1">
+          <Label className="text-xs">Pengiriman</Label>
+          <Select
+            value={form.pengiriman || '__none__'}
+            onValueChange={(val) => update('pengiriman', !val || val === '__none__' ? '' : val)}
+          >
+            <SelectTrigger className="h-8 text-sm">
+              <SelectValue>
+                {form.pengiriman ? (PENGIRIMAN_LABEL[form.pengiriman] ?? form.pengiriman) : '— Tidak ada —'}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">— Tidak ada —</SelectItem>
+              <SelectItem value="HARI_H">Hari H</SelectItem>
+              <SelectItem value="H_1">H-1</SelectItem>
+              <SelectItem value="H_2">H-2</SelectItem>
+              <SelectItem value="H_3">H-3</SelectItem>
+              <SelectItem value="TITIP_POTONG">Titip Potong</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* DP field */}
+        {form.paymentStatus === 'DP' && (
+          <div className="space-y-1">
+            <Label className="text-xs">Jumlah DP</Label>
+            <RupiahInput value={form.dp} onValueChange={(v) => update('dp', v)} className="h-8 text-sm" />
+          </div>
+        )}
+        {isAdmin && (
+          <div className="space-y-1">
+            <Label className="text-xs">Sudah Dikirim</Label>
+            <div className="pt-1">
+              <Switch checked={form.isSent} onCheckedChange={(val) => update('isSent', val)} />
+            </div>
+          </div>
+        )}
+
+        {/* Payment + Bukti */}
+        <div className="col-span-2 md:col-span-4">
+          <div className="flex flex-wrap items-end gap-4">
+            <div className="space-y-1 w-[180px]">
+              <Label className="text-xs">Pembayaran</Label>
+              <Select
+                value={form.paymentStatus}
+                onValueChange={(val) => update('paymentStatus', val ?? form.paymentStatus)}
+              >
+                <SelectTrigger className="h-8 text-sm">
+                  <SelectValue>{PAYMENT_LABEL[form.paymentStatus] ?? form.paymentStatus}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="BELUM_BAYAR">Belum Bayar</SelectItem>
+                  <SelectItem value="DP">DP</SelectItem>
+                  <SelectItem value="LUNAS">Lunas</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1 flex-1 min-w-[200px]">
+              <Label className="text-xs">Bukti Transfer</Label>
+              <BuktiTransferUpload
+                key={entry.id + '-bukti'}
+                initialUrls={entry.buktiTransfer ?? []}
+                onChange={setBuktiTransferUrls}
+              />
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Notes - full width */}
-      <div className="col-span-2 md:col-span-4 space-y-1">
-        <Label className="text-xs">Catatan</Label>
-        <Textarea
-          value={form.notes}
-          onChange={(e) => update('notes', e.target.value)}
-          rows={2}
-          className="text-sm"
-        />
+        {/* Notes */}
+        <div className="col-span-2 md:col-span-4 space-y-1">
+          <Label className="text-xs">Catatan</Label>
+          <Textarea value={form.notes} onChange={(e) => update('notes', e.target.value)} rows={2} className="text-sm" />
+        </div>
       </div>
     </div>
   );
@@ -985,7 +926,6 @@ function EntryRow({
   onEdit,
   onCancel,
   onSaved,
-  availableLivestock,
   salesUsers,
 }: {
   entry: EntryData;
@@ -995,7 +935,6 @@ function EntryRow({
   onEdit: () => void;
   onCancel: () => void;
   onSaved: () => void;
-  availableLivestock: AvailableLivestock[];
   salesUsers: SalesUser[];
 }) {
   const {
@@ -1003,25 +942,20 @@ function EntryRow({
     update,
     loading,
     setBuktiTransferUrls,
-    newLivestockId,
-    setNewLivestockId,
+    itemPrices,
+    updateItemPrice,
     handleSave,
     handleApprove,
     handleReject,
     handleDelete,
   } = useEntryRow(entry, onSaved);
 
-  const isMati = entry.livestock.condition === 'MATI';
+  const isMati = entry.items.some((i) => i.livestock.condition === 'MATI');
   const rowClass = isMati
     ? 'bg-zinc-300 text-zinc-800 hover:bg-zinc-400/70 dark:bg-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-600'
     : isEditing
       ? 'bg-muted/30'
       : '';
-
-  const weightLabel =
-    entry.livestock.type === 'SAPI'
-      ? formatWeight(entry.livestock.weightMin, entry.livestock.weightMax)
-      : null;
 
   return (
     <>
@@ -1029,22 +963,24 @@ function EntryRow({
       <tr className={`border-b last:border-0 transition-colors ${rowClass}`}>
         <td className="p-3 font-mono text-xs">{entry.invoiceNo}</td>
         <td className="p-3">
-          <span>
-            {entry.livestock.type}
-            {entry.livestock.grade ? ' ' + entry.livestock.grade : ''}
-          </span>
-          {weightLabel && (
-            <span className="ml-1.5 inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded bg-muted text-muted-foreground align-middle">
-              {weightLabel}
-            </span>
-          )}
-          <div className="text-xs text-muted-foreground">
-            <LivestockPhotoLink
-              photoUrl={entry.livestock.photoUrl}
-              alt={`${entry.livestock.type} ${entry.livestock.grade ?? ''} - ${entry.livestock.sku}`}
-            >
-              {entry.livestock.tag ?? entry.livestock.sku}
-            </LivestockPhotoLink>
+          <div className="space-y-1">
+            {entry.items.map((item) => {
+              const lv = item.livestock;
+              const wLabel = lv.type === 'SAPI' ? formatWeight(lv.weightMin, lv.weightMax) : null;
+              return (
+                <div key={lv.id} className="flex items-center gap-1.5 text-xs">
+                  <LivestockPhotoLink
+                    photoUrl={lv.photoUrl}
+                    alt={`${lv.type} ${lv.grade ?? ''} - ${lv.sku}`}
+                  >
+                    <span className="font-medium">{lv.tag ?? lv.sku}</span>
+                  </LivestockPhotoLink>
+                  <span className="text-muted-foreground">
+                    {lv.type}{lv.grade ? ' ' + lv.grade : ''}{wLabel ? ' · ' + wLabel : ''}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </td>
         <td className="p-3">
@@ -1181,9 +1117,8 @@ function EntryRow({
               form={form}
               update={update}
               setBuktiTransferUrls={setBuktiTransferUrls}
-              availableLivestock={availableLivestock}
-              newLivestockId={newLivestockId}
-              setNewLivestockId={setNewLivestockId}
+              itemPrices={itemPrices}
+              updateItemPrice={updateItemPrice}
               salesUsers={salesUsers}
             />
           </td>
@@ -1201,7 +1136,6 @@ function MobileEntryCard({
   onEdit,
   onCancel,
   onSaved,
-  availableLivestock,
   salesUsers,
 }: {
   entry: EntryData;
@@ -1211,7 +1145,6 @@ function MobileEntryCard({
   onEdit: () => void;
   onCancel: () => void;
   onSaved: () => void;
-  availableLivestock: AvailableLivestock[];
   salesUsers: SalesUser[];
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -1220,8 +1153,8 @@ function MobileEntryCard({
     update,
     loading,
     setBuktiTransferUrls,
-    newLivestockId,
-    setNewLivestockId,
+    itemPrices,
+    updateItemPrice,
     handleSave,
     handleApprove,
     handleReject,
@@ -1229,15 +1162,10 @@ function MobileEntryCard({
   } = useEntryRow(entry, onSaved);
 
   const open = expanded || isEditing;
-  const isMati = entry.livestock.condition === 'MATI';
+  const isMati = entry.items.some((i) => i.livestock.condition === 'MATI');
   const cardClass = isMati
     ? 'bg-zinc-300 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-200'
     : 'bg-card';
-  const weightLabel =
-    entry.livestock.type === 'SAPI'
-      ? formatWeight(entry.livestock.weightMin, entry.livestock.weightMax)
-      : null;
-
   return (
     <div className={`rounded-lg border shadow-sm overflow-hidden ${cardClass}`}>
       {/* Header — tap to toggle */}
@@ -1253,25 +1181,23 @@ function MobileEntryCard({
         }}
         className="w-full flex items-center gap-2 p-3 text-left hover:bg-muted/30 transition-colors cursor-pointer"
       >
-        <div className="flex-1 min-w-0 text-sm truncate">
-          <span className="font-medium">{entry.buyerName}</span>
-          <span className="mx-2 text-muted-foreground">|</span>
-          <span className="font-medium">
-            {entry.livestock.type}
-            {entry.livestock.grade ? ' ' + entry.livestock.grade : ''}
-          </span>
-          {weightLabel && (
-            <span className="ml-1.5 inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded bg-muted text-muted-foreground align-middle">
-              {weightLabel}
-            </span>
-          )}
-          <LivestockPhotoLink
-            photoUrl={entry.livestock.photoUrl}
-            alt={`${entry.livestock.type} ${entry.livestock.grade ?? ''} - ${entry.livestock.sku}`}
-            className="text-muted-foreground text-xs ml-1"
-          >
-            ({entry.livestock.tag ?? entry.livestock.sku})
-          </LivestockPhotoLink>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-medium truncate">{entry.buyerName}</div>
+          <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-0.5">
+            {entry.items.map((item) => {
+              const lv = item.livestock;
+              return (
+                <LivestockPhotoLink
+                  key={lv.id}
+                  photoUrl={lv.photoUrl}
+                  alt={`${lv.type} ${lv.grade ?? ''} - ${lv.sku}`}
+                  className="text-xs text-muted-foreground"
+                >
+                  {lv.tag ?? lv.sku}
+                </LivestockPhotoLink>
+              );
+            })}
+          </div>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
           <StatusIcon status={entry.status} />
@@ -1296,9 +1222,8 @@ function MobileEntryCard({
                 form={form}
                 update={update}
                 setBuktiTransferUrls={setBuktiTransferUrls}
-                availableLivestock={availableLivestock}
-                newLivestockId={newLivestockId}
-                setNewLivestockId={setNewLivestockId}
+                itemPrices={itemPrices}
+                updateItemPrice={updateItemPrice}
                 salesUsers={salesUsers}
               />
               <div className="flex gap-2 pt-2 border-t">
@@ -1329,22 +1254,25 @@ function MobileEntryCard({
                 <CardRow
                   label="Hewan"
                   value={
-                    <>
-                      {entry.livestock.type}
-                      {entry.livestock.grade ? ' ' + entry.livestock.grade : ''}
-                      {weightLabel && (
-                        <span className="ml-1.5 inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded bg-muted text-muted-foreground align-middle">
-                          {weightLabel}
-                        </span>
-                      )}
-                      <LivestockPhotoLink
-                        photoUrl={entry.livestock.photoUrl}
-                        alt={`${entry.livestock.type} ${entry.livestock.grade ?? ''} - ${entry.livestock.sku}`}
-                        className="text-muted-foreground text-xs ml-1"
-                      >
-                        ({entry.livestock.tag ?? entry.livestock.sku})
-                      </LivestockPhotoLink>
-                    </>
+                    <div className="space-y-1">
+                      {entry.items.map((item) => {
+                        const lv = item.livestock;
+                        const wLabel = lv.type === 'SAPI' ? formatWeight(lv.weightMin, lv.weightMax) : null;
+                        return (
+                          <div key={lv.id} className="flex items-center gap-1.5 text-xs">
+                            <LivestockPhotoLink
+                              photoUrl={lv.photoUrl}
+                              alt={`${lv.type} ${lv.grade ?? ''} - ${lv.sku}`}
+                            >
+                              <span className="font-medium">{lv.tag ?? lv.sku}</span>
+                            </LivestockPhotoLink>
+                            <span className="text-muted-foreground">
+                              {lv.type}{lv.grade ? ' ' + lv.grade : ''}{wLabel ? ' · ' + wLabel : ''}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   }
                 />
                 <CardRow

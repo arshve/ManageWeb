@@ -18,7 +18,7 @@ export const revalidate = 0;
 export async function GET() {
   try {
     const livestock = await prisma.livestock.findMany({
-      where: { isSold: false, condition: 'SEHAT', entry: null },
+      where: { isSold: false, condition: 'SEHAT', entryItem: null },
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,

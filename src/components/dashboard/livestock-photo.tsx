@@ -17,11 +17,13 @@ export function LivestockPhoto({
   alt,
   thumbnailClassName = 'w-10 h-10',
   priority = false,
+  interactive = true,
 }: {
   photoUrl: string | null;
   alt: string;
   thumbnailClassName?: string;
   priority?: boolean;
+  interactive?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const onClose = useCallback(() => setOpen(false), []);
@@ -36,6 +38,28 @@ export function LivestockPhoto({
     );
   }
 
+  const imgEl = (
+    <Image
+      src={photoUrl}
+      alt={alt}
+      fill
+      sizes={thumbnailClassName.includes('w-24') ? '96px' : '40px'}
+      loading={priority ? 'eager' : 'lazy'}
+      priority={priority}
+      className="object-cover"
+    />
+  );
+
+  if (!interactive) {
+    return (
+      <div
+        className={`${thumbnailClassName} rounded-md overflow-hidden relative flex-shrink-0`}
+      >
+        {imgEl}
+      </div>
+    );
+  }
+
   return (
     <>
       <button
@@ -44,15 +68,7 @@ export function LivestockPhoto({
         className={`${thumbnailClassName} rounded-md overflow-hidden relative flex-shrink-0 ring-1 ring-border hover:ring-2 hover:ring-primary transition-all cursor-zoom-in`}
         title="Lihat foto"
       >
-        <Image
-          src={photoUrl}
-          alt={alt}
-          fill
-          sizes={thumbnailClassName.includes('w-24') ? '96px' : '40px'}
-          loading={priority ? 'eager' : 'lazy'}
-          priority={priority}
-          className="object-cover"
-        />
+        {imgEl}
       </button>
 
       <Lightbox src={photoUrl} alt={alt} open={open} onClose={onClose} />

@@ -93,12 +93,8 @@ export default async function SalesDeliveriesPage({
         buyerLat: true,
         buyerLng: true,
         buyerMaps: true,
-        livestock: {
-          select: {
-            sku: true,
-            type: true,
-            grade: true,
-          },
+        items: {
+          include: { livestock: { select: { sku: true, type: true, grade: true, tag: true } } },
         },
         sales: {
           select: {
@@ -136,7 +132,7 @@ export default async function SalesDeliveriesPage({
     .map((e) => ({
       id: e.id,
       invoiceNo: e.invoiceNo,
-      sku: e.livestock?.sku,
+      sku: e.items[0]?.livestock?.sku,
       buyerName: e.buyerName,
       lat: e.buyerLat!,
       lng: e.buyerLng!,
@@ -275,18 +271,21 @@ export default async function SalesDeliveriesPage({
                                 {(s.delivery?.sequence ?? 0) + 1}
                               </td>
                               <td className="px-3 py-3">
-                                <div className="font-medium text-foreground mb-0.5">
-                                  {s.livestock?.type
-                                    ? s.livestock.type.charAt(0) +
-                                      s.livestock.type.slice(1).toLowerCase()
-                                    : ''}
-                                  {s.livestock?.grade
-                                    ? ` ${s.livestock.grade}`
-                                    : ''}
+                                <div className="space-y-1">
+                                  {s.items.map((item) => (
+                                    <div key={item.livestock?.sku ?? item.livestock?.tag}>
+                                      <div className="font-medium text-foreground text-xs">
+                                        {item.livestock?.type
+                                          ? item.livestock.type.charAt(0) + item.livestock.type.slice(1).toLowerCase()
+                                          : ''}
+                                        {item.livestock?.grade ? ` ${item.livestock.grade}` : ''}
+                                      </div>
+                                      <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
+                                        {item.livestock?.tag ?? item.livestock?.sku ?? s.invoiceNo}
+                                      </span>
+                                    </div>
+                                  ))}
                                 </div>
-                                <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
-                                  {s.livestock?.sku ?? s.invoiceNo}
-                                </span>
                               </td>
                               <td className="px-3 py-3">
                                 <span className="font-medium text-foreground">
@@ -375,9 +374,13 @@ export default async function SalesDeliveriesPage({
                               <span className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground">
                                 {(s.delivery?.sequence ?? 0) + 1}
                               </span>
-                              <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
-                                {s.livestock?.sku ?? s.invoiceNo}
-                              </span>
+                              <div className="flex flex-wrap gap-1">
+                                {s.items.map((item) => (
+                                  <span key={item.livestock?.sku ?? item.livestock?.tag} className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
+                                    {item.livestock?.tag ?? item.livestock?.sku ?? s.invoiceNo}
+                                  </span>
+                                ))}
+                              </div>
                             </div>
                             <StatusBadge
                               status={s.delivery?.status ?? 'PENDING'}
@@ -396,15 +399,16 @@ export default async function SalesDeliveriesPage({
                           </div>
 
                           <div className="text-sm text-muted-foreground bg-muted/20 p-2 rounded-md border border-border/50">
-                            <span className="font-medium text-foreground block mb-0.5">
-                              {s.livestock?.type
-                                ? s.livestock.type.charAt(0) +
-                                  s.livestock.type.slice(1).toLowerCase()
-                                : ''}
-                              {s.livestock?.grade
-                                ? ` ${s.livestock.grade}`
-                                : ''}
-                            </span>
+                            <div className="space-y-0.5 mb-1">
+                              {s.items.map((item) => (
+                                <span key={item.livestock?.sku ?? item.livestock?.tag} className="font-medium text-foreground text-xs block">
+                                  {item.livestock?.type
+                                    ? item.livestock.type.charAt(0) + item.livestock.type.slice(1).toLowerCase()
+                                    : ''}
+                                  {item.livestock?.grade ? ` ${item.livestock.grade}` : ''}
+                                </span>
+                              ))}
+                            </div>
                             <span className="block text-xs mb-1">
                               Sales: {s.sales?.name ?? '—'}
                             </span>

@@ -1,15 +1,3 @@
-/**
- * Server Actions: Sale Entries
- *
- * These are server-side functions called directly from React components.
- * They handle CRUD operations for sale entries (data penjualan).
- *
- * Entry lifecycle:
- *   Sales creates entry (PENDING) → Admin approves (APPROVED) or rejects (REJECTED)
- *   When approved, the linked livestock is automatically marked as sold.
- *   When deleted, the livestock is automatically unmarked (available again).
- */
-
 'use server';
 
 import { prisma } from '@/lib/prisma';
@@ -19,11 +7,6 @@ import { generateInvoiceNo } from '@/lib/format';
 import { supabaseAdmin } from '@/lib/supabase';
 import { logAudit } from '@/lib/audit';
 
-/**
- * Deletes files from Supabase Storage given their public URLs.
- * Extracts the storage path from the URL and calls the admin client.
- * Only runs in production — dev uses local disk.
- */
 async function deleteStorageFiles(urls: string[]) {
   if (process.env.NODE_ENV === 'development' || urls.length === 0) return;
   const paths = urls
@@ -38,148 +21,113 @@ async function deleteStorageFiles(urls: string[]) {
   }
 }
 
-/**
- * Creates a new sale entry. Called by sales persons from the "Tambah Entry" form.
- *
- * Flow:
- * 1. Verifies the user is logged in
- * 2. Checks the selected livestock exists and is not already sold
- * 3. Looks up pricing table to auto-fill hargaModal (buy price)
- * 4. Calculates HPP (cost of goods sold) = hargaModal + resellerCut
- * 5. Calculates profit = hargaJual - HPP
- * 6. Creates the entry with PENDING status (awaiting admin approval)
- *
- * @param formData - Form data with livestockId, buyerName, hargaJual, etc.
- * @returns { success, entryId } or { error }
- */
+interface RawItem {
+  livestockId: string;
+  hargaJual: number;
+  hargaModal?: number | null;
+  resellerCut?: number | null;
+  tag?: string | null;
+}
+
 export async function createEntry(formData: FormData) {
   const profile = await requireAuth();
 
-  const livestockId = formData.get('livestockId')?.toString().trim();
-  if (!livestockId) {
-    return { error: 'Pilih hewan terlebih dahulu' };
+  const itemsJson = formData.get('items')?.toString();
+  if (!itemsJson) return { error: 'Pilih hewan terlebih dahulu' };
+
+  let rawItems: RawItem[];
+  try {
+    rawItems = JSON.parse(itemsJson);
+  } catch {
+    return { error: 'Data hewan tidak valid' };
+  }
+  if (!Array.isArray(rawItems) || rawItems.length === 0) {
+    return { error: 'Pilih minimal satu hewan' };
   }
 
-  const livestock = await prisma.livestock.findUnique({
-    where: { id: livestockId },
-  });
+  // Validate all livestock exist, not sold, not already linked
+  const livestockIds = rawItems.map((i) => i.livestockId);
+  const [allLivestock, existingItems] = await Promise.all([
+    prisma.livestock.findMany({ where: { id: { in: livestockIds } } }),
+    prisma.entryItem.findMany({ where: { livestockId: { in: livestockIds } } }),
+  ]);
 
-  const existingEntry = await prisma.entry.findUnique({
-    where: { livestockId },
-  });
-
-  if (existingEntry) {
-    return {
-      error: 'Hewan ini sudah memiliki entry penjualan (Pending/Approved)!',
-    };
+  if (existingItems.length > 0) {
+    return { error: 'Satu atau lebih hewan sudah memiliki entry penjualan' };
   }
-
-  if (!livestock || livestock.isSold) {
-    return { error: 'Hewan tidak tersedia atau sudah terjual' };
+  for (const raw of rawItems) {
+    const lv = allLivestock.find((l) => l.id === raw.livestockId);
+    if (!lv || lv.isSold) {
+      return { error: `Hewan ${raw.livestockId} tidak tersedia atau sudah terjual` };
+    }
   }
-
-  const pricing =
-    livestock.grade != null
-      ? await prisma.pricing.findUnique({
-          where: {
-            animalType_grade: {
-              animalType: livestock.type,
-              grade: livestock.grade,
-            },
-          },
-        })
-      : null;
-
-  const hargaJual =
-    Number(formData.get('hargaJual')) ||
-    livestock.hargaJual ||
-    pricing?.hargaJual ||
-    0;
-  const hargaModal = formData.get('hargaModal')
-    ? Number(formData.get('hargaModal'))
-    : (livestock.hargaModal ?? pricing?.hargaBeli ?? null);
-  const resellerCut = formData.get('resellerCut')
-    ? Number(formData.get('resellerCut'))
-    : null;
-  const hpp = hargaModal ? hargaModal + (resellerCut ?? 0) : null;
-  const profit = hpp !== null ? hargaJual - hpp : null;
 
   let salesId = profile.id;
   let status: 'PENDING' | 'APPROVED' = 'PENDING';
   let approvedAt: Date | null = null;
   let approvedBy: string | null = null;
 
-  if ((profile.role === 'ADMIN' || profile.role === 'SUPER_ADMIN')) {
+  if (profile.role === 'ADMIN' || profile.role === 'SUPER_ADMIN') {
     const adminSelectedSalesId = formData.get('salesId')?.toString().trim();
-
-    // FIX: Jika Admin memilih sales, gunakan ID Sales tersebut.
-    // Jika tidak, gunakan ID Admin itu sendiri (Diri Sendiri).
     if (adminSelectedSalesId) {
       const salesExists = await prisma.profile.findUnique({
         where: { id: adminSelectedSalesId },
       });
-
       if (!salesExists) {
-        return {
-          error: 'Akun sales yang dipilih tidak valid atau sudah dihapus.',
-        };
+        return { error: 'Akun sales yang dipilih tidak valid atau sudah dihapus.' };
       }
       salesId = adminSelectedSalesId;
     } else {
       salesId = profile.id;
     }
-
     status = 'APPROVED';
     approvedAt = new Date();
     approvedBy = profile.id;
   }
 
-  const entryData = {
-    invoiceNo: generateInvoiceNo(),
-    livestockId,
-    salesId,
-    status,
-    hargaJual,
-    hargaModal,
-    resellerCut,
-    hpp,
-    profit,
-    dp: formData.get('dp') ? Number(formData.get('dp')) : null,
-    totalBayar: formData.get('totalBayar')
-      ? Number(formData.get('totalBayar'))
-      : null,
-    paymentStatus:
-      (formData.get('paymentStatus') as 'BELUM_BAYAR' | 'DP' | 'LUNAS') ||
-      'BELUM_BAYAR',
-    buyerName: formData.get('buyerName') as string,
-    buyerPhone: (formData.get('buyerPhone') as string) || null,
-    buyerAddress: (formData.get('buyerAddress') as string) || null,
-    buyerMaps: (formData.get('buyerMaps') as string) || null,
-    pengiriman:
-      (formData.get('pengiriman') as 'HARI_H' | 'H_1' | 'H_2' | 'H_3' | 'TITIP_POTONG') || null,
-    notes: (formData.get('notes') as string) || null,
-    buktiTransfer: formData.getAll('buktiTransfer') as string[],
-    approvedAt,
-    approvedBy,
-  };
-
-  const livestockTag = (formData.get('livestockTag') as string) || null;
+  // Build per-item create data with computed hpp/profit
+  const itemsCreate = rawItems.map((raw) => {
+    const hargaJual = raw.hargaJual || 0;
+    const hargaModal = raw.hargaModal ?? null;
+    const resellerCut = raw.resellerCut ?? null;
+    const hpp = hargaModal !== null ? hargaModal + (resellerCut ?? 0) : null;
+    const profit = hpp !== null ? hargaJual - hpp : null;
+    return { livestockId: raw.livestockId, hargaJual, hargaModal, resellerCut, hpp, profit };
+  });
 
   const entry = await prisma.$transaction(async (tx) => {
     const created = await tx.entry.create({
-      data: entryData,
+      data: {
+        invoiceNo: generateInvoiceNo(),
+        salesId,
+        status,
+        dp: formData.get('dp') ? Number(formData.get('dp')) : null,
+        totalBayar: formData.get('totalBayar') ? Number(formData.get('totalBayar')) : null,
+        paymentStatus:
+          (formData.get('paymentStatus') as 'BELUM_BAYAR' | 'DP' | 'LUNAS') || 'BELUM_BAYAR',
+        buyerName: formData.get('buyerName') as string,
+        buyerPhone: (formData.get('buyerPhone') as string) || null,
+        buyerAddress: (formData.get('buyerAddress') as string) || null,
+        buyerMaps: (formData.get('buyerMaps') as string) || null,
+        pengiriman:
+          (formData.get('pengiriman') as 'HARI_H' | 'H_1' | 'H_2' | 'H_3' | 'TITIP_POTONG') || null,
+        notes: (formData.get('notes') as string) || null,
+        buktiTransfer: formData.getAll('buktiTransfer') as string[],
+        approvedAt,
+        approvedBy,
+        items: { create: itemsCreate },
+      },
     });
 
-    const livestockUpdate: Record<string, unknown> = { tag: livestockTag };
-    if (hargaModal !== null) livestockUpdate.hargaModal = hargaModal;
-    if (status === 'APPROVED') {
-      livestockUpdate.isSold = true;
+    // Update livestock: tag + isSold
+    for (const raw of rawItems) {
+      const update: Record<string, unknown> = {};
+      if (raw.tag) update.tag = raw.tag;
+      if (status === 'APPROVED') update.isSold = true;
+      if (Object.keys(update).length > 0) {
+        await tx.livestock.update({ where: { id: raw.livestockId }, data: update });
+      }
     }
-
-    await tx.livestock.update({
-      where: { id: livestockId },
-      data: livestockUpdate,
-    });
 
     return created;
   });
@@ -199,35 +147,24 @@ export async function createEntry(formData: FormData) {
   return { success: true, entryId: entry.id };
 }
 
-/**
- * Approves a pending entry. Admin-only.
- * Uses a database transaction to atomically:
- * 1. Update the entry status to APPROVED with timestamp and approver ID
- * 2. Mark the linked livestock as sold (isSold=true)
- *
- * This ensures both operations succeed or both fail — you can't have
- * an approved entry with unsold livestock or vice versa.
- *
- * @param id - The entry ID to approve
- * @returns { success } or { error }
- */
 export async function approveEntry(id: string) {
   const admin = await requireRole('ADMIN', 'SUPER_ADMIN');
 
-  const entry = await prisma.entry.findUnique({ where: { id } });
+  const entry = await prisma.entry.findUnique({
+    where: { id },
+    include: { items: true },
+  });
   if (!entry) return { error: 'Entry tidak ditemukan' };
+
+  const livestockIds = entry.items.map((i) => i.livestockId);
 
   const [updated] = await prisma.$transaction([
     prisma.entry.update({
       where: { id },
-      data: {
-        status: 'APPROVED',
-        approvedAt: new Date(),
-        approvedBy: admin.id,
-      },
+      data: { status: 'APPROVED', approvedAt: new Date(), approvedBy: admin.id },
     }),
-    prisma.livestock.update({
-      where: { id: entry.livestockId },
+    prisma.livestock.updateMany({
+      where: { id: { in: livestockIds } },
       data: { isSold: true },
     }),
   ]);
@@ -248,24 +185,13 @@ export async function approveEntry(id: string) {
   return { success: true };
 }
 
-/**
- * Rejects a pending entry. Admin-only.
- * Simply sets the status to REJECTED. The livestock remains available
- * for sale since it was never marked as sold.
- *
- * @param id - The entry ID to reject
- * @returns { success } or { error }
- */
 export async function rejectEntry(id: string) {
   const admin = await requireRole('ADMIN', 'SUPER_ADMIN');
 
   const entry = await prisma.entry.findUnique({ where: { id } });
   if (!entry) return { error: 'Entry tidak ditemukan' };
 
-  await prisma.entry.update({
-    where: { id },
-    data: { status: 'REJECTED' },
-  });
+  await prisma.entry.update({ where: { id }, data: { status: 'REJECTED' } });
 
   await logAudit({
     actor: admin,
@@ -282,73 +208,23 @@ export async function rejectEntry(id: string) {
   return { success: true };
 }
 
-/**
- * Updates an existing entry's details. Admin-only.
- * Admin can edit buyer info, pricing, payment status, delivery status, etc.
- * Recalculates HPP and profit based on updated values.
- *
- * @param id - The entry ID to update
- * @param formData - Updated form data
- * @returns { success } or { error }
- */
 export async function updateEntry(id: string, formData: FormData) {
   const profile = await requireAuth();
 
   const entry = await prisma.entry.findUnique({
     where: { id },
-    include: { livestock: true },
+    include: { items: { include: { livestock: true } } },
   });
   if (!entry) return { error: 'Entry tidak ditemukan' };
 
-  if ((profile.role !== 'ADMIN' && profile.role !== 'SUPER_ADMIN') && entry.salesId !== profile.id) {
+  if (
+    profile.role !== 'ADMIN' &&
+    profile.role !== 'SUPER_ADMIN' &&
+    entry.salesId !== profile.id
+  ) {
     return { error: 'Anda tidak berhak mengubah entry ini' };
   }
 
-  // Livestock swap: only allowed when the current livestock is MATI.
-  // Validate the new one is available, not already linked to another entry, and healthy.
-  const newLivestockIdRaw = formData.get('livestockId') as string | null;
-  const swapLivestockId =
-    newLivestockIdRaw && newLivestockIdRaw !== entry.livestockId
-      ? newLivestockIdRaw
-      : null;
-
-  let newLivestock: typeof entry.livestock | null = null;
-  if (swapLivestockId) {
-    if (entry.livestock.condition !== 'MATI') {
-      return { error: 'Hewan hanya bisa diganti jika kondisinya MATI' };
-    }
-
-    newLivestock = await prisma.livestock.findUnique({
-      where: { id: swapLivestockId },
-    });
-    if (!newLivestock) return { error: 'Hewan pengganti tidak ditemukan' };
-    if (newLivestock.condition === 'MATI') {
-      return { error: 'Hewan pengganti tidak boleh berkondisi MATI' };
-    }
-    if (newLivestock.isSold) {
-      return { error: 'Hewan pengganti sudah terjual' };
-    }
-
-    const conflict = await prisma.entry.findUnique({
-      where: { livestockId: swapLivestockId },
-    });
-    if (conflict) {
-      return { error: 'Hewan pengganti sudah memiliki entry lain' };
-    }
-  }
-
-  // Recalculate financials with updated values
-  const hargaJual = Number(formData.get('hargaJual')) || entry.hargaJual;
-  const hargaModal = formData.get('hargaModal')
-    ? Number(formData.get('hargaModal'))
-    : entry.hargaModal;
-  const resellerCut = formData.get('resellerCut')
-    ? Number(formData.get('resellerCut'))
-    : entry.resellerCut;
-  const hpp = hargaModal !== null ? hargaModal + (resellerCut ?? 0) : null;
-  const profit = hpp !== null ? hargaJual - hpp : null;
-
-  // buktiTransfer: use submitted URLs, or [] if explicitly cleared, or keep existing
   const submittedBukti = formData.getAll('buktiTransfer') as string[];
   const buktiTransferCleared = formData.get('buktiTransferCleared') === 'true';
   const buktiTransfer =
@@ -358,58 +234,56 @@ export async function updateEntry(id: string, formData: FormData) {
         ? []
         : entry.buktiTransfer;
 
-  const livestockTag = (formData.get('livestockTag') as string) || null;
-
-  const entryData = {
-    hargaJual,
-    hargaModal,
-    resellerCut,
-    hpp,
-    profit,
-    dp: formData.get('dp') ? Number(formData.get('dp')) : null,
-    totalBayar: formData.get('totalBayar')
-      ? Number(formData.get('totalBayar'))
-      : null,
-    paymentStatus:
-      (formData.get('paymentStatus') as 'BELUM_BAYAR' | 'DP' | 'LUNAS') ||
-      entry.paymentStatus,
-    buyerName: (formData.get('buyerName') as string) || entry.buyerName,
-    buyerPhone: (formData.get('buyerPhone') as string) || null,
-    buyerAddress: (formData.get('buyerAddress') as string) || null,
-    buyerMaps: (formData.get('buyerMaps') as string) || null,
-    pengiriman:
-      (formData.get('pengiriman') as 'HARI_H' | 'H_1' | 'H_2' | 'H_3' | 'TITIP_POTONG') || null,
-    notes: (formData.get('notes') as string) || null,
-    isSent: formData.get('isSent') === 'true',
-    buktiTransfer,
-    ...(swapLivestockId ? { livestockId: swapLivestockId } : {}),
-    ...((profile.role === 'ADMIN' || profile.role === 'SUPER_ADMIN') && formData.get('salesId')
-      ? { salesId: formData.get('salesId') as string }
-      : {}),
-  };
-
-  const targetLivestockId = swapLivestockId ?? entry.livestockId;
+  // Parse per-item pricing submitted from the edit form
+  const itemPricesJson = formData.get('itemPrices')?.toString();
+  const itemPrices: Array<{
+    id: string;
+    hargaJual: string;
+    hargaModal: string;
+    resellerCut: string;
+    tag: string;
+  }> = itemPricesJson ? JSON.parse(itemPricesJson) : [];
 
   const updated = await prisma.$transaction(async (tx) => {
     const u = await tx.entry.update({
       where: { id },
-      data: entryData,
+      data: {
+        dp: formData.get('dp') ? Number(formData.get('dp')) : null,
+        totalBayar: formData.get('totalBayar') ? Number(formData.get('totalBayar')) : null,
+        paymentStatus:
+          (formData.get('paymentStatus') as 'BELUM_BAYAR' | 'DP' | 'LUNAS') ||
+          entry.paymentStatus,
+        buyerName: (formData.get('buyerName') as string) || entry.buyerName,
+        buyerPhone: (formData.get('buyerPhone') as string) || null,
+        buyerAddress: (formData.get('buyerAddress') as string) || null,
+        buyerMaps: (formData.get('buyerMaps') as string) || null,
+        pengiriman:
+          (formData.get('pengiriman') as 'HARI_H' | 'H_1' | 'H_2' | 'H_3' | 'TITIP_POTONG') || null,
+        notes: (formData.get('notes') as string) || null,
+        isSent: formData.get('isSent') === 'true',
+        buktiTransfer,
+        ...((profile.role === 'ADMIN' || profile.role === 'SUPER_ADMIN') && formData.get('salesId')
+          ? { salesId: formData.get('salesId') as string }
+          : {}),
+      },
     });
 
-    // Update livestock tag + sync hargaModal
-    await tx.livestock.update({
-      where: { id: targetLivestockId },
-      data: { tag: livestockTag, hargaModal },
-    });
-
-    if (swapLivestockId && entry.status === 'APPROVED') {
-      await tx.livestock.update({
-        where: { id: entry.livestockId },
-        data: { isSold: false },
+    // Update each item's pricing + livestock tag
+    for (const ip of itemPrices) {
+      const entryItem = entry.items.find((i) => i.id === ip.id);
+      if (!entryItem) continue;
+      const hargaJual = Number(ip.hargaJual) || entryItem.hargaJual;
+      const hargaModal = ip.hargaModal ? Number(ip.hargaModal) : entryItem.hargaModal;
+      const resellerCut = ip.resellerCut ? Number(ip.resellerCut) : entryItem.resellerCut;
+      const hpp = hargaModal !== null ? hargaModal + (resellerCut ?? 0) : null;
+      const profit = hpp !== null ? hargaJual - hpp : null;
+      await tx.entryItem.update({
+        where: { id: ip.id },
+        data: { hargaJual, hargaModal, resellerCut, hpp, profit },
       });
       await tx.livestock.update({
-        where: { id: swapLivestockId },
-        data: { isSold: true },
+        where: { id: entryItem.livestockId },
+        data: { tag: ip.tag || null, ...(hargaModal !== null ? { hargaModal } : {}) },
       });
     }
 
@@ -426,7 +300,6 @@ export async function updateEntry(id: string, formData: FormData) {
     after: updated,
   });
 
-  // Delete removed photos from storage (diff between old and new URL list)
   const removedUrls = entry.buktiTransfer.filter(
     (url) => !buktiTransfer.includes(url),
   );
@@ -438,28 +311,29 @@ export async function updateEntry(id: string, formData: FormData) {
   return { success: true };
 }
 
-/**
- * Deletes an entry and marks the linked livestock as available again.
- * Admin-only. Uses a transaction to ensure consistency.
- *
- * @param id - The entry ID to delete
- * @returns { success } or { error }
- */
 export async function deleteEntry(id: string) {
   const profile = await requireAuth();
 
-  const entry = await prisma.entry.findUnique({ where: { id } });
+  const entry = await prisma.entry.findUnique({
+    where: { id },
+    include: { items: true },
+  });
   if (!entry) return { error: 'Entry tidak ditemukan' };
 
-  if ((profile.role !== 'ADMIN' && profile.role !== 'SUPER_ADMIN') && entry.salesId !== profile.id) {
+  if (
+    profile.role !== 'ADMIN' &&
+    profile.role !== 'SUPER_ADMIN' &&
+    entry.salesId !== profile.id
+  ) {
     return { error: 'Anda tidak berhak mengubah entry ini' };
   }
 
-  // Transaction: delete entry + mark livestock as available again
+  const livestockIds = entry.items.map((i) => i.livestockId);
+
   await prisma.$transaction([
     prisma.entry.delete({ where: { id } }),
-    prisma.livestock.update({
-      where: { id: entry.livestockId },
+    prisma.livestock.updateMany({
+      where: { id: { in: livestockIds } },
       data: { isSold: false },
     }),
   ]);
@@ -473,7 +347,6 @@ export async function deleteEntry(id: string) {
     before: entry,
   });
 
-  // Delete all bukti transfer photos from storage
   await deleteStorageFiles(entry.buktiTransfer);
 
   revalidatePath('/admin');

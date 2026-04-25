@@ -24,16 +24,20 @@ export async function LivestockTable({
   const livestock = await prisma.livestock.findMany({
     orderBy: { createdAt: 'desc' },
     include: {
-      entry: {
+      entryItem: {
         select: {
-          id: true,
-          status: true,
-          buyerName: true,
-          sales: { select: { name: true } },
-          delivery: {
+          entry: {
             select: {
+              id: true,
               status: true,
-              driver: { select: { name: true } },
+              buyerName: true,
+              sales: { select: { name: true } },
+              delivery: {
+                select: {
+                  status: true,
+                  driver: { select: { name: true } },
+                },
+              },
             },
           },
         },
@@ -76,10 +80,10 @@ export async function LivestockTable({
     photoUrl: item.photoUrl,
     notes: item.notes,
     isSold: item.isSold,
-    buyerName: item.entry?.buyerName ?? null,
-    salesName: item.entry?.sales?.name ?? null,
-    driverName: item.entry?.delivery?.driver?.name ?? null,
-    deliveryStatus: item.entry?.delivery?.status ?? null,
+    buyerName: item.entryItem?.entry?.buyerName ?? null,
+    salesName: item.entryItem?.entry?.sales?.name ?? null,
+    driverName: item.entryItem?.entry?.delivery?.driver?.name ?? null,
+    deliveryStatus: item.entryItem?.entry?.delivery?.status ?? null,
   }));
 
   return (

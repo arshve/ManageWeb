@@ -13,52 +13,39 @@ export default async function FinancePage() {
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
-        hargaJual: true,
-        hargaModal: true,
-        resellerCut: true,
-        profit: true,
         paymentStatus: true,
         buyerName: true,
         buyerAddress: true,
         salesId: true,
-        livestock: {
-          select: {
-            sku: true,
-            tag: true,
-            photoUrl: true,
+        items: {
+          include: {
+            livestock: { select: { sku: true, tag: true, photoUrl: true } },
           },
         },
       },
     }),
     prisma.profile.findMany({
       where: { role: { in: ['SALES', 'ADMIN', 'SUPER_ADMIN'] }, isActive: true },
-      select: {
-        id: true,
-        name: true,
-        phone: true,
-        rekBank: true,
-      },
+      select: { id: true, name: true, phone: true, rekBank: true },
       orderBy: { name: 'asc' },
     }),
-    prisma.cashflow.findMany({
-      orderBy: { createdAt: 'desc' },
-    }),
+    prisma.cashflow.findMany({ orderBy: { createdAt: 'desc' } }),
   ]);
 
   const serialized = entries.map((e) => ({
     id: e.id,
-    hargaJual: e.hargaJual,
-    hargaModal: e.hargaModal ?? 0,
-    resellerCut: e.resellerCut ?? 0,
-    profit: e.profit ?? 0,
+    hargaJual: e.items.reduce((s, i) => s + i.hargaJual, 0),
+    hargaModal: e.items.reduce((s, i) => s + (i.hargaModal ?? 0), 0),
+    resellerCut: e.items.reduce((s, i) => s + (i.resellerCut ?? 0), 0),
+    profit: e.items.reduce((s, i) => s + (i.profit ?? 0), 0),
     paymentStatus: e.paymentStatus,
     buyerName: e.buyerName,
     buyerAddress: e.buyerAddress,
     salesId: e.salesId,
     livestock: {
-      sku: e.livestock.sku,
-      tag: e.livestock.tag,
-      photoUrl: e.livestock.photoUrl,
+      sku: e.items[0]?.livestock?.sku ?? '',
+      tag: e.items[0]?.livestock?.tag ?? null,
+      photoUrl: e.items[0]?.livestock?.photoUrl ?? null,
     },
   }));
 

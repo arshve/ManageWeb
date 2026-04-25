@@ -18,13 +18,14 @@ export interface InvoiceData {
   invoiceNo: string;
   createdAt: Date;
   buyerName: string;
-  livestock: {
+  items: {
     type: string;
     grade: string | null;
     weightMin: number | null;
     weightMax: number | null;
-  };
-  hargaJual: number;
+    hargaJual: number;
+    tag: string | null;
+  }[];
   dp: number | null;
   pengiriman: string | null;
   deliveryDate: Date | null;
@@ -109,10 +110,10 @@ const styles = StyleSheet.create({
     borderRightColor: '#cccccc',
     textAlign: 'center',
   },
-  colInv: { width: '22%' },
-  colJenis: { width: '18%' },
-  colTipe: { width: '20%' },
-  colBayar: { width: '20%' },
+  colNo: { width: '8%' },
+  colJenis: { width: '22%' },
+  colTipe: { width: '25%' },
+  colTag: { width: '25%' },
   colHarga: { width: '20%', borderRightWidth: 0 },
   totalsBlock: { marginTop: 6, flexDirection: 'column', alignItems: 'flex-end' },
   totalsRow: {
@@ -145,17 +146,9 @@ const styles = StyleSheet.create({
 });
 
 export function InvoiceDocument({ data }: { data: InvoiceData }) {
+  const totalHargaJual = data.items.reduce((s, i) => s + i.hargaJual, 0);
   const paidAmount = data.dp ?? 0;
-  const sisa = Math.max(0, data.hargaJual - paidAmount);
-
-  const tipeBerat = [
-    data.livestock.grade,
-    data.livestock.weightMin && data.livestock.weightMax
-      ? `${data.livestock.weightMin}-${data.livestock.weightMax}`
-      : null,
-  ]
-    .filter(Boolean)
-    .join(' ');
+  const sisa = Math.max(0, totalHargaJual - paidAmount);
 
   return (
     <Document>
@@ -191,39 +184,41 @@ export function InvoiceDocument({ data }: { data: InvoiceData }) {
         <Text style={styles.sectionLabel}>Perincian Pesanan :</Text>
         <View style={styles.table}>
           <View style={styles.tableHeader}>
-            <Text style={[styles.th, styles.colInv]}>INV No.</Text>
+            <Text style={[styles.th, styles.colNo]}>No.</Text>
             <Text style={[styles.th, styles.colJenis]}>Jenis</Text>
             <Text style={[styles.th, styles.colTipe]}>Tipe/Berat</Text>
-            <Text style={[styles.th, styles.colBayar]}>Bayar</Text>
+            <Text style={[styles.th, styles.colTag]}>Tag</Text>
             <Text style={[styles.th, styles.colHarga]}>Harga</Text>
           </View>
-          <View style={styles.tableRow}>
-            <Text style={[styles.td, styles.colInv]}>{data.invoiceNo}</Text>
-            <Text style={[styles.td, styles.colJenis]}>
-              {data.livestock.type}
-            </Text>
-            <Text style={[styles.td, styles.colTipe]}>{tipeBerat || '-'}</Text>
-            <Text style={[styles.td, styles.colBayar]}>
-              {paidAmount ? formatRupiah(paidAmount) : '-'}
-            </Text>
-            <Text style={[styles.td, styles.colHarga]}>
-              {formatRupiah(data.hargaJual)}
-            </Text>
-          </View>
+          {data.items.map((item, idx) => {
+            const tipeBerat = [
+              item.grade,
+              item.weightMin && item.weightMax
+                ? `${item.weightMin}-${item.weightMax} kg`
+                : null,
+            ]
+              .filter(Boolean)
+              .join(' · ');
+            return (
+              <View key={idx} style={styles.tableRow}>
+                <Text style={[styles.td, styles.colNo]}>{idx + 1}</Text>
+                <Text style={[styles.td, styles.colJenis]}>{item.type}</Text>
+                <Text style={[styles.td, styles.colTipe]}>{tipeBerat || '-'}</Text>
+                <Text style={[styles.td, styles.colTag]}>{item.tag || '-'}</Text>
+                <Text style={[styles.td, styles.colHarga]}>{formatRupiah(item.hargaJual)}</Text>
+              </View>
+            );
+          })}
         </View>
 
         <View style={styles.totalsBlock}>
           <View style={styles.totalsRow}>
             <Text style={styles.totalsLabel}>Total Harga :</Text>
-            <Text style={styles.totalsValue}>
-              {formatRupiah(data.hargaJual)}
-            </Text>
+            <Text style={styles.totalsValue}>{formatRupiah(totalHargaJual)}</Text>
           </View>
           <View style={styles.totalsRow}>
             <Text style={styles.totalsLabel}>Total Bayar :</Text>
-            <Text style={styles.totalsValue}>
-              {formatRupiah(paidAmount)}
-            </Text>
+            <Text style={styles.totalsValue}>{formatRupiah(paidAmount)}</Text>
           </View>
           <View style={styles.totalsRow}>
             <Text style={styles.totalsLabel}>Sisa Bayar :</Text>

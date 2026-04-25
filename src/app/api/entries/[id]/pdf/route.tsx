@@ -25,7 +25,7 @@ export async function GET(
 
   const entry = await prisma.entry.findUnique({
     where: { id },
-    include: { livestock: true },
+    include: { items: { include: { livestock: true } } },
   });
   if (!entry) {
     return NextResponse.json({ error: 'Entry tidak ditemukan' }, { status: 404 });
@@ -36,17 +36,13 @@ export async function GET(
   }
 
   if (entry.status !== 'APPROVED') {
-    return NextResponse.json(
-      { error: 'Entry belum disetujui' },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: 'Entry belum disetujui' }, { status: 400 });
   }
   if (entry.buktiTransfer.length === 0) {
-    return NextResponse.json(
-      { error: 'Belum ada bukti transfer' },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: 'Belum ada bukti transfer' }, { status: 400 });
   }
+
+  const totalHargaJual = entry.items.reduce((s, i) => s + i.hargaJual, 0);
 
   const pdfBuffer =
     type === 'invoice'
@@ -56,13 +52,14 @@ export async function GET(
               invoiceNo: entry.invoiceNo,
               createdAt: entry.createdAt,
               buyerName: entry.buyerName,
-              livestock: {
-                type: entry.livestock.type,
-                grade: entry.livestock.grade,
-                weightMin: entry.livestock.weightMin,
-                weightMax: entry.livestock.weightMax,
-              },
-              hargaJual: entry.hargaJual,
+              items: entry.items.map((i) => ({
+                type: i.livestock.type,
+                grade: i.livestock.grade,
+                weightMin: i.livestock.weightMin,
+                weightMax: i.livestock.weightMax,
+                hargaJual: i.hargaJual,
+                tag: i.livestock.tag,
+              })),
               dp: entry.dp,
               pengiriman: entry.pengiriman,
               deliveryDate: entry.deliveryDate,
@@ -75,7 +72,7 @@ export async function GET(
               invoiceNo: entry.invoiceNo,
               createdAt: entry.createdAt,
               buyerName: entry.buyerName,
-              hargaJual: entry.hargaJual,
+              hargaJual: totalHargaJual,
               dp: entry.dp,
               totalBayar: entry.totalBayar,
               variant: variant as 'dp' | 'full',

@@ -116,7 +116,7 @@ model Livestock {
   photoUrl  String?
   notes     String?
   isSold    Boolean         @default(false)
-  entry     Entry?
+  entryItem EntryItem?
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
 }
@@ -125,15 +125,9 @@ model Entry {
   id            String        @id @default(cuid())
   invoiceNo     String        @unique
   status        EntryStatus   @default(PENDING)
-  livestockId   String        @unique
-  livestock     Livestock     @relation(fields: [livestockId], references: [id])
+  items         EntryItem[]
   salesId       String
   sales         Profile       @relation(fields: [salesId], references: [id])
-  hargaJual     Float
-  hargaModal    Float?
-  resellerCut   Float?
-  hpp           Float?
-  profit        Float?
   dp            Float?
   totalBayar    Float?
   paymentStatus PaymentStatus @default(BELUM_BAYAR)
@@ -155,6 +149,22 @@ model Entry {
   updatedAt     DateTime      @updatedAt
 
   @@index([deliveryDate])
+}
+
+model EntryItem {
+  id          String    @id @default(cuid())
+  entryId     String
+  entry       Entry     @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  livestockId String    @unique
+  livestock   Livestock @relation(fields: [livestockId], references: [id])
+  hargaJual   Float
+  hargaModal  Float?
+  resellerCut Float?
+  hpp         Float?
+  profit      Float?
+  createdAt   DateTime  @default(now())
+
+  @@index([entryId])
 }
 
 model Delivery {

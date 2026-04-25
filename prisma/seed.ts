@@ -124,14 +124,8 @@ async function main() {
       update: {},
       create: {
         invoiceNo: `INV-SEED-${String(invoiceCounter).padStart(3, "0")}`,
-        livestockId: e.livestock.id,
         salesId: e.salesId,
         status: e.status,
-        hargaJual: e.hargaJual,
-        hargaModal,
-        resellerCut: e.resellerCut,
-        hpp,
-        profit,
         dp: e.dp ?? null,
         totalBayar: e.paymentStatus === "LUNAS" ? e.hargaJual : e.dp ?? null,
         paymentStatus: e.paymentStatus,
@@ -140,6 +134,16 @@ async function main() {
         buyerAddress: "Tangerang Selatan",
         approvedAt: e.status === "APPROVED" ? new Date() : null,
         approvedBy: e.status === "APPROVED" ? admin.id : null,
+        items: {
+          create: [{
+            livestockId: e.livestock.id,
+            hargaJual: e.hargaJual,
+            hargaModal,
+            resellerCut: e.resellerCut,
+            hpp,
+            profit,
+          }],
+        },
       },
     });
 

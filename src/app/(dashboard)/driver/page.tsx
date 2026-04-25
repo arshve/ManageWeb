@@ -52,14 +52,8 @@ export default async function DriverPage({
           buyerLat: true,
           buyerLng: true,
           sales: { select: { name: true } },
-          livestock: {
-            select: {
-              sku: true,
-              tag: true,
-              type: true,
-              grade: true,
-              photoUrl: true,
-            },
+          items: {
+            include: { livestock: { select: { sku: true, tag: true, type: true, grade: true, photoUrl: true } } },
           },
         },
       },
@@ -78,7 +72,7 @@ export default async function DriverPage({
       id: d.entry.id,
       invoiceNo: d.entry.invoiceNo,
       buyerName: d.entry.buyerName,
-      sku: d.entry.livestock.sku,
+      sku: d.entry.items[0]?.livestock?.sku ?? '',
       lat: d.entry.buyerLat!,
       lng: d.entry.buyerLng!,
       sequence: d.sequence,
@@ -134,7 +128,7 @@ export default async function DriverPage({
             buyerLat: d.entry.buyerLat,
             buyerLng: d.entry.buyerLng,
             salesName: d.entry.sales.name,
-            livestock: d.entry.livestock,
+            items: d.entry.items.map((i) => i.livestock),
           },
         }))}
       />

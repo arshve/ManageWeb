@@ -31,12 +31,12 @@ const PAGE_SIZE = ITEMS_PER_ROW_DESKTOP * ROWS_PER_PAGE; // 15 items per page
 
 export function LivestockPicker({
   livestock,
-  selectedId,
-  onSelect,
+  selectedIds,
+  onToggle,
 }: {
   livestock: PickerLivestock[];
-  selectedId: string;
-  onSelect: (id: string) => void;
+  selectedIds: string[];
+  onToggle: (id: string) => void;
 }) {
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [gradeFilter, setGradeFilter] = useState('ALL');
@@ -173,8 +173,8 @@ export function LivestockPicker({
               <LivestockCard
                 key={l.id}
                 livestock={l}
-                isSelected={l.id === selectedId}
-                onSelect={() => onSelect(l.id === selectedId ? '' : l.id)}
+                isSelected={selectedIds.includes(l.id)}
+                onSelect={() => onToggle(l.id)}
               />
             ))}
           </div>
@@ -271,6 +271,7 @@ function LivestockCard({
             photoUrl={l.photoUrl}
             alt={`${typeLabel}${l.grade ? ' ' + l.grade : ''}`}
             thumbnailClassName="w-full h-full object-cover"
+            interactive={false}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">

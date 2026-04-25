@@ -41,13 +41,13 @@ type Stop = {
     buyerLat: number | null;
     buyerLng: number | null;
     salesName: string;
-    livestock: {
+    items: {
       sku: string;
       tag: string | null;
       type: string;
       grade: string | null;
       photoUrl: string | null;
-    };
+    }[];
   };
 };
 
@@ -252,10 +252,6 @@ function StopCard({
     setBusy(false);
   }
 
-  const typeLabel =
-    stop.entry.livestock.type.charAt(0) +
-    stop.entry.livestock.type.slice(1).toLowerCase() +
-    (stop.entry.livestock.grade ? ' Grade ' + stop.entry.livestock.grade : '');
 
   return (
     <Card
@@ -293,9 +289,13 @@ function StopCard({
           >
             {stop.sequence + 1}
           </span>
-          <span className="text-sm font-mono tracking-tight text-muted-foreground">
-            {stop.entry.livestock.sku}
-          </span>
+          <div className="flex flex-wrap gap-1">
+            {stop.entry.items.map((lv) => (
+              <span key={lv.sku} className="text-xs font-mono tracking-tight text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                {lv.tag ?? lv.sku}
+              </span>
+            ))}
+          </div>
         </div>
         <StatusBadge status={stop.status} />
       </div>
@@ -366,27 +366,30 @@ function StopCard({
         </div>
 
         {/* ── Animal Details ── */}
-        <div className="bg-muted/40 rounded-lg p-3 flex gap-3 items-center border">
-          <LivestockPhoto
-            photoUrl={stop.entry.livestock.photoUrl}
-            alt={stop.entry.livestock.sku}
-            thumbnailClassName="w-14 h-14"
-          />
-          <div className="text-sm flex-1 min-w-0">
-            <p className="font-semibold text-foreground truncate">
-              {typeLabel}
-            </p>
-            <div className="text-xs text-muted-foreground mt-0.5 space-y-0.5">
-              <p className="truncate">
-                <span className="font-medium">Tag:</span>{' '}
-                {stop.entry.livestock.tag || '—'}
-              </p>
-              <p className="truncate">
-                <span className="font-medium">Sales:</span>{' '}
-                {stop.entry.salesName}
-              </p>
-            </div>
-          </div>
+        <div className="bg-muted/40 rounded-lg p-3 space-y-2 border">
+          {stop.entry.items.map((lv) => {
+            const typeLabel =
+              lv.type.charAt(0) + lv.type.slice(1).toLowerCase() +
+              (lv.grade ? ' Grade ' + lv.grade : '');
+            return (
+              <div key={lv.sku} className="flex gap-3 items-center">
+                <LivestockPhoto
+                  photoUrl={lv.photoUrl}
+                  alt={lv.sku}
+                  thumbnailClassName="w-12 h-12"
+                />
+                <div className="text-sm flex-1 min-w-0">
+                  <p className="font-semibold text-foreground truncate">{typeLabel}</p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    <span className="font-medium">Tag:</span> {lv.tag || '—'}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+          <p className="text-xs text-muted-foreground">
+            <span className="font-medium">Sales:</span> {stop.entry.salesName}
+          </p>
         </div>
 
         {/* ── Driver Action Forms ── */}

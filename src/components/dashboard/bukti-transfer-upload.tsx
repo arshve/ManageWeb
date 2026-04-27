@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useState, useRef } from 'react';
+import { compressImage } from '@/lib/image';
 import { X, Plus, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import { toast } from 'sonner';
@@ -64,8 +65,9 @@ export function BuktiTransferUpload({
 
     setUploading(true);
     try {
+      const compressed = await compressImage(file);
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', compressed);
 
       const res = await fetch('/api/upload?folder=transfers', {
         method: 'POST',

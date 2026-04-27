@@ -13,6 +13,7 @@
 
 // 1. Add useEffect to the imports
 import React, { useState, useRef, useEffect } from 'react';
+import { compressImage } from '@/lib/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { RupiahInput } from '@/components/ui/rupiah-input';
@@ -140,8 +141,9 @@ export function LivestockForm({ livestock, trigger }: LivestockFormProps) {
   }
 
   async function uploadPhoto(file: File): Promise<string> {
+    const compressed = await compressImage(file);
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('file', compressed);
 
     const res = await fetch('/api/upload', {
       method: 'POST',

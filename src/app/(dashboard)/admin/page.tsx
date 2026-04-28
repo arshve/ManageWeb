@@ -24,9 +24,11 @@ export default async function AdminDashboardPage() {
       include: { items: { select: { hargaJual: true, hargaModal: true, profit: true } } },
     }),
     prisma.entry.findMany({
+      where: { requests: { none: { isFulfilled: false } } },
       orderBy: { createdAt: 'desc' },
       include: {
         items: { include: { livestock: true } },
+        requests: { where: { isFulfilled: false }, select: { id: true, type: true, grade: true, weightMin: true, weightMax: true, hargaJual: true } },
         sales: { select: { id: true, name: true } },
         delivery: {
           select: { status: true, driver: { select: { name: true } } },
@@ -107,6 +109,14 @@ export default async function AdminDashboardPage() {
             condition: first.condition,
           }
         : null,
+      requests: entry.requests.map((r) => ({
+        id: r.id,
+        type: r.type,
+        grade: r.grade,
+        weightMin: r.weightMin,
+        weightMax: r.weightMax,
+        hargaJual: r.hargaJual,
+      })),
       sales: { id: entry.sales.id, name: entry.sales.name },
     };
   });

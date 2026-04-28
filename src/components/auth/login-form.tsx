@@ -42,13 +42,20 @@ export function LoginForm() {
     setLoading(true);
     setError('');
 
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password }),
-    });
-
-    const data = await res.json();
+    let res: Response;
+    let data: Record<string, string> = {};
+    try {
+      res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+      data = await res.json();
+    } catch {
+      setError('Terjadi kesalahan jaringan, coba lagi');
+      setLoading(false);
+      return;
+    }
 
     if (!res.ok) {
       setError(data.error || 'Username atau password salah');

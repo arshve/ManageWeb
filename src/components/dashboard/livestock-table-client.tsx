@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { Pagination } from '@/components/ui/pagination';
 import {
   ChevronDown,
   HeartPulse,
@@ -95,6 +96,10 @@ export function LivestockTableClient({
   const [gradeFilter, setGradeFilter] = useState('ALL');
   const [weightFilter, setWeightFilter] = useState('ALL');
   const [sortOrder, setSortOrder] = useState<'newest' | 'sku_asc' | 'sku_desc'>('newest');
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 25;
+
+  useEffect(() => { setPage(1); }, [typeFilter, statusFilter, conditionFilter, gradeFilter, weightFilter]);
 
   const typeFiltered = useMemo(() => {
     return typeFilter !== 'ALL' ? livestock.filter((l) => l.type === typeFilter) : livestock;
@@ -140,6 +145,9 @@ export function LivestockTableClient({
     gradeFilter !== 'ALL' ||
     weightFilter !== 'ALL' ||
     sortOrder !== 'newest';
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div className="space-y-4">
@@ -315,7 +323,7 @@ export function LivestockTableClient({
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((item) => {
+                {paginated.map((item) => {
                   const isMati = item.condition === 'MATI';
                   const rowClass = isMati
                     ? 'bg-black text-white hover:bg-zinc-900'
@@ -432,7 +440,7 @@ export function LivestockTableClient({
 
           {/* Mobile card list */}
           <div className="md:hidden p-3 space-y-3">
-            {filtered.map((item) => (
+            {paginated.map((item) => (
               <MobileLivestockCard
                 key={item.id}
                 item={item}
@@ -448,6 +456,8 @@ export function LivestockTableClient({
               </div>
             )}
           </div>
+
+          <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
         </CardContent>
       </Card>
     </div>

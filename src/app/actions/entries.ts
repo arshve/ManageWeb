@@ -29,9 +29,124 @@ interface RawItem {
   tag?: string | null;
 }
 
+interface RawRequest {
+  type: 'KAMBING' | 'DOMBA' | 'SAPI';
+  grade?: 'SUPER' | 'A' | 'B' | 'C' | 'D' | null;
+  weightMin?: number | null;
+  weightMax?: number | null;
+  hargaJual: number;
+  hargaModal?: number | null;
+  resellerCut?: number | null;
+  notes?: string | null;
+}
+
+function buildEntryBaseData(formData: FormData, salesId: string, status: 'PENDING' | 'APPROVED', approvedAt: Date | null, approvedBy: string | null) {
+  return {
+    invoiceNo: generateInvoiceNo(),
+    salesId,
+    status,
+    dp: formData.get('dp') ? Number(formData.get('dp')) : null,
+    totalBayar: formData.get('totalBayar') ? Number(formData.get('totalBayar')) : null,
+    paymentStatus: (formData.get('paymentStatus') as 'BELUM_BAYAR' | 'DP' | 'LUNAS') || 'BELUM_BAYAR',
+    buyerName: formData.get('buyerName') as string,
+    buyerPhone: (formData.get('buyerPhone') as string) || null,
+    buyerAddress: (formData.get('buyerAddress') as string) || null,
+    buyerMaps: (formData.get('buyerMaps') as string) || null,
+    pengiriman: (formData.get('pengiriman') as 'HARI_H' | 'H_1' | 'H_2' | 'H_3' | 'TITIP_POTONG') || null,
+    notes: (formData.get('notes') as string) || null,
+    buktiTransfer: formData.getAll('buktiTransfer') as string[],
+    approvedAt,
+    approvedBy,
+  };
+}
+
+async function resolveRoleFields(profile: { id: string; role: string }, formData: FormData) {
+  let salesId = profile.id;
+  let status: 'PENDING' | 'APPROVED' = 'PENDING';
+  let approvedAt: Date | null = null;
+  let approvedBy: string | null = null;
+
+  if (profile.role === 'ADMIN' || profile.role === 'SUPER_ADMIN') {
+    const adminSelectedSalesId = formData.get('salesId')?.toString().trim();
+    if (adminSelectedSalesId) {
+      const salesExists = await prisma.profile.findUnique({ where: { id: adminSelectedSalesId } });
+      if (!salesExists) return { error: 'Akun sales yang dipilih tidak valid atau sudah dihapus.' };
+      salesId = adminSelectedSalesId;
+    } else {
+      salesId = profile.id;
+    }
+    status = 'APPROVED';
+    approvedAt = new Date();
+    approvedBy = profile.id;
+  }
+
+  return { salesId, status, approvedAt, approvedBy };
+}
+
 export async function createEntry(formData: FormData) {
   const profile = await requireAuth();
+  const mode = formData.get('mode')?.toString() ?? 'LANGSUNG';
 
+  if (mode === 'ANTRIAN') {
+    const requestsJson = formData.get('requests')?.toString();
+    if (!requestsJson) return { error: 'Tambahkan minimal satu permintaan' };
+
+    let rawRequests: RawRequest[];
+    try {
+      rawRequests = JSON.parse(requestsJson);
+    } catch {
+      return { error: 'Data permintaan tidak valid' };
+    }
+    if (!Array.isArray(rawRequests) || rawRequests.length === 0) {
+      return { error: 'Tambahkan minimal satu permintaan' };
+    }
+    for (const r of rawRequests) {
+      if (!r.type || !r.hargaJual || r.hargaJual <= 0) {
+        return { error: 'Setiap permintaan harus memiliki jenis hewan dan harga jual' };
+      }
+    }
+
+    const resolved = await resolveRoleFields(profile, formData);
+    if ('error' in resolved) return resolved;
+    const { salesId, status, approvedAt, approvedBy } = resolved;
+
+    const entry = await prisma.$transaction(async (tx) => {
+      return tx.entry.create({
+        data: {
+          ...buildEntryBaseData(formData, salesId, status, approvedAt, approvedBy),
+          pengiriman: null,
+          requests: {
+            create: rawRequests.map((r) => ({
+              type: r.type,
+              grade: r.grade ?? null,
+              weightMin: r.weightMin ?? null,
+              weightMax: r.weightMax ?? null,
+              hargaJual: r.hargaJual,
+              hargaModal: r.hargaModal ?? null,
+              resellerCut: r.resellerCut ?? null,
+              notes: r.notes ?? null,
+            })),
+          },
+        },
+      });
+    });
+
+    await logAudit({
+      actor: profile,
+      action: 'CREATE',
+      entity: 'Entry',
+      entityId: entry.id,
+      label: `${entry.invoiceNo} — ${entry.buyerName} (Antrian)`,
+      after: entry,
+    });
+
+    revalidatePath('/sales');
+    revalidatePath('/admin');
+    revalidatePath('/admin/antrian');
+    return { success: true, entryId: entry.id };
+  }
+
+  // LANGSUNG mode (default)
   const itemsJson = formData.get('items')?.toString();
   if (!itemsJson) return { error: 'Pilih hewan terlebih dahulu' };
 
@@ -45,47 +160,22 @@ export async function createEntry(formData: FormData) {
     return { error: 'Pilih minimal satu hewan' };
   }
 
-  // Validate all livestock exist, not sold, not already linked
   const livestockIds = rawItems.map((i) => i.livestockId);
   const [allLivestock, existingItems] = await Promise.all([
     prisma.livestock.findMany({ where: { id: { in: livestockIds } } }),
     prisma.entryItem.findMany({ where: { livestockId: { in: livestockIds } } }),
   ]);
 
-  if (existingItems.length > 0) {
-    return { error: 'Satu atau lebih hewan sudah memiliki entry penjualan' };
-  }
+  if (existingItems.length > 0) return { error: 'Satu atau lebih hewan sudah memiliki entry penjualan' };
   for (const raw of rawItems) {
     const lv = allLivestock.find((l) => l.id === raw.livestockId);
-    if (!lv || lv.isSold) {
-      return { error: `Hewan ${raw.livestockId} tidak tersedia atau sudah terjual` };
-    }
+    if (!lv || lv.isSold) return { error: `Hewan ${raw.livestockId} tidak tersedia atau sudah terjual` };
   }
 
-  let salesId = profile.id;
-  let status: 'PENDING' | 'APPROVED' = 'PENDING';
-  let approvedAt: Date | null = null;
-  let approvedBy: string | null = null;
+  const resolved = await resolveRoleFields(profile, formData);
+  if ('error' in resolved) return resolved;
+  const { salesId, status, approvedAt, approvedBy } = resolved;
 
-  if (profile.role === 'ADMIN' || profile.role === 'SUPER_ADMIN') {
-    const adminSelectedSalesId = formData.get('salesId')?.toString().trim();
-    if (adminSelectedSalesId) {
-      const salesExists = await prisma.profile.findUnique({
-        where: { id: adminSelectedSalesId },
-      });
-      if (!salesExists) {
-        return { error: 'Akun sales yang dipilih tidak valid atau sudah dihapus.' };
-      }
-      salesId = adminSelectedSalesId;
-    } else {
-      salesId = profile.id;
-    }
-    status = 'APPROVED';
-    approvedAt = new Date();
-    approvedBy = profile.id;
-  }
-
-  // Build per-item create data with computed hpp/profit
   const itemsCreate = rawItems.map((raw) => {
     const hargaJual = raw.hargaJual || 0;
     const hargaModal = raw.hargaModal ?? null;
@@ -98,28 +188,11 @@ export async function createEntry(formData: FormData) {
   const entry = await prisma.$transaction(async (tx) => {
     const created = await tx.entry.create({
       data: {
-        invoiceNo: generateInvoiceNo(),
-        salesId,
-        status,
-        dp: formData.get('dp') ? Number(formData.get('dp')) : null,
-        totalBayar: formData.get('totalBayar') ? Number(formData.get('totalBayar')) : null,
-        paymentStatus:
-          (formData.get('paymentStatus') as 'BELUM_BAYAR' | 'DP' | 'LUNAS') || 'BELUM_BAYAR',
-        buyerName: formData.get('buyerName') as string,
-        buyerPhone: (formData.get('buyerPhone') as string) || null,
-        buyerAddress: (formData.get('buyerAddress') as string) || null,
-        buyerMaps: (formData.get('buyerMaps') as string) || null,
-        pengiriman:
-          (formData.get('pengiriman') as 'HARI_H' | 'H_1' | 'H_2' | 'H_3' | 'TITIP_POTONG') || null,
-        notes: (formData.get('notes') as string) || null,
-        buktiTransfer: formData.getAll('buktiTransfer') as string[],
-        approvedAt,
-        approvedBy,
+        ...buildEntryBaseData(formData, salesId, status, approvedAt, approvedBy),
         items: { create: itemsCreate },
       },
     });
 
-    // Update livestock: tag + isSold
     for (const raw of rawItems) {
       const update: Record<string, unknown> = {};
       if (raw.tag) update.tag = raw.tag;
@@ -351,5 +424,110 @@ export async function deleteEntry(id: string) {
 
   revalidatePath('/admin');
   revalidatePath('/sales');
+  return { success: true };
+}
+
+export async function fulfillEntryRequest(requestId: string, livestockId: string, formData: FormData) {
+  const admin = await requireRole('ADMIN', 'SUPER_ADMIN');
+
+  const [request, livestock] = await Promise.all([
+    prisma.entryRequest.findUnique({ where: { id: requestId }, include: { entry: true } }),
+    prisma.livestock.findUnique({ where: { id: livestockId } }),
+  ]);
+
+  if (!request) return { error: 'Permintaan tidak ditemukan' };
+  if (!livestock) return { error: 'Hewan tidak ditemukan' };
+  if (livestock.isSold) return { error: 'Hewan sudah terjual' };
+  if (livestock.type !== request.type) return { error: `Jenis hewan tidak sesuai (diminta: ${request.type})` };
+
+  const hargaModal = formData.get('hargaModal') ? Number(formData.get('hargaModal')) : (livestock.hargaModal ?? 0);
+  const resellerCut = formData.get('resellerCut') ? Number(formData.get('resellerCut')) : (request.resellerCut ?? 0);
+  const hpp = hargaModal + resellerCut;
+  const profit = request.hargaJual - hpp;
+
+  await prisma.$transaction([
+    prisma.entryItem.create({
+      data: {
+        entryId: request.entryId,
+        livestockId,
+        hargaJual: request.hargaJual,
+        hargaModal,
+        resellerCut,
+        hpp,
+        profit,
+      },
+    }),
+    prisma.livestock.update({
+      where: { id: livestockId },
+      data: { isSold: true },
+    }),
+    prisma.entryRequest.update({ where: { id: requestId }, data: { isFulfilled: true } }),
+  ]);
+
+  const gradeLabel = request.grade ? `/${request.grade}` : '';
+  await logAudit({
+    actor: admin,
+    action: 'UPDATE',
+    entity: 'Entry',
+    entityId: request.entryId,
+    label: `${request.entry.invoiceNo} — fulfill ${request.type}${gradeLabel}`,
+    after: { livestockId, hargaJual: request.hargaJual, hargaModal, resellerCut },
+  });
+
+  revalidatePath('/admin/antrian');
+  revalidatePath('/admin');
+  revalidatePath('/sales');
+  revalidatePath('/catalogue');
+  return { success: true };
+}
+
+export async function updateEntryRequests(entryId: string, requestsJson: string) {
+  const profile = await requireAuth();
+
+  const entry = await prisma.entry.findUnique({ where: { id: entryId } });
+  if (!entry) return { error: 'Entry tidak ditemukan' };
+  if (profile.role !== 'ADMIN' && profile.role !== 'SUPER_ADMIN' && entry.salesId !== profile.id) {
+    return { error: 'Anda tidak berhak mengubah entry ini' };
+  }
+
+  let rawRequests: RawRequest[];
+  try {
+    rawRequests = JSON.parse(requestsJson);
+  } catch {
+    return { error: 'Data permintaan tidak valid' };
+  }
+  if (!Array.isArray(rawRequests) || rawRequests.length === 0) {
+    return { error: 'Minimal satu permintaan harus ada' };
+  }
+
+  await prisma.$transaction([
+    prisma.entryRequest.deleteMany({ where: { entryId } }),
+    prisma.entryRequest.createMany({
+      data: rawRequests.map((r) => ({
+        entryId,
+        type: r.type,
+        grade: r.grade ?? null,
+        weightMin: r.weightMin ?? null,
+        weightMax: r.weightMax ?? null,
+        hargaJual: r.hargaJual,
+        hargaModal: r.hargaModal ?? null,
+        resellerCut: r.resellerCut ?? null,
+        notes: r.notes ?? null,
+      })),
+    }),
+  ]);
+
+  await logAudit({
+    actor: profile,
+    action: 'UPDATE',
+    entity: 'Entry',
+    entityId: entryId,
+    label: `${entry.invoiceNo} — ${entry.buyerName} (Antrian)`,
+    after: { requests: rawRequests },
+  });
+
+  revalidatePath('/admin');
+  revalidatePath('/sales');
+  revalidatePath('/admin/antrian');
   return { success: true };
 }

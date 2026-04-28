@@ -32,6 +32,7 @@ import {
   History,
   Truck,
   Wallet,
+  ListChecks,
 } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -48,6 +49,7 @@ const adminLinks = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/livestock', label: 'Hewan', icon: Beef },
   { href: '/admin/deliveries', label: 'Delivery', icon: Truck },
+  { href: '/admin/antrian', label: 'Antrian', icon: ListChecks },
   { href: '/admin/users', label: 'Kelola User', icon: Users },
   { href: '/admin/pricing', label: 'Harga', icon: DollarSign },
 ];

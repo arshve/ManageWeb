@@ -1,0 +1,1 @@
+ALTER TABLE "EntryRequest" ADD COLUMN "isFulfilled" BOOLEAN NOT NULL DEFAULT false;

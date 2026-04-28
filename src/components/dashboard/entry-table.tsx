@@ -19,6 +19,7 @@
 'use client';
 
 import { useState, useMemo, useRef, useEffect } from 'react';
+import { Pagination } from '@/components/ui/pagination';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -127,6 +128,14 @@ export interface EntryData {
     condition: string;
   } | null;
   sales: { id: string; name: string };
+  requests: {
+    id: string;
+    type: string;
+    grade: string | null;
+    weightMin: number | null;
+    weightMax: number | null;
+    hargaJual: number;
+  }[];
 }
 
 export interface SalesUser {
@@ -185,6 +194,10 @@ export function EntryTable({
   const [sentFilter, setSentFilter] = useState('ALL');
   const [sortField, setSortField] = useState<SortField>('createdAt');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 20;
+
+  useEffect(() => { setPage(1); }, [search, statusFilter, paymentFilter, sentFilter]);
 
   function toggleSort(field: SortField) {
     if (sortField === field) {
@@ -268,6 +281,9 @@ export function EntryTable({
     sortField,
     sortDir,
   ]);
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div>
@@ -406,7 +422,7 @@ export function EntryTable({
                   Harga Jual <SortIcon field="hargaJual" />
                 </span>
               </th>
-              <th className="text-center p-3 font-medium">Sales Cut</th>
+              {isAdmin && <th className="text-center p-3 font-medium">Sales Cut</th>}
               {canViewFinancials && (
                 <>
                   <th className="text-center p-3 font-medium">Modal</th>
@@ -435,7 +451,7 @@ export function EntryTable({
             </tr>
           </thead>
           <tbody>
-            {filtered.map((entry) => (
+            {paginated.map((entry) => (
               <EntryRow
                 key={entry.id}
                 entry={entry}
@@ -451,7 +467,7 @@ export function EntryTable({
             {filtered.length === 0 && (
               <tr>
                 <td
-                  colSpan={isAdmin ? (canViewFinancials ? 13 : 11) : 10}
+                  colSpan={isAdmin ? (canViewFinancials ? 13 : 11) : 9}
                   className="p-8 text-center text-muted-foreground"
                 >
                   {entries.length === 0
@@ -466,7 +482,7 @@ export function EntryTable({
 
       {/* Mobile card list */}
       <div className="md:hidden p-3 space-y-3">
-        {filtered.map((entry) => (
+        {paginated.map((entry) => (
           <MobileEntryCard
             key={entry.id}
             entry={entry}
@@ -487,6 +503,8 @@ export function EntryTable({
           </div>
         )}
       </div>
+
+      <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
     </div>
   );
 }
@@ -981,6 +999,15 @@ function EntryRow({
                 </div>
               );
             })}
+            {entry.requests.map((req) => {
+              const wLabel = req.type === 'SAPI' ? formatWeight(req.weightMin, req.weightMax) : null;
+              return (
+                <div key={req.id} className="flex items-center gap-1.5 text-xs text-muted-foreground italic">
+                  <span className="bg-amber-100 text-amber-700 text-[10px] font-medium px-1 rounded">antrian</span>
+                  <span>{req.type}{req.grade ? ' ' + req.grade : ''}{wLabel ? ' · ' + wLabel : ''}</span>
+                </div>
+              );
+            })}
           </div>
         </td>
         <td className="p-3">
@@ -993,9 +1020,11 @@ function EntryRow({
         </td>
         {isAdmin && <td className="p-3">{entry.sales.name}</td>}
         <td className="p-3 text-center">{formatRupiah(entry.hargaJual)}</td>
-        <td className="p-3 text-center">
-          {entry.resellerCut ? formatRupiah(entry.resellerCut) : '-'}
-        </td>
+        {isAdmin && (
+          <td className="p-3 text-center">
+            {entry.resellerCut ? formatRupiah(entry.resellerCut) : '-'}
+          </td>
+        )}
         {canViewFinancials && (
           <>
             <td className="p-3 text-center">
@@ -1110,7 +1139,7 @@ function EntryRow({
       {/* Inline edit row */}
       {isEditing && (
         <tr className="border-b bg-muted/20">
-          <td colSpan={isAdmin ? 13 : 10} className="p-4">
+          <td colSpan={isAdmin ? 13 : 9} className="p-4">
             <EntryEditFields
               entry={entry}
               isAdmin={isAdmin}
@@ -1197,6 +1226,11 @@ function MobileEntryCard({
                 </LivestockPhotoLink>
               );
             })}
+            {entry.requests.length > 0 && (
+              <span className="text-xs text-amber-600 italic">
+                +{entry.requests.length} antrian
+              </span>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
@@ -1272,6 +1306,15 @@ function MobileEntryCard({
                           </div>
                         );
                       })}
+                      {entry.requests.map((req) => {
+                        const wLabel = req.type === 'SAPI' ? formatWeight(req.weightMin, req.weightMax) : null;
+                        return (
+                          <div key={req.id} className="flex items-center gap-1.5 text-xs text-muted-foreground italic">
+                            <span className="bg-amber-100 text-amber-700 text-[10px] font-medium px-1 rounded">antrian</span>
+                            <span>{req.type}{req.grade ? ' ' + req.grade : ''}{wLabel ? ' · ' + wLabel : ''}</span>
+                          </div>
+                        );
+                      })}
                     </div>
                   }
                 />
@@ -1293,12 +1336,14 @@ function MobileEntryCard({
                   label="Harga Jual"
                   value={formatRupiah(entry.hargaJual)}
                 />
-                <CardRow
-                  label="Sales Cut"
-                  value={
-                    entry.resellerCut ? formatRupiah(entry.resellerCut) : '-'
-                  }
-                />
+                {isAdmin && (
+                  <CardRow
+                    label="Sales Cut"
+                    value={
+                      entry.resellerCut ? formatRupiah(entry.resellerCut) : '-'
+                    }
+                  />
+                )}
                 {canViewFinancials && (
                   <>
                     <CardRow

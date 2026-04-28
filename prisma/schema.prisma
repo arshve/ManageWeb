@@ -122,10 +122,11 @@ model Livestock {
 }
 
 model Entry {
-  id            String        @id @default(cuid())
-  invoiceNo     String        @unique
-  status        EntryStatus   @default(PENDING)
+  id            String         @id @default(cuid())
+  invoiceNo     String         @unique
+  status        EntryStatus    @default(PENDING)
   items         EntryItem[]
+  requests      EntryRequest[]
   salesId       String
   sales         Profile       @relation(fields: [salesId], references: [id])
   dp            Float?
@@ -165,6 +166,25 @@ model EntryItem {
   createdAt   DateTime  @default(now())
 
   @@index([entryId])
+}
+
+model EntryRequest {
+  id          String       @id @default(cuid())
+  entryId     String
+  entry       Entry        @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  type        AnimalType
+  grade       AnimalGrade?
+  weightMin   Float?
+  weightMax   Float?
+  hargaJual   Float
+  hargaModal  Float?
+  resellerCut Float?
+  notes       String?
+  isFulfilled Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+
+  @@index([entryId])
+  @@index([type, grade])
 }
 
 model Delivery {

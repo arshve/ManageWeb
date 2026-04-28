@@ -6,9 +6,11 @@ import { Card, CardContent } from '@/components/ui/card';
 export default async function AdminEntriesPage() {
   const [entries, salesUsers] = await Promise.all([
     prisma.entry.findMany({
+      where: { requests: { none: { isFulfilled: false } } },
       orderBy: { createdAt: 'desc' },
       include: {
         items: { include: { livestock: true } },
+        requests: { where: { isFulfilled: false }, select: { id: true, type: true, grade: true, weightMin: true, weightMax: true, hargaJual: true } },
         sales: { select: { id: true, name: true } },
         delivery: {
           select: {
@@ -84,6 +86,14 @@ export default async function AdminEntriesPage() {
         photoUrl: first.photoUrl,
         condition: first.condition,
       } : null,
+      requests: entry.requests.map((r) => ({
+        id: r.id,
+        type: r.type,
+        grade: r.grade,
+        weightMin: r.weightMin,
+        weightMax: r.weightMax,
+        hargaJual: r.hargaJual,
+      })),
       sales: { id: entry.sales.id, name: entry.sales.name },
     };
   });

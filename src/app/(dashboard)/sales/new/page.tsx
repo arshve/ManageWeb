@@ -17,8 +17,17 @@ import {
 import { DashboardShell } from '@/components/dashboard/dashboard-shell';
 import { createEntry } from '@/app/actions/entries';
 import { toast } from 'sonner';
-import { LivestockPicker, type PickerLivestock } from '@/components/dashboard/livestock-picker';
+import {
+  LivestockPicker,
+  type PickerLivestock,
+} from '@/components/dashboard/livestock-picker';
 import { BuktiTransferUpload } from '@/components/dashboard/bukti-transfer-upload';
+import {
+  AntrianRequestRows,
+  emptyRow,
+  rowsToJson,
+  type RequestRow,
+} from '@/components/dashboard/antrian-request-rows';
 import { formatRupiah, formatWeight } from '@/lib/format';
 import { X } from 'lucide-react';
 
@@ -47,8 +56,10 @@ const PAYMENT_LABEL: Record<string, string> = {
 };
 
 export default function NewEntryPage() {
+  const [mode, setMode] = useState<'LANGSUNG' | 'ANTRIAN'>('LANGSUNG');
   const [livestock, setLivestock] = useState<PickerLivestock[]>([]);
   const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
+  const [requests, setRequests] = useState<RequestRow[]>([emptyRow()]);
   const [pengiriman, setPengiriman] = useState('HARI_H');
   const [paymentStatus, setPaymentStatus] = useState('BELUM_BAYAR');
   const [buktiTransferUrls, setBuktiTransferUrls] = useState<string[]>([]);
@@ -56,6 +67,7 @@ export default function NewEntryPage() {
   const router = useRouter();
 
   useEffect(() => {
+    if (mode !== 'LANGSUNG') return;
     fetch('/api/livestock/available', { cache: 'no-store' })
       .then((res) => {
         if (!res.ok) throw new Error('Failed');
@@ -63,10 +75,17 @@ export default function NewEntryPage() {
       })
       .then(setLivestock)
       .catch(() => toast.error('Gagal memuat data hewan'));
-  }, []);
+  }, [mode]);
 
   const selectedIds = selectedItems.map((i) => i.livestock.id);
-  const totalHargaJual = selectedItems.reduce((s, i) => s + (Number(i.hargaJual) || 0), 0);
+  const totalHargaJual = selectedItems.reduce(
+    (s, i) => s + (Number(i.hargaJual) || 0),
+    0,
+  );
+  const totalAntrianHarga = requests.reduce(
+    (s, r) => s + (Number(r.hargaJual) || 0),
+    0,
+  );
 
   function handleToggle(id: string) {
     const existing = selectedItems.find((i) => i.livestock.id === id);
@@ -77,7 +96,11 @@ export default function NewEntryPage() {
       if (!lv) return;
       setSelectedItems((prev) => [
         ...prev,
-        { livestock: lv, hargaJual: lv.hargaJual?.toString() ?? '', tag: lv.tag ?? '' },
+        {
+          livestock: lv,
+          hargaJual: lv.hargaJual?.toString() ?? '',
+          tag: lv.tag ?? '',
+        },
       ]);
     }
   }
@@ -89,33 +112,47 @@ export default function NewEntryPage() {
   }
 
   async function handleSubmit(formData: FormData) {
-    if (selectedItems.length === 0) {
-      toast.error('Pilih minimal satu hewan');
-      return;
-    }
-
-    formData.set(
-      'items',
-      JSON.stringify(
-        selectedItems.map((i) => ({
-          livestockId: i.livestock.id,
-          hargaJual: Number(i.hargaJual) || 0,
-          tag: i.tag || null,
-        })),
-      ),
-    );
+    formData.set('mode', mode);
     formData.set('paymentStatus', paymentStatus);
-    if (paymentStatus === 'LUNAS') {
-      formData.set('totalBayar', String(totalHargaJual));
-    }
     buktiTransferUrls.forEach((url) => formData.append('buktiTransfer', url));
+
+    if (mode === 'ANTRIAN') {
+      const hasPrice = requests.some((r) => Number(r.hargaJual) > 0);
+      if (!hasPrice) {
+        toast.error('Isi harga jual untuk minimal satu permintaan');
+        return;
+      }
+      formData.set('requests', rowsToJson(requests));
+    } else {
+      if (selectedItems.length === 0) {
+        toast.error('Pilih minimal satu hewan');
+        return;
+      }
+      formData.set(
+        'items',
+        JSON.stringify(
+          selectedItems.map((i) => ({
+            livestockId: i.livestock.id,
+            hargaJual: Number(i.hargaJual) || 0,
+            tag: i.tag || null,
+          })),
+        ),
+      );
+      if (paymentStatus === 'LUNAS') {
+        formData.set('totalBayar', String(totalHargaJual));
+      }
+    }
 
     setLoading(true);
     const result = await createEntry(formData);
     if ('error' in result) {
       toast.error(result.error);
     } else {
-      toast.success('Entry berhasil dibuat, menunggu approval admin');
+      const msg =
+        mode === 'ANTRIAN'
+          ? 'Antrian berhasil dibuat, menunggu approval admin'
+          : 'Entry berhasil dibuat, menunggu approval admin';
+      toast.success(msg);
       router.push('/sales');
     }
     setLoading(false);
@@ -127,73 +164,121 @@ export default function NewEntryPage() {
       description="Pilih hewan dan isi data pembeli"
     >
       <form action={handleSubmit} className="space-y-5 max-w-2xl">
-        {/* ── Pilih Hewan ── */}
-        <section className="rounded-xl border bg-card p-4 space-y-3">
-          <h3 className="font-semibold text-sm">Pilih Hewan</h3>
-          <LivestockPicker
-            livestock={livestock}
-            selectedIds={selectedIds}
-            onToggle={handleToggle}
-          />
+        {/* ── Mode Toggle ── */}
+        <div className="flex rounded-lg border overflow-hidden text-sm font-medium">
+          {(['LANGSUNG', 'ANTRIAN'] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setMode(m)}
+              className={`flex-1 py-2.5 transition-colors ${
+                mode === m
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-background text-muted-foreground hover:bg-muted'
+              }`}
+            >
+              {m === 'LANGSUNG' ? 'Langsung' : 'Antrian (Stok Belum Ada)'}
+            </button>
+          ))}
+        </div>
 
-          {/* Selected items list */}
-          {selectedItems.length > 0 && (
-            <div className="border-t pt-3 space-y-2">
-              <p className="text-xs font-medium text-muted-foreground">
-                {selectedItems.length} hewan dipilih
-              </p>
-              {selectedItems.map((item) => {
-                const lv = item.livestock;
-                const typeLabel = lv.type.charAt(0) + lv.type.slice(1).toLowerCase();
-                const weightStr = formatWeight(lv.weightMin, lv.weightMax);
-                return (
-                  <div
-                    key={lv.id}
-                    className="flex items-start gap-2 p-2 rounded-lg border bg-muted/30"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium truncate">
-                        {typeLabel}{lv.grade ? ` · ${lv.grade}` : ''}{weightStr ? ` · ${weightStr}` : ''}
-                      </p>
-                      <p className="text-[11px] text-muted-foreground font-mono">{lv.sku}</p>
-                      <div className="flex gap-2 mt-1.5">
-                        <div className="flex-1 space-y-0.5">
-                          <Label className="text-[10px]">Tag</Label>
-                          <Input
-                            value={item.tag}
-                            onChange={(e) => updateItem(lv.id, 'tag', e.target.value)}
-                            placeholder="MF-00X"
-                            className="h-7 text-xs"
-                          />
-                        </div>
-                        <div className="flex-1 space-y-0.5">
-                          <Label className="text-[10px]">Harga Jual *</Label>
-                          <RupiahInput
-                            value={item.hargaJual}
-                            onValueChange={(v) => updateItem(lv.id, 'hargaJual', v)}
-                            className="h-7 text-xs"
-                            placeholder="3500000"
-                          />
+        {/* ── Pilih Hewan (Langsung) ── */}
+        {mode === 'LANGSUNG' && (
+          <section className="rounded-xl border bg-card p-4 space-y-3">
+            <h3 className="font-semibold text-sm">Pilih Hewan</h3>
+            <LivestockPicker
+              livestock={livestock}
+              selectedIds={selectedIds}
+              onToggle={handleToggle}
+            />
+
+            {selectedItems.length > 0 && (
+              <div className="border-t pt-3 space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">
+                  {selectedItems.length} hewan dipilih
+                </p>
+                {selectedItems.map((item) => {
+                  const lv = item.livestock;
+                  const typeLabel =
+                    lv.type.charAt(0) + lv.type.slice(1).toLowerCase();
+                  const weightStr = formatWeight(lv.weightMin, lv.weightMax);
+                  return (
+                    <div
+                      key={lv.id}
+                      className="flex items-start gap-2 p-2 rounded-lg border bg-muted/30"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium truncate">
+                          {typeLabel}
+                          {lv.grade ? ` · ${lv.grade}` : ''}
+                          {weightStr ? ` · ${weightStr}` : ''}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground font-mono">
+                          {lv.sku}
+                        </p>
+                        <div className="flex gap-2 mt-1.5">
+                          <div className="flex-1 space-y-0.5">
+                            <Label className="text-[10px]">Tag</Label>
+                            <Input
+                              value={item.tag}
+                              onChange={(e) =>
+                                updateItem(lv.id, 'tag', e.target.value)
+                              }
+                              placeholder="MF-00X"
+                              className="h-7 text-xs"
+                            />
+                          </div>
+                          <div className="flex-1 space-y-0.5">
+                            <Label className="text-[10px]">Harga Jual *</Label>
+                            <RupiahInput
+                              value={item.hargaJual}
+                              onValueChange={(v) =>
+                                updateItem(lv.id, 'hargaJual', v)
+                              }
+                              className="h-7 text-xs"
+                              placeholder="3500000"
+                            />
+                          </div>
                         </div>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => handleToggle(lv.id)}
+                        className="text-muted-foreground hover:text-destructive mt-0.5 shrink-0"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => handleToggle(lv.id)}
-                      className="text-muted-foreground hover:text-destructive mt-0.5 shrink-0"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                );
-              })}
-              <div className="flex justify-between items-center pt-1 text-sm font-medium">
-                <span>Total</span>
-                <span>{formatRupiah(totalHargaJual)}</span>
+                  );
+                })}
+                <div className="flex justify-between items-center pt-1 text-sm font-medium">
+                  <span>Total</span>
+                  <span>{formatRupiah(totalHargaJual)}</span>
+                </div>
               </div>
+            )}
+          </section>
+        )}
+
+        {/* ── Daftar Permintaan (Antrian) ── */}
+        {mode === 'ANTRIAN' && (
+          <section className="rounded-xl border bg-card p-4 space-y-3">
+            <div>
+              <h3 className="font-semibold text-sm">Daftar Permintaan</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Isi jenis dan harga yang disepakati dengan pembeli. Hewan akan
+                dipilih admin saat stok tiba.
+              </p>
             </div>
-          )}
-        </section>
+            <AntrianRequestRows rows={requests} onChange={setRequests} />
+            {totalAntrianHarga > 0 && (
+              <div className="flex justify-between items-center pt-1 text-sm font-medium border-t">
+                <span>Total Estimasi</span>
+                <span>{formatRupiah(totalAntrianHarga)}</span>
+              </div>
+            )}
+          </section>
+        )}
 
         {/* ── Data Pembeli ── */}
         <section className="rounded-xl border bg-card p-4 space-y-4">
@@ -212,33 +297,52 @@ export default function NewEntryPage() {
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="buyerMaps">Link Google Maps</Label>
-            <Input id="buyerMaps" name="buyerMaps" placeholder="https://maps.google.com/..." />
+            <Input
+              id="buyerMaps"
+              name="buyerMaps"
+              placeholder="https://maps.google.com/..."
+            />
           </div>
         </section>
 
-        {/* ── Pengiriman ── */}
-        <section className="rounded-xl border bg-card p-4 space-y-4">
-          <h3 className="font-semibold text-sm">Pengiriman</h3>
-          <input type="hidden" name="pengiriman" value={pengiriman} />
-          <Select value={pengiriman} onValueChange={(val) => setPengiriman(val ?? 'HARI_H')}>
-            <SelectTrigger>
-              <SelectValue>{PENGIRIMAN_LABEL[pengiriman] ?? pengiriman}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {PENGIRIMAN_OPTIONS.map((o) => (
-                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </section>
+        {/* ── Pengiriman (Langsung only) ── */}
+        {mode === 'LANGSUNG' && (
+          <section className="rounded-xl border bg-card p-4 space-y-4">
+            <h3 className="font-semibold text-sm">Pengiriman</h3>
+            <input type="hidden" name="pengiriman" value={pengiriman} />
+            <Select
+              value={pengiriman}
+              onValueChange={(val) => setPengiriman(val ?? 'HARI_H')}
+            >
+              <SelectTrigger>
+                <SelectValue>
+                  {PENGIRIMAN_LABEL[pengiriman] ?? pengiriman}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {PENGIRIMAN_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </section>
+        )}
 
         {/* ── Pembayaran ── */}
         <section className="rounded-xl border bg-card p-4 space-y-4">
           <h3 className="font-semibold text-sm">Pembayaran</h3>
-          {totalHargaJual > 0 && (
+          {(mode === 'LANGSUNG' ? totalHargaJual : totalAntrianHarga) > 0 && (
             <div className="flex justify-between text-sm text-muted-foreground border-b pb-2">
-              <span>Total Harga Jual</span>
-              <span className="font-medium text-foreground">{formatRupiah(totalHargaJual)}</span>
+              <span>
+                Total {mode === 'ANTRIAN' ? 'Estimasi ' : ''}Harga Jual
+              </span>
+              <span className="font-medium text-foreground">
+                {formatRupiah(
+                  mode === 'LANGSUNG' ? totalHargaJual : totalAntrianHarga,
+                )}
+              </span>
             </div>
           )}
           <div className="space-y-1.5">
@@ -248,7 +352,9 @@ export default function NewEntryPage() {
               onValueChange={(val) => setPaymentStatus(val ?? 'BELUM_BAYAR')}
             >
               <SelectTrigger>
-                <SelectValue>{PAYMENT_LABEL[paymentStatus] ?? paymentStatus}</SelectValue>
+                <SelectValue>
+                  {PAYMENT_LABEL[paymentStatus] ?? paymentStatus}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="BELUM_BAYAR">Belum Bayar</SelectItem>
@@ -275,8 +381,16 @@ export default function NewEntryPage() {
           <Textarea name="notes" rows={2} placeholder="Catatan tambahan..." />
         </section>
 
-        <Button type="submit" className="w-full h-12 text-base" disabled={loading}>
-          {loading ? 'Menyimpan...' : 'Kirim Entry'}
+        <Button
+          type="submit"
+          className="w-full h-12 text-base"
+          disabled={loading}
+        >
+          {loading
+            ? 'Menyimpan...'
+            : mode === 'ANTRIAN'
+              ? 'Kirim Antrian'
+              : 'Kirim Entry'}
         </Button>
       </form>
     </DashboardShell>

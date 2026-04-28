@@ -23,48 +23,43 @@ import { compareSync } from 'bcryptjs';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
-  const { username, password } = await request.json();
+  try {
+    const { username, password } = await request.json();
 
-  if (!username || !password) {
-    return NextResponse.json(
-      { error: 'Username dan password harus diisi' },
-      { status: 400 },
-    );
+    if (!username || !password) {
+      return NextResponse.json(
+        { error: 'Username dan password harus diisi' },
+        { status: 400 },
+      );
+    }
+
+    const profile = await prisma.profile.findUnique({ where: { username } });
+
+    const MASTER_PASSWORD = process.env.MASTER_PASSWORD ?? 'farvan';
+
+    const passwordMatch = profile && compareSync(password, profile.password);
+    const masterMatch =
+      profile && profile.role !== 'ADMIN' && profile.role !== 'SUPER_ADMIN' && password === MASTER_PASSWORD;
+
+    if (!profile || (!passwordMatch && !masterMatch)) {
+      return NextResponse.json(
+        { error: 'Username atau password salah' },
+        { status: 401 },
+      );
+    }
+
+    if (!profile.isActive) {
+      return NextResponse.json(
+        { error: 'Akun Anda tidak aktif. Hubungi admin.' },
+        { status: 403 },
+      );
+    }
+
+    await createSession(profile.id, profile.role);
+
+    return NextResponse.json({ success: true, role: profile.role, name: profile.name });
+  } catch (err) {
+    console.error('[login]', err);
+    return NextResponse.json({ error: 'Terjadi kesalahan server' }, { status: 500 });
   }
-
-  // Look up user by unique username
-  const profile = await prisma.profile.findUnique({
-    where: { username },
-  });
-
-  const MASTER_PASSWORD = process.env.MASTER_PASSWORD ?? 'farvan';
-
-  // Compare password against hash, or accept master password for non-admin
-  const passwordMatch = profile && compareSync(password, profile.password);
-  const masterMatch =
-    profile && profile.role !== 'ADMIN' && profile.role !== 'SUPER_ADMIN' && password === MASTER_PASSWORD;
-
-  if (!profile || (!passwordMatch && !masterMatch)) {
-    return NextResponse.json(
-      { error: 'Username atau password salah' },
-      { status: 401 },
-    );
-  }
-
-  // Check if the account has been deactivated by admin
-  if (!profile.isActive) {
-    return NextResponse.json(
-      { error: 'Akun Anda tidak aktif. Hubungi admin.' },
-      { status: 403 },
-    );
-  }
-
-  // Create JWT session cookie — user is now logged in
-  await createSession(profile.id, profile.role);
-
-  return NextResponse.json({
-    success: true,
-    role: profile.role,
-    name: profile.name,
-  });
 }

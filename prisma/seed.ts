@@ -1,5 +1,13 @@
-import "dotenv/config";
+import { config } from "dotenv";
+import { existsSync } from "fs";
+import path from "path";
 import { PrismaClient } from "../src/generated/prisma/client";
+
+const localPath = path.join(process.cwd(), ".env.local");
+config({
+  path: existsSync(localPath) ? localPath : path.join(process.cwd(), ".env"),
+  override: true,
+});
 import { hashSync } from "bcryptjs";
 
 const prisma = new PrismaClient();

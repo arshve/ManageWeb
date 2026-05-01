@@ -55,6 +55,7 @@ export default async function AdminDeliveriesPage({
         buyerLat: true,
         buyerLng: true,
         buyerMaps: true,
+        pengiriman: true,
         delivery: {
           select: {
             id: true,
@@ -143,6 +144,7 @@ export default async function AdminDeliveriesPage({
     buyerLat: e.buyerLat,
     buyerLng: e.buyerLng,
     buyerMaps: e.buyerMaps,
+    pengiriman: e.pengiriman,
     delivery: e.delivery,
   }));
 

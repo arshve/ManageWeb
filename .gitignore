@@ -45,6 +45,9 @@ next-env.d.ts
 
 /graphify-out
 
+# Production DB backups (contain plaintext data — never commit)
+/backups
+
 # Ignore AI instructions
 CLAUDE.md
 AGENT.md

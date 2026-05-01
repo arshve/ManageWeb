@@ -67,6 +67,7 @@ type ScheduledEntry = {
   buyerLat: number | null;
   buyerLng: number | null;
   buyerMaps: string | null;
+  pengiriman: string | null;
   delivery: {
     id: string;
     sequence: number | null;
@@ -897,6 +898,7 @@ export function DeliveriesAdminView({
                         <th className={cn(th, 'w-36')}>Hewan / SKU</th>
                         <th className={th}>Pembeli</th>
                         <th className={th}>Alamat</th>
+                        <th className={cn(th, 'w-28 text-center')}>Pengiriman</th>
                         <th className={cn(th, 'w-28 text-center')}>Status</th>
                         <th className={cn(th, 'w-12 pr-4')}></th>
                       </tr>
@@ -927,6 +929,11 @@ export function DeliveriesAdminView({
                             </td>
                             <td className={cn(td, 'text-xs text-gray-500 max-w-xs truncate')} title={s.buyerAddress ?? undefined}>{s.buyerAddress ?? '—'}</td>
                             <td className={cn(td, 'text-center')}>
+                              {s.pengiriman ? (
+                                <ColorBadge color="blue">{formatPengiriman(s.pengiriman)}</ColorBadge>
+                              ) : <span className="text-xs text-gray-400">—</span>}
+                            </td>
+                            <td className={cn(td, 'text-center')}>
                               <ColorBadge color={STATUS_COLOR[s.delivery?.status ?? ''] ?? 'gray'}>{s.delivery?.status ?? 'PENDING'}</ColorBadge>
                             </td>
                             <td className={cn(td, 'pr-4 text-right')}>
@@ -953,6 +960,7 @@ export function DeliveriesAdminView({
                             <span className="font-medium text-sm text-gray-900">{s.buyerName}</span>
                           </div>
                           <div className="flex items-center gap-2">
+                            {s.pengiriman && <ColorBadge color="blue">{formatPengiriman(s.pengiriman)}</ColorBadge>}
                             <ColorBadge color={STATUS_COLOR[s.delivery?.status ?? ''] ?? 'gray'}>{s.delivery?.status ?? 'PENDING'}</ColorBadge>
                             {href && (
                               <a href={href} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center w-7 h-7 rounded-md border border-gray-200 text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors text-base">↗</a>

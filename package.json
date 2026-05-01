@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "seed:stress": "tsx prisma/stress-seed.ts",
+    "backup:prod": "tsx scripts/backup-prod.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.3.0",

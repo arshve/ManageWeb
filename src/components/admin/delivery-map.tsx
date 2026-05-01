@@ -152,6 +152,7 @@ export function DeliveryMap({
 
   const routeCacheRef = useRef<Record<string, [number, number][]>>({});
   const [routeVersion, setRouteVersion] = useState(0);
+  const [routingFailed, setRoutingFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -169,29 +170,49 @@ export function DeliveryMap({
       }
       if (tasks.length === 0) return;
 
-      let updated = false;
-      for (const { cacheKey, coordsStr } of tasks) {
-        if (cancelled) return;
+      const fetchRoute = async (coordsStr: string): Promise<[number, number][] | null> => {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 10_000);
         try {
           const url = `https://router.project-osrm.org/route/v1/driving/${coordsStr}?overview=full&geometries=geojson`;
-          const res = await fetch(url);
-          if (!res.ok) continue;
+          const res = await fetch(url, { signal: controller.signal });
+          if (!res.ok) return null;
           const data = await res.json();
-          if (data.code !== 'Ok' || !data.routes?.[0]) continue;
-          const coords = data.routes[0].geometry.coordinates as [
-            number,
-            number,
-          ][];
-          routeCacheRef.current[cacheKey] = coords.map(([lng, lat]) => [
-            lat,
-            lng,
-          ]);
-          updated = true;
-        } catch {
-          // fall back to straight line
+          if (data.code !== 'Ok' || !data.routes?.[0]) return null;
+          const coords = data.routes[0].geometry.coordinates as [number, number][];
+          return coords.map(([lng, lat]) => [lat, lng]);
+        } catch (err) {
+          console.warn('[delivery-map] OSRM fetch failed:', err);
+          return null;
+        } finally {
+          clearTimeout(timer);
         }
+      };
+
+      let updated = false;
+      let anyFailed = false;
+      for (const { cacheKey, coordsStr } of tasks) {
+        if (cancelled) return;
+        let result = await fetchRoute(coordsStr);
+        // retry once after a short pause before giving up
+        if (!result && !cancelled) {
+          await new Promise((r) => setTimeout(r, 1000));
+          result = await fetchRoute(coordsStr);
+        }
+        if (result) {
+          routeCacheRef.current[cacheKey] = result;
+          updated = true;
+        } else {
+          anyFailed = true;
+        }
+        // small gap between sequential requests to avoid rate-limiting
+        if (!cancelled) await new Promise((r) => setTimeout(r, 200));
       }
-      if (!cancelled && updated) setRouteVersion((v) => v + 1);
+      if (!cancelled) {
+        if (updated) setRouteVersion((v) => v + 1);
+        if (anyFailed) setRoutingFailed(true);
+        else setRoutingFailed(false);
+      }
     }, 300);
     return () => {
       cancelled = true;
@@ -212,6 +233,12 @@ export function DeliveryMap({
   const center: [number, number] = [depot.lat, depot.lng];
 
   return (
+    <div className="space-y-2">
+    {routingFailed && (
+      <p className="text-xs text-yellow-700 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-950/40 border border-yellow-200 dark:border-yellow-800 rounded px-3 py-2">
+        ⚠ Gagal memuat rute jalan dari OSRM — menampilkan garis lurus. Periksa koneksi internet lalu refresh halaman.
+      </p>
+    )}
     <div className="h-[500px] w-full rounded-lg overflow-hidden border">
       <MapContainer
         center={center}
@@ -303,6 +330,7 @@ export function DeliveryMap({
           );
         })}
       </MapContainer>
+    </div>
     </div>
   );
 }

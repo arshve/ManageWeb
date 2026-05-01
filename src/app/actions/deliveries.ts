@@ -244,7 +244,7 @@ export async function generateRoutes(
     lng: e.buyerLng!,
   }));
 
-  const buckets = splitToDrivers(points, driverCount);
+  const buckets = splitToDrivers(depot, points, driverCount);
   const routes = buckets.map((b) => solveTSP(depot, b));
 
   const assignments: { entryId: string; sequence: number }[] = [];

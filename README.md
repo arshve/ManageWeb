@@ -195,6 +195,88 @@ npm run lint              # ESLint
 npx prisma studio         # DB GUI at :5555
 npx prisma db push        # Sync schema
 npx tsx prisma/seed.ts    # Re-seed
+npm run seed:stress       # Stress data for delivery flow (see below)
+npm run backup:prod       # pg_dump production DB to backups/ (run before staging tests)
+```
+
+### Staging / stress data
+
+#### How the env switch works
+
+The repo uses Next.js's `.env.local` convention as a single switch:
+
+| File | Purpose | Loaded by |
+|---|---|---|
+| `.env` | Prod credentials / fallback | All tools (lowest priority) |
+| `.env.local` | **Local development credentials** | Next.js dev/build, `tsx prisma/*.ts`, `npx prisma *`, `scripts/*.ts` |
+
+When `.env.local` exists, **everything** (Next dev server, seed scripts, Prisma CLI) reads it and ignores `.env`. Delete or rename `.env.local` to fall back to `.env` (production).
+
+#### Step 0 — Back up production first
+
+Before any local testing, dump prod to a local file:
+
+```bash
+npm run backup:prod
+```
+
+Output lands in `backups/prod-<timestamp>.sql` (gitignored). If something goes wrong, restore with:
+
+```bash
+psql "$DIRECT_URL" -f backups/prod-<timestamp>.sql
+```
+
+> `pg_dump` / `psql` must be on your PATH (installed with the PostgreSQL client tools).
+
+#### Step 1 — Set up local mode
+
+```bash
+# Create a local database
+psql -U postgres -c "CREATE DATABASE millenials_farm;"
+
+# Copy the local env template
+cp .env.local.example .env.local        # macOS / Linux
+Copy-Item .env.local.example .env.local  # Windows
+
+# Edit .env.local: replace USER / PASSWORD with your local Postgres credentials
+
+# Push schema + seed baseline data
+npx prisma db push
+npx tsx prisma/seed.ts
+
+# Seed 500 entries × 6 drivers × 3 days
+npm run seed:stress
+
+# Run against local DB
+npm run dev
+```
+
+From this point every `npm run dev`, `npx prisma studio`, and seed command hits your local Postgres — production is untouched.
+
+#### Stress seed details
+
+`npm run seed:stress` populates the local DB with:
+
+- 6 driver accounts (`stressdriver1`..`stressdriver6`, password `driver`) with vehicle plates and 3-day availability
+- 500 livestock + 500 fully-populated APPROVED entries (all fields: `pengiriman`, `notes`, `buktiTransfer`, Google Maps URLs, full pricing) with PENDING unassigned deliveries
+- Buyer coordinates scattered across Jabodetabek (Jakarta, Bekasi, Tangerang, Tangsel, Depok, Bogor)
+
+Idempotent — re-runs clean their own prefix (`INV-STRESS-`, `MF-STRESS-`, `stressdriver*`) before recreating. Regular seed data is never touched.
+
+After seeding, open `/admin/deliveries` and click **Generate Routes** to exercise the TSP solver on 500 stops × 6 drivers × 3 days.
+
+#### Will this touch production?
+
+**No.** `npm run seed:stress` requires `.env.local` to exist and also checks that the `DATABASE_URL` inside it is `localhost` or `127.0.0.1`. It exits immediately without touching anything if either check fails. There is no way to accidentally run it against prod with this setup.
+
+To wipe staging and start fresh:
+
+```bash
+psql -U postgres -c "DROP DATABASE millenials_farm;"
+psql -U postgres -c "CREATE DATABASE millenials_farm;"
+npx prisma db push
+npx tsx prisma/seed.ts
+npm run seed:stress
 ```
 
 ### Windows notes

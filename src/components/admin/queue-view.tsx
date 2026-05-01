@@ -107,9 +107,11 @@ function StatusBadge({ status }: { status: string }) {
 export function QueueView({
   requests,
   availableLivestock,
+  canViewFinancials,
 }: {
   requests: QueueRequest[];
   availableLivestock: AvailableLivestock[];
+  canViewFinancials: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -392,19 +394,21 @@ export function QueueView({
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-3 pt-2 border-t">
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Harga Modal</Label>
-                  <RupiahInput
-                    value={hargaModal}
-                    onValueChange={setHargaModal}
-                    placeholder={
-                      availableLivestock.find((l) => l.id === pickedId)?.hargaModal?.toString() ??
-                      '0'
-                    }
-                    className="h-9 text-sm"
-                  />
-                </div>
+              <div className={`grid gap-3 pt-2 border-t ${canViewFinancials ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                {canViewFinancials && (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Harga Modal</Label>
+                    <RupiahInput
+                      value={hargaModal}
+                      onValueChange={setHargaModal}
+                      placeholder={
+                        availableLivestock.find((l) => l.id === pickedId)?.hargaModal?.toString() ??
+                        '0'
+                      }
+                      className="h-9 text-sm"
+                    />
+                  </div>
+                )}
                 <div className="space-y-1.5">
                   <Label className="text-xs">Komisi Sales</Label>
                   <RupiahInput
@@ -414,7 +418,7 @@ export function QueueView({
                     className="h-9 text-sm"
                   />
                 </div>
-                {pickedId && hargaModal && (
+                {canViewFinancials && pickedId && hargaModal && (
                   <div className="col-span-2 flex justify-between text-sm border-t pt-2">
                     <span className="text-muted-foreground">Estimasi Profit</span>
                     <span className="font-medium">

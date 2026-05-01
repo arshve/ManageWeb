@@ -1,10 +1,11 @@
 import { prisma } from '@/lib/prisma';
-import { requireRole } from '@/lib/auth';
+import { requireRole, isSuperAdmin } from '@/lib/auth';
 import { DashboardShell } from '@/components/dashboard/dashboard-shell';
 import { QueueView } from '@/components/admin/queue-view';
 
 export default async function AntrianPage() {
-  await requireRole('ADMIN', 'SUPER_ADMIN');
+  const profile = await requireRole('ADMIN', 'SUPER_ADMIN');
+  const canViewFinancials = isSuperAdmin(profile.role);
 
   const [requests, availableLivestock] = await Promise.all([
     // Fetch ALL requests (fulfilled + unfulfilled) for entries that still have
@@ -76,7 +77,7 @@ export default async function AntrianPage() {
       title="Antrian Hewan"
       description="Permintaan pembeli yang menunggu stok tersedia"
     >
-      <QueueView requests={serializedRequests} availableLivestock={availableLivestock} />
+      <QueueView requests={serializedRequests} availableLivestock={availableLivestock} canViewFinancials={canViewFinancials} />
     </DashboardShell>
   );
 }

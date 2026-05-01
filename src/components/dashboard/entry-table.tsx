@@ -46,6 +46,8 @@ import {
   Clock,
   Truck,
   Route,
+  MapPin,
+  Map,
   Search,
   ArrowUpDown,
   ArrowUp,
@@ -437,8 +439,7 @@ export function EntryTable({
                 </>
               )}
               <th className="text-center p-3 font-medium">Bayar</th>
-              <th className="text-center p-3 font-medium w-24">Kirim</th>
-              <th className="text-center p-3 font-medium w-12">Status</th>
+              <th className="text-center p-3 font-medium w-32">Status</th>
               <th
                 className="text-center p-3 font-medium cursor-pointer select-none hover:bg-muted/80"
                 onClick={() => toggleSort('createdAt')}
@@ -467,7 +468,7 @@ export function EntryTable({
             {filtered.length === 0 && (
               <tr>
                 <td
-                  colSpan={isAdmin ? (canViewFinancials ? 13 : 11) : 9}
+                  colSpan={isAdmin ? (canViewFinancials ? 12 : 10) : 8}
                   className="p-8 text-center text-muted-foreground"
                 >
                   {entries.length === 0
@@ -729,6 +730,7 @@ function useEntryRow(entry: EntryData, onSaved: () => void) {
 function EntryEditFields({
   entry,
   isAdmin,
+  canViewFinancials,
   form,
   update,
   itemPrices,
@@ -738,6 +740,7 @@ function EntryEditFields({
 }: {
   entry: EntryData;
   isAdmin: boolean;
+  canViewFinancials: boolean;
   form: ReturnType<typeof useEntryRow>['form'];
   update: ReturnType<typeof useEntryRow>['update'];
   itemPrices: ItemPriceState[];
@@ -766,7 +769,7 @@ function EntryEditFields({
                 {isMatiItem && <span className="ml-2 text-destructive text-[10px] font-semibold">MATI</span>}
                 <span className="ml-2 text-muted-foreground font-mono text-[10px]">{lv.sku}</span>
               </p>
-              <div className={`grid gap-1.5 ${isAdmin ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2'}`}>
+              <div className={`grid gap-1.5 ${canViewFinancials ? 'grid-cols-2 sm:grid-cols-4' : isAdmin ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-2'}`}>
                 <div className="space-y-0.5">
                   <Label className="text-[10px]">Tag</Label>
                   <Input
@@ -784,25 +787,25 @@ function EntryEditFields({
                     className="h-7 text-xs"
                   />
                 </div>
+                {canViewFinancials && (
+                  <div className="space-y-0.5">
+                    <Label className="text-[10px]">Modal</Label>
+                    <RupiahInput
+                      value={ip.hargaModal}
+                      onValueChange={(v) => updateItemPrice(ip.id, 'hargaModal', v)}
+                      className="h-7 text-xs"
+                    />
+                  </div>
+                )}
                 {isAdmin && (
-                  <>
-                    <div className="space-y-0.5">
-                      <Label className="text-[10px]">Modal</Label>
-                      <RupiahInput
-                        value={ip.hargaModal}
-                        onValueChange={(v) => updateItemPrice(ip.id, 'hargaModal', v)}
-                        className="h-7 text-xs"
-                      />
-                    </div>
-                    <div className="space-y-0.5">
-                      <Label className="text-[10px]">Reseller Cut</Label>
-                      <RupiahInput
-                        value={ip.resellerCut}
-                        onValueChange={(v) => updateItemPrice(ip.id, 'resellerCut', v)}
-                        className="h-7 text-xs"
-                      />
-                    </div>
-                  </>
+                  <div className="space-y-0.5">
+                    <Label className="text-[10px]">Reseller Cut</Label>
+                    <RupiahInput
+                      value={ip.resellerCut}
+                      onValueChange={(v) => updateItemPrice(ip.id, 'resellerCut', v)}
+                      className="h-7 text-xs"
+                    />
+                  </div>
                 )}
               </div>
             </div>
@@ -1017,6 +1020,11 @@ function EntryRow({
               {entry.buyerPhone}
             </div>
           )}
+          <BuyerLocationIcons
+            address={entry.buyerAddress}
+            maps={entry.buyerMaps}
+            className="mt-1"
+          />
         </td>
         {isAdmin && <td className="p-3">{entry.sales.name}</td>}
         <td className="p-3 text-center">{formatRupiah(entry.hargaJual)}</td>
@@ -1052,10 +1060,11 @@ function EntryRow({
           />
         </td>
         <td className="p-3 text-center">
-          <KirimCell isSent={entry.isSent} delivery={entry.delivery} />
-        </td>
-        <td className="p-3 text-center">
-          <StatusIcon status={entry.status} />
+          <StatusCell
+            status={entry.status}
+            isSent={entry.isSent}
+            delivery={entry.delivery}
+          />
         </td>
         <td className="p-3 text-xs text-muted-foreground whitespace-nowrap text-center">
           {formatDateTime(new Date(entry.createdAt))}
@@ -1139,10 +1148,11 @@ function EntryRow({
       {/* Inline edit row */}
       {isEditing && (
         <tr className="border-b bg-muted/20">
-          <td colSpan={isAdmin ? 13 : 9} className="p-4">
+          <td colSpan={isAdmin ? 12 : 8} className="p-4">
             <EntryEditFields
               entry={entry}
               isAdmin={isAdmin}
+              canViewFinancials={canViewFinancials}
               form={form}
               update={update}
               setBuktiTransferUrls={setBuktiTransferUrls}
@@ -1215,6 +1225,7 @@ function MobileEntryCard({
           <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-0.5">
             {entry.items.map((item) => {
               const lv = item.livestock;
+              const wLabel = lv.type === 'SAPI' ? formatWeight(lv.weightMin, lv.weightMax) : null;
               return (
                 <LivestockPhotoLink
                   key={lv.id}
@@ -1222,7 +1233,7 @@ function MobileEntryCard({
                   alt={`${lv.type} ${lv.grade ?? ''} - ${lv.sku}`}
                   className="text-xs text-muted-foreground"
                 >
-                  {lv.tag ?? lv.sku}
+                  {lv.type}{lv.grade ? ' ' + lv.grade : ''}{wLabel ? ' · ' + wLabel : ''}
                 </LivestockPhotoLink>
               );
             })}
@@ -1237,6 +1248,7 @@ function MobileEntryCard({
           <StatusIcon status={entry.status} />
           <KirimIcon isSent={entry.isSent} />
           <DeliveryIcon delivery={entry.delivery} />
+          <BuyerLocationIcons address={entry.buyerAddress} maps={entry.buyerMaps} />
         </div>
         <ChevronDown
           className={`h-4 w-4 text-muted-foreground shrink-0 transition-transform ${
@@ -1253,6 +1265,7 @@ function MobileEntryCard({
               <EntryEditFields
                 entry={entry}
                 isAdmin={isAdmin}
+                canViewFinancials={canViewFinancials}
                 form={form}
                 update={update}
                 setBuktiTransferUrls={setBuktiTransferUrls}
@@ -1328,6 +1341,16 @@ function MobileEntryCard({
                           {entry.buyerPhone}
                         </div>
                       )}
+                      {entry.buyerAddress && (
+                        <div className="text-muted-foreground text-xs mt-0.5">
+                          {entry.buyerAddress}
+                        </div>
+                      )}
+                      <BuyerLocationIcons
+                        address={entry.buyerAddress}
+                        maps={entry.buyerMaps}
+                        className="mt-1"
+                      />
                     </>
                   }
                 />
@@ -1523,16 +1546,19 @@ function DeliveryIcon({
   );
 }
 
-function KirimCell({
+function StatusCell({
+  status,
   isSent,
   delivery,
 }: {
+  status: string;
   isSent: boolean;
   delivery: { status: string; driverName: string | null } | null;
 }) {
   return (
     <div className="flex flex-col items-center gap-0.5">
       <div className="flex items-center gap-1.5">
+        <StatusIcon status={status} />
         <KirimIcon isSent={isSent} />
         <DeliveryIcon delivery={delivery} />
       </div>
@@ -1540,6 +1566,45 @@ function KirimCell({
         <span className="text-[10px] leading-tight text-muted-foreground max-w-[90px] truncate">
           {delivery.driverName}
         </span>
+      )}
+    </div>
+  );
+}
+
+function BuyerLocationIcons({
+  address,
+  maps,
+  className = '',
+}: {
+  address: string | null;
+  maps: string | null;
+  className?: string;
+}) {
+  return (
+    <div className={`flex items-center gap-1.5 ${className}`}>
+      <IconTooltip label={address ? `Alamat: ${address}` : 'Alamat belum diisi'}>
+        <MapPin
+          className={`h-3.5 w-3.5 ${
+            address ? 'text-primary' : 'text-muted-foreground/30'
+          }`}
+        />
+      </IconTooltip>
+      {maps ? (
+        <a
+          href={maps}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="inline-flex hover:opacity-70"
+        >
+          <IconTooltip label="Buka di Google Maps">
+            <Map className="h-3.5 w-3.5 text-primary" />
+          </IconTooltip>
+        </a>
+      ) : (
+        <IconTooltip label="Maps belum diisi">
+          <Map className="h-3.5 w-3.5 text-muted-foreground/30" />
+        </IconTooltip>
       )}
     </div>
   );

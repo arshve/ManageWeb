@@ -109,9 +109,13 @@ TypeScript 5 · ESLint 9 · Turbopack (dev) · `tsx` (seed script)
 
 ### Prerequisites
 
-- Node.js 18+
-- PostgreSQL 15+ (`brew install postgresql@17`)
-- Supabase project (free tier) — only used for realtime driver location. Can skip if you don't need live tracking.
+- Node.js 18+ ([nodejs.org](https://nodejs.org))
+- Git
+- PostgreSQL 17
+  - **macOS**: `brew install postgresql@17`
+  - **Windows**: download installer from [postgresql.org/download/windows](https://www.postgresql.org/download/windows/), or `choco install postgresql17` (Chocolatey). Add `C:\Program Files\PostgreSQL\17\bin` to PATH.
+  - **Linux**: `sudo apt install postgresql-17`
+- Supabase project (optional — only needed for live driver tracking)
 
 ### 1. Clone + Install
 
@@ -123,7 +127,18 @@ npm install
 
 ### 2. Environment
 
-Create `.env`:
+Copy the example file:
+
+```bash
+# macOS / Linux
+cp .env.example .env
+
+# Windows (PowerShell)
+Copy-Item .env.example .env
+```
+
+Then edit `.env` with your local Postgres credentials:
+
 
 ```env
 # Database
@@ -148,8 +163,15 @@ SUPABASE_SERVICE_ROLE_KEY=""
 
 ### 3. Database
 
+Create the database (works on all platforms):
+
 ```bash
-createdb millenials_farm
+psql -U postgres -c "CREATE DATABASE millenials_farm;"
+```
+
+Sync schema and seed:
+
+```bash
 npx prisma db push
 npx prisma generate
 npx tsx prisma/seed.ts   # sample users, livestock, pricing, entries
@@ -174,6 +196,13 @@ npx prisma studio         # DB GUI at :5555
 npx prisma db push        # Sync schema
 npx tsx prisma/seed.ts    # Re-seed
 ```
+
+### Windows notes
+
+- All `npm run *` scripts are pure Node — work in PowerShell, cmd, or Git Bash without modification.
+- File paths in code use `path.join` consistently; uploads land in `public/uploads/...` regardless of OS.
+- If `git status` shows every file as modified after clone, your Git client converted line endings on checkout. Run `git config --global core.autocrlf input` and re-clone, or run `git add --renormalize .` once.
+- Windows Defender / antivirus can slow `npm install` and `next build`. Consider excluding the project folder.
 
 ## Project Structure
 

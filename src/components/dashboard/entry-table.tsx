@@ -53,6 +53,7 @@ import {
   ArrowUp,
   ArrowDown,
   ChevronDown,
+  Calendar,
 } from 'lucide-react';
 import {
   updateEntry,
@@ -66,6 +67,7 @@ import {
   formatDateTime,
   formatPaymentStatus,
   formatWeight,
+  formatPengiriman,
 } from '@/lib/format';
 import { BuktiTransferUpload } from '@/components/dashboard/bukti-transfer-upload';
 import { PdfMenu } from '@/components/dashboard/pdf-menu';
@@ -194,12 +196,13 @@ export function EntryTable({
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [paymentFilter, setPaymentFilter] = useState('ALL');
   const [sentFilter, setSentFilter] = useState('ALL');
+  const [pengirimanFilter, setPengirimanFilter] = useState('ALL');
   const [sortField, setSortField] = useState<SortField>('createdAt');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 20;
 
-  useEffect(() => { setPage(1); }, [search, statusFilter, paymentFilter, sentFilter]);
+  useEffect(() => { setPage(1); }, [search, statusFilter, paymentFilter, sentFilter, pengirimanFilter]);
 
   function toggleSort(field: SortField) {
     if (sortField === field) {
@@ -246,6 +249,11 @@ export function EntryTable({
         sentFilter === 'YES' ? e.isSent : !e.isSent,
       );
     }
+    if (pengirimanFilter !== 'ALL') {
+      result = result.filter((e) =>
+        pengirimanFilter === 'NONE' ? !e.pengiriman : e.pengiriman === pengirimanFilter,
+      );
+    }
 
     result = [...result].sort((a, b) => {
       let cmp = 0;
@@ -280,6 +288,7 @@ export function EntryTable({
     statusFilter,
     paymentFilter,
     sentFilter,
+    pengirimanFilter,
     sortField,
     sortDir,
   ]);
@@ -360,10 +369,38 @@ export function EntryTable({
               <SelectItem value="NO">Belum Kirim</SelectItem>
             </SelectContent>
           </Select>
+          <Select
+            value={pengirimanFilter}
+            onValueChange={(val) => setPengirimanFilter(val ?? 'ALL')}
+          >
+            <SelectTrigger className="h-8 w-[140px] text-xs">
+              <SelectValue>
+                {{
+                  ALL: 'Semua Kirim',
+                  NONE: 'Belum Diset',
+                  HARI_H: 'Hari H',
+                  H_1: 'H-1',
+                  H_2: 'H-2',
+                  H_3: 'H-3',
+                  TITIP_POTONG: 'Titip Potong',
+                }[pengirimanFilter] ?? pengirimanFilter}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">Semua Pengiriman</SelectItem>
+              <SelectItem value="NONE">Belum Diset</SelectItem>
+              <SelectItem value="HARI_H">Hari H</SelectItem>
+              <SelectItem value="H_1">H-1</SelectItem>
+              <SelectItem value="H_2">H-2</SelectItem>
+              <SelectItem value="H_3">H-3</SelectItem>
+              <SelectItem value="TITIP_POTONG">Titip Potong</SelectItem>
+            </SelectContent>
+          </Select>
           {(search ||
             statusFilter !== 'ALL' ||
             paymentFilter !== 'ALL' ||
-            sentFilter !== 'ALL') && (
+            sentFilter !== 'ALL' ||
+            pengirimanFilter !== 'ALL') && (
             <Button
               variant="ghost"
               size="sm"
@@ -373,6 +410,7 @@ export function EntryTable({
                 setStatusFilter('ALL');
                 setPaymentFilter('ALL');
                 setSentFilter('ALL');
+                setPengirimanFilter('ALL');
               }}
             >
               <X className="h-3 w-3 mr-1" />
@@ -1205,9 +1243,19 @@ function MobileEntryCard({
   const cardClass = isMati
     ? 'bg-zinc-300 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-200'
     : 'bg-card';
+
+  const firstLv = entry.items[0]?.livestock;
+  const firstWeight = firstLv?.type === 'SAPI' ? formatWeight(firstLv.weightMin, firstLv.weightMax) : null;
+  const livestockSummary = firstLv
+    ? [firstLv.type, firstLv.grade, firstWeight].filter(Boolean).join(' · ') +
+      (entry.items.length > 1 ? ` +${entry.items.length - 1}` : '')
+    : entry.requests.length > 0
+    ? `${entry.requests.length} antrian`
+    : '—';
+
   return (
     <div className={`rounded-lg border shadow-sm overflow-hidden ${cardClass}`}>
-      {/* Header — tap to toggle */}
+      {/* Header */}
       <div
         role="button"
         tabIndex={0}
@@ -1222,27 +1270,7 @@ function MobileEntryCard({
       >
         <div className="flex-1 min-w-0">
           <div className="text-sm font-medium truncate">{entry.buyerName}</div>
-          <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-0.5">
-            {entry.items.map((item) => {
-              const lv = item.livestock;
-              const wLabel = lv.type === 'SAPI' ? formatWeight(lv.weightMin, lv.weightMax) : null;
-              return (
-                <LivestockPhotoLink
-                  key={lv.id}
-                  photoUrl={lv.photoUrl}
-                  alt={`${lv.type} ${lv.grade ?? ''} - ${lv.sku}`}
-                  className="text-xs text-muted-foreground"
-                >
-                  {lv.type}{lv.grade ? ' ' + lv.grade : ''}{wLabel ? ' · ' + wLabel : ''}
-                </LivestockPhotoLink>
-              );
-            })}
-            {entry.requests.length > 0 && (
-              <span className="text-xs text-amber-600 italic">
-                +{entry.requests.length} antrian
-              </span>
-            )}
-          </div>
+          <div className="text-xs text-muted-foreground truncate mt-0.5">{livestockSummary}</div>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
           <StatusIcon status={entry.status} />
@@ -1257,235 +1285,183 @@ function MobileEntryCard({
         />
       </div>
 
-      {/* Body */}
+      {/* Expanded bands */}
       {open && (
-        <div className="border-t">
-          {isEditing ? (
-            <div className="p-3 space-y-3">
-              <EntryEditFields
-                entry={entry}
-                isAdmin={isAdmin}
-                canViewFinancials={canViewFinancials}
-                form={form}
-                update={update}
-                setBuktiTransferUrls={setBuktiTransferUrls}
-                itemPrices={itemPrices}
-                updateItemPrice={updateItemPrice}
-                salesUsers={salesUsers}
-              />
-              <div className="flex gap-2 pt-2 border-t">
-                <Button
-                  size="sm"
-                  className="flex-1"
-                  onClick={handleSave}
-                  disabled={loading}
-                >
-                  <Save className="h-3.5 w-3.5 mr-1" />
-                  Simpan
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="flex-1"
-                  onClick={onCancel}
-                  disabled={loading}
-                >
-                  <XCircle className="h-3.5 w-3.5 mr-1" />
-                  Batal
-                </Button>
+        isEditing ? (
+          <div className="p-3 space-y-3 border-t">
+            <EntryEditFields
+              entry={entry}
+              isAdmin={isAdmin}
+              canViewFinancials={canViewFinancials}
+              form={form}
+              update={update}
+              setBuktiTransferUrls={setBuktiTransferUrls}
+              itemPrices={itemPrices}
+              updateItemPrice={updateItemPrice}
+              salesUsers={salesUsers}
+            />
+            <div className="flex gap-2 pt-2 border-t">
+              <Button size="sm" className="flex-1" onClick={handleSave} disabled={loading}>
+                <Save className="h-3.5 w-3.5 mr-1" />
+                Simpan
+              </Button>
+              <Button size="sm" variant="outline" className="flex-1" onClick={onCancel} disabled={loading}>
+                <XCircle className="h-3.5 w-3.5 mr-1" />
+                Batal
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="divide-y text-sm border-t">
+            {/* Hewan + Pembeli */}
+            <div className="grid grid-cols-2 gap-3 px-3 py-2.5">
+              <div>
+                <BandLabel>Hewan</BandLabel>
+                {entry.items.map((item) => {
+                  const lv = item.livestock;
+                  const w = lv.type === 'SAPI' ? formatWeight(lv.weightMin, lv.weightMax) : null;
+                  return (
+                    <div key={lv.id} className="mt-1">
+                      <LivestockPhotoLink photoUrl={lv.photoUrl} alt={`${lv.type} ${lv.grade ?? ''} - ${lv.sku}`}>
+                        <span className="text-sm font-medium">{lv.tag ?? lv.sku}</span>
+                      </LivestockPhotoLink>
+                      <div className="text-xs text-muted-foreground">
+                        {lv.type}{lv.grade ? ` ${lv.grade}` : ''}{w ? ` · ${w}` : ''}
+                      </div>
+                    </div>
+                  );
+                })}
+                {entry.requests.map((req) => {
+                  const w = req.type === 'SAPI' ? formatWeight(req.weightMin, req.weightMax) : null;
+                  return (
+                    <div key={req.id} className="mt-1 flex items-center gap-1 text-xs text-muted-foreground italic">
+                      <span className="bg-amber-100 text-amber-700 text-[10px] font-medium px-1 rounded not-italic">antrian</span>
+                      <span>{req.type}{req.grade ? ` ${req.grade}` : ''}{w ? ` · ${w}` : ''}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <div>
+                <BandLabel>Pembeli</BandLabel>
+                <div className="mt-1 font-medium truncate">{entry.buyerName}</div>
+                {entry.buyerPhone && (
+                  <div className="text-xs text-muted-foreground">{entry.buyerPhone}</div>
+                )}
+                {entry.buyerAddress && (
+                  <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{entry.buyerAddress}</div>
+                )}
+                <BuyerLocationIcons address={entry.buyerAddress} maps={entry.buyerMaps} className="mt-1" />
               </div>
             </div>
-          ) : (
-            <>
-              <dl className="divide-y text-sm">
-                <CardRow
-                  label="Hewan"
-                  value={
-                    <div className="space-y-1">
-                      {entry.items.map((item) => {
-                        const lv = item.livestock;
-                        const wLabel = lv.type === 'SAPI' ? formatWeight(lv.weightMin, lv.weightMax) : null;
-                        return (
-                          <div key={lv.id} className="flex items-center gap-1.5 text-xs">
-                            <LivestockPhotoLink
-                              photoUrl={lv.photoUrl}
-                              alt={`${lv.type} ${lv.grade ?? ''} - ${lv.sku}`}
-                            >
-                              <span className="font-medium">{lv.tag ?? lv.sku}</span>
-                            </LivestockPhotoLink>
-                            <span className="text-muted-foreground">
-                              {lv.type}{lv.grade ? ' ' + lv.grade : ''}{wLabel ? ' · ' + wLabel : ''}
-                            </span>
-                          </div>
-                        );
-                      })}
-                      {entry.requests.map((req) => {
-                        const wLabel = req.type === 'SAPI' ? formatWeight(req.weightMin, req.weightMax) : null;
-                        return (
-                          <div key={req.id} className="flex items-center gap-1.5 text-xs text-muted-foreground italic">
-                            <span className="bg-amber-100 text-amber-700 text-[10px] font-medium px-1 rounded">antrian</span>
-                            <span>{req.type}{req.grade ? ' ' + req.grade : ''}{wLabel ? ' · ' + wLabel : ''}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  }
-                />
-                <CardRow
-                  label="Pembeli"
-                  value={
-                    <>
-                      {entry.buyerName}
-                      {entry.buyerPhone && (
-                        <div className="text-muted-foreground text-xs">
-                          {entry.buyerPhone}
-                        </div>
-                      )}
-                      {entry.buyerAddress && (
-                        <div className="text-muted-foreground text-xs mt-0.5">
-                          {entry.buyerAddress}
-                        </div>
-                      )}
-                      <BuyerLocationIcons
-                        address={entry.buyerAddress}
-                        maps={entry.buyerMaps}
-                        className="mt-1"
-                      />
-                    </>
-                  }
-                />
-                {isAdmin && <CardRow label="Sales" value={entry.sales.name} />}
-                <CardRow
-                  label="Harga Jual"
-                  value={formatRupiah(entry.hargaJual)}
-                />
+
+            {/* Sales + Harga Jual */}
+            <div className={`grid gap-3 px-3 py-2.5 ${isAdmin ? 'grid-cols-2' : 'grid-cols-1'}`}>
+              {isAdmin && (
+                <div>
+                  <BandLabel>Sales</BandLabel>
+                  <div className="mt-1 font-medium">{entry.sales.name}</div>
+                </div>
+              )}
+              <div>
+                <BandLabel>Harga Jual</BandLabel>
+                <div className="mt-1 font-semibold">{formatRupiah(entry.hargaJual)}</div>
+              </div>
+            </div>
+
+            {/* Financial */}
+            {(isAdmin || canViewFinancials) && (
+              <div className="flex gap-5 px-3 py-2.5 bg-muted/20">
                 {isAdmin && (
-                  <CardRow
-                    label="Sales Cut"
-                    value={
-                      entry.resellerCut ? formatRupiah(entry.resellerCut) : '-'
-                    }
-                  />
+                  <FinCol label="Sales Cut" value={entry.resellerCut ? formatRupiah(entry.resellerCut) : '–'} />
                 )}
                 {canViewFinancials && (
                   <>
-                    <CardRow
-                      label="Modal"
-                      value={
-                        entry.hargaModal ? formatRupiah(entry.hargaModal) : '-'
-                      }
-                    />
-                    <CardRow
+                    <FinCol label="Modal" value={entry.hargaModal ? formatRupiah(entry.hargaModal) : '–'} />
+                    <FinCol
                       label="Profit"
-                      value={
-                        entry.profit ? (
-                          <span
-                            className={
-                              entry.profit >= 0
-                                ? 'text-primary'
-                                : 'text-destructive'
-                            }
-                          >
-                            {formatRupiah(entry.profit)}
-                          </span>
-                        ) : (
-                          '-'
-                        )
-                      }
+                      value={entry.profit ? formatRupiah(entry.profit) : '–'}
+                      valueClass={entry.profit != null && entry.profit < 0 ? 'text-destructive' : undefined}
                     />
                   </>
                 )}
-                <CardRow
-                  label="Bayar"
-                  value={
-                    <HoverBuktiTransfer
-                      buktiTransfer={entry.buktiTransfer}
-                      paymentStatus={entry.paymentStatus}
-                    />
-                  }
-                />
-                <CardRow
-                  label="Tanggal"
-                  value={
-                    <span className="text-muted-foreground text-xs">
-                      {formatDateTime(new Date(entry.createdAt))}
-                    </span>
-                  }
-                />
-                {entry.notes && (
-                  <CardRow
-                    label="Catatan"
-                    value={
-                      <span className="text-muted-foreground text-xs whitespace-pre-wrap">
-                        {entry.notes}
-                      </span>
-                    }
-                  />
-                )}
-              </dl>
+              </div>
+            )}
 
-              {/* Action bar */}
-              <div className="flex items-center justify-end gap-1 p-2 border-t bg-muted/20">
+            {/* Pembayaran */}
+            <div className="flex items-center justify-between px-3 py-2.5">
+              <BandLabel>Pembayaran</BandLabel>
+              <HoverBuktiTransfer buktiTransfer={entry.buktiTransfer} paymentStatus={entry.paymentStatus} />
+            </div>
+
+            {/* Catatan */}
+            {entry.notes && (
+              <div className="px-3 py-2.5 bg-muted/20">
+                <BandLabel>Catatan</BandLabel>
+                <p className="mt-1 text-xs text-muted-foreground whitespace-pre-wrap">{entry.notes}</p>
+              </div>
+            )}
+
+            {/* Date + Pengiriman + Actions */}
+            <div className="flex items-center justify-between px-3 py-2 bg-muted/20">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground min-w-0">
+                <Calendar className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{formatDateTime(new Date(entry.createdAt))}</span>
+                {entry.pengiriman && (
+                  <span className="shrink-0 bg-muted text-muted-foreground text-[10px] font-medium px-1.5 py-0.5 rounded">
+                    {formatPengiriman(entry.pengiriman)}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
                 {isAdmin && entry.status === 'PENDING' && (
                   <>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-primary"
-                      onClick={handleApprove}
-                      title="Setujui"
-                    >
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={handleApprove} title="Setujui">
                       <Check className="h-4 w-4" />
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-destructive"
-                      onClick={handleReject}
-                      title="Tolak"
-                    >
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={handleReject} title="Tolak">
                       <X className="h-4 w-4" />
                     </Button>
                   </>
                 )}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={onEdit}
-                  title="Edit"
-                >
+                {entry.status === 'APPROVED' && entry.buktiTransfer.length > 0 && (
+                  <PdfMenu entryId={entry.id} />
+                )}
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onEdit} title="Edit">
                   <Pencil className="h-3.5 w-3.5" />
                 </Button>
-                {entry.status === 'APPROVED' &&
-                  entry.buktiTransfer.length > 0 && (
-                    <PdfMenu entryId={entry.id} />
-                  )}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 text-destructive"
-                  onClick={handleDelete}
-                  title="Hapus"
-                >
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={handleDelete} title="Hapus">
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>
-            </>
-          )}
-        </div>
+            </div>
+          </div>
+        )
       )}
     </div>
   );
 }
 
-function CardRow({ label, value }: { label: string; value: React.ReactNode }) {
+function BandLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex items-start gap-3 px-3 py-2">
-      <dt className="text-muted-foreground text-xs w-24 flex-shrink-0 pt-0.5">
-        {label}
-      </dt>
-      <dd className="flex-1 text-sm min-w-0">{value}</dd>
+    <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+      {children}
+    </span>
+  );
+}
+
+function FinCol({
+  label,
+  value,
+  valueClass,
+}: {
+  label: string;
+  value: React.ReactNode;
+  valueClass?: string;
+}) {
+  return (
+    <div>
+      <BandLabel>{label}</BandLabel>
+      <div className={`mt-0.5 text-sm ${valueClass ?? ''}`}>{value}</div>
     </div>
   );
 }

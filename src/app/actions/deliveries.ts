@@ -189,6 +189,7 @@ export async function generateRoutes(
   deliveryDate: string,
   driverCount: number,
   startInput?: string,
+  maxPerDriver = 30,
 ) {
   const admin = await requireRole('ADMIN', 'SUPER_ADMIN');
   const date = parseDateOnly(deliveryDate);
@@ -244,7 +245,7 @@ export async function generateRoutes(
     lng: e.buyerLng!,
   }));
 
-  const buckets = splitToDrivers(depot, points, driverCount);
+  const buckets = splitToDrivers(depot, points, driverCount, maxPerDriver);
   const routes = buckets.map((b) => solveTSP(depot, b));
 
   const assignments: { entryId: string; sequence: number }[] = [];

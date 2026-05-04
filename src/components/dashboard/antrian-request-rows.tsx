@@ -16,9 +16,8 @@ import { X, Plus } from 'lucide-react';
 
 export interface RequestRow {
   _id: string;
-  type: 'KAMBING' | 'DOMBA' | 'SAPI';
+  type: 'KAMBING' | 'DOMBA';
   grade: string;
-  weight: string;
   hargaJual: string;
   hargaModal: string;
   resellerCut: string;
@@ -30,7 +29,6 @@ export function emptyRow(): RequestRow {
     _id: Math.random().toString(36).slice(2),
     type: 'KAMBING',
     grade: 'A',
-    weight: '',
     hargaJual: '',
     hargaModal: '',
     resellerCut: '',
@@ -41,24 +39,14 @@ export function emptyRow(): RequestRow {
 export function rowsToJson(rows: RequestRow[]): string {
   return JSON.stringify(
     rows.map((r) => {
-      const isSapi = r.type === 'SAPI';
       const hargaJual = Number(r.hargaJual) || 0;
       const hargaModal = r.hargaModal ? Number(r.hargaModal) : null;
       const resellerCut = r.resellerCut ? Number(r.resellerCut) : null;
-
-      let weightMin: number | null = null;
-      let weightMax: number | null = null;
-      if (isSapi && r.weight) {
-        const [a, b] = r.weight.split('-').map((s) => parseFloat(s.trim()));
-        weightMin = isNaN(a) ? null : a;
-        weightMax = b !== undefined && !isNaN(b) ? b : weightMin;
-      }
-
       return {
         type: r.type,
-        grade: isSapi ? null : r.grade || null,
-        weightMin,
-        weightMax,
+        grade: r.grade || null,
+        weightMin: null,
+        weightMax: null,
         hargaJual,
         hargaModal,
         resellerCut,
@@ -118,49 +106,35 @@ export function AntrianRequestRows({
                   if (!v) return;
                   const t = v as RequestRow['type'];
                   update(row._id, 'type', t);
-                  if (t === 'SAPI') update(row._id, 'grade', '');
-                  else if (!row.grade) update(row._id, 'grade', 'A');
+                  if (!row.grade) update(row._id, 'grade', 'A');
                 }}
               >
                 <SelectTrigger className="h-8 text-xs">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent alignItemWithTrigger={false}>
                   <SelectItem value="KAMBING">Kambing</SelectItem>
                   <SelectItem value="DOMBA">Domba</SelectItem>
-                  <SelectItem value="SAPI">Sapi</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            {row.type !== 'SAPI' ? (
-              <div className="space-y-1">
-                <Label className="text-[11px]">Grade</Label>
-                <Select
-                  value={row.grade || 'A'}
-                  onValueChange={(v) => v && update(row._id, 'grade', v)}
-                >
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {GRADES.map((g) => (
-                      <SelectItem key={g} value={g}>{g}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ) : (
-              <div className="space-y-1">
-                <Label className="text-[11px]">Berat (kg)</Label>
-                <Input
-                  value={row.weight}
-                  onChange={(e) => update(row._id, 'weight', e.target.value)}
-                  placeholder="200-250"
-                  className="h-8 text-xs"
-                />
-              </div>
-            )}
+            <div className="space-y-1">
+              <Label className="text-[11px]">Grade</Label>
+              <Select
+                value={row.grade || 'A'}
+                onValueChange={(v) => v && update(row._id, 'grade', v)}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent alignItemWithTrigger={false}>
+                  {GRADES.map((g) => (
+                    <SelectItem key={g} value={g}>{g}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           {/* Pricing */}

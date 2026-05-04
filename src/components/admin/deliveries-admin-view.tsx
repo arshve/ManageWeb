@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
@@ -164,6 +164,7 @@ export function DeliveriesAdminView({
     {},
   );
   const [startInput, setStartInput] = useState(defaultStart);
+  const [maxPerDriver, setMaxPerDriver] = useState(30);
   const [mapDepot, setMapDepot] = useState(
     () => parseLatLng(defaultStart) ?? initialDepot,
   );
@@ -230,6 +231,16 @@ export function DeliveriesAdminView({
     };
   }, []);
 
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (jenisDropdownRef.current && !jenisDropdownRef.current.contains(e.target as Node)) {
+        setJenisDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const assignableDrivers = drivers.filter((d) => !d.isAssigned);
   const driverCount = assignableDrivers.length;
 
@@ -240,7 +251,9 @@ export function DeliveriesAdminView({
   const [unscheduledSearch, setUnscheduledSearch] = useState('');
   const [unscheduledCoordFilter, setUnscheduledCoordFilter] = useState<'ALL' | 'HAS_COORDS' | 'NO_COORDS'>('ALL');
   const [unscheduledPengirimanFilter, setUnscheduledPengirimanFilter] = useState('ALL');
-  const [unscheduledJenisFilter, setUnscheduledJenisFilter] = useState('ALL');
+  const [unscheduledJenisFilter, setUnscheduledJenisFilter] = useState<Set<string>>(new Set());
+  const [jenisDropdownOpen, setJenisDropdownOpen] = useState(false);
+  const jenisDropdownRef = useRef<HTMLDivElement>(null);
   const [unscheduledPage, setUnscheduledPage] = useState(0);
   const UNSCHEDULED_PAGE_SIZE = 25;
 
@@ -249,7 +262,7 @@ export function DeliveriesAdminView({
     if (unscheduledCoordFilter === 'HAS_COORDS') list = list.filter((e) => e.hasCoords);
     else if (unscheduledCoordFilter === 'NO_COORDS') list = list.filter((e) => !e.hasCoords);
     if (unscheduledPengirimanFilter !== 'ALL') list = list.filter((e) => e.pengiriman === unscheduledPengirimanFilter);
-    if (unscheduledJenisFilter !== 'ALL') list = list.filter((e) => e.items.some((i) => i.type === unscheduledJenisFilter));
+    if (unscheduledJenisFilter.size > 0) list = list.filter((e) => e.items.some((i) => i.type != null && unscheduledJenisFilter.has(i.type)));
     if (unscheduledSearch.trim()) {
       const q = unscheduledSearch.trim().toLowerCase();
       list = list.filter(
@@ -342,7 +355,7 @@ export function DeliveriesAdminView({
       return;
     }
     startTransition(async () => {
-      const r = await generateRoutes(dateStr, activeRouteCount, startInput);
+      const r = await generateRoutes(dateStr, activeRouteCount, startInput, maxPerDriver);
       if ('error' in r) {
         toast.error(r.error);
         return;
@@ -637,16 +650,48 @@ export function DeliveriesAdminView({
             <option value="H_3">{formatPengiriman('H_3')}</option>
             <option value="TITIP_POTONG">{formatPengiriman('TITIP_POTONG')}</option>
           </select>
-          <select
-            value={unscheduledJenisFilter}
-            onChange={(ev) => { setUnscheduledJenisFilter(ev.target.value); setUnscheduledPage(0); }}
-            className="h-8 rounded-md border border-gray-300 bg-white px-2 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400"
-          >
-            <option value="ALL">Semua Jenis</option>
-            <option value="KAMBING">Kambing</option>
-            <option value="DOMBA">Domba</option>
-            <option value="SAPI">Sapi</option>
-          </select>
+          <div ref={jenisDropdownRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setJenisDropdownOpen((o) => !o)}
+              className={cn(
+                'h-8 rounded-md border bg-white px-2 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400 flex items-center gap-1.5 whitespace-nowrap',
+                unscheduledJenisFilter.size > 0 ? 'border-gray-500 font-medium' : 'border-gray-300',
+              )}
+            >
+              {unscheduledJenisFilter.size === 0
+                ? 'Semua Jenis'
+                : Array.from(unscheduledJenisFilter).map((t) => t === 'KAMBING' ? 'Kambing' : t === 'DOMBA' ? 'Domba' : 'Sapi').join(', ')}
+              <svg className="h-3.5 w-3.5 text-gray-400 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" /></svg>
+            </button>
+            {jenisDropdownOpen && (
+              <div className="absolute left-0 top-full mt-1 z-50 min-w-[120px] rounded-md border border-gray-200 bg-white shadow-md py-1">
+                {(['KAMBING', 'DOMBA', 'SAPI'] as const).map((type) => {
+                  const label = type === 'KAMBING' ? 'Kambing' : type === 'DOMBA' ? 'Domba' : 'Sapi';
+                  const checked = unscheduledJenisFilter.has(type);
+                  return (
+                    <label key={type} className="flex items-center gap-2 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => {
+                          setUnscheduledJenisFilter((prev) => {
+                            const next = new Set(prev);
+                            if (checked) next.delete(type);
+                            else next.add(type);
+                            return next;
+                          });
+                          setUnscheduledPage(0);
+                        }}
+                        className="h-3.5 w-3.5 rounded border-gray-300 accent-gray-700"
+                      />
+                      {label}
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+          </div>
           <select
             value={unscheduledCoordFilter}
             onChange={(ev) => { setUnscheduledCoordFilter(ev.target.value as 'ALL' | 'HAS_COORDS' | 'NO_COORDS'); setUnscheduledPage(0); }}
@@ -656,10 +701,10 @@ export function DeliveriesAdminView({
             <option value="HAS_COORDS">Punya Koordinat</option>
             <option value="NO_COORDS">Belum Ada Koordinat</option>
           </select>
-          {(unscheduledSearch || unscheduledCoordFilter !== 'ALL' || unscheduledPengirimanFilter !== 'ALL' || unscheduledJenisFilter !== 'ALL') && (
+          {(unscheduledSearch || unscheduledCoordFilter !== 'ALL' || unscheduledPengirimanFilter !== 'ALL' || unscheduledJenisFilter.size > 0) && (
             <button
               type="button"
-              onClick={() => { setUnscheduledSearch(''); setUnscheduledCoordFilter('ALL'); setUnscheduledPengirimanFilter('ALL'); setUnscheduledJenisFilter('ALL'); setUnscheduledPage(0); }}
+              onClick={() => { setUnscheduledSearch(''); setUnscheduledCoordFilter('ALL'); setUnscheduledPengirimanFilter('ALL'); setUnscheduledJenisFilter(new Set()); setUnscheduledPage(0); }}
               className="text-xs text-gray-400 hover:text-gray-700 underline underline-offset-2"
             >
               Reset
@@ -820,6 +865,16 @@ export function DeliveriesAdminView({
                 className="h-6 w-12 rounded bg-white px-1 text-xs text-center border focus:outline-none focus:ring-1"
               />
               <span className="text-xs text-gray-500 mr-2">rute</span>
+              <label className="text-xs text-gray-500 font-medium ml-1">maks</label>
+              <input
+                type="number"
+                min={1}
+                max={999}
+                value={maxPerDriver}
+                onChange={(e) => setMaxPerDriver(Math.max(1, parseInt(e.target.value) || 1))}
+                className="h-6 w-12 rounded bg-white px-1 text-xs text-center border focus:outline-none focus:ring-1"
+              />
+              <span className="text-xs text-gray-500 mr-2">/driver</span>
               <Button size="sm" onClick={handleGenerate} disabled={pending || !scheduled.length} className="py-1 px-3 h-6">
                 Generate
               </Button>

@@ -1,6 +1,9 @@
 type Pt = { id: string; lat: number; lng: number };
 
-function sqDist(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+function sqDist(
+  a: { lat: number; lng: number },
+  b: { lat: number; lng: number },
+): number {
   const dlat = a.lat - b.lat;
   const dlng = a.lng - b.lng;
   return dlat * dlat + dlng * dlng;
@@ -16,7 +19,12 @@ function sqDist(a: { lat: number; lng: number }, b: { lat: number; lng: number }
  * so a dense far-east cluster stays together rather than being split across
  * adjacent sector boundaries.
  */
-export function splitToDrivers(depot: Pt, points: Pt[], driverCount: number): Pt[][] {
+export function splitToDrivers(
+  depot: Pt,
+  points: Pt[],
+  driverCount: number,
+  maxPerDriver = 30,
+): Pt[][] {
   if (driverCount <= 0 || points.length === 0) return [];
   if (driverCount === 1) return [points];
   if (points.length <= driverCount) return points.map((p) => [p]);
@@ -28,7 +36,10 @@ export function splitToDrivers(depot: Pt, points: Pt[], driverCount: number): Pt
     let bestD = sqDist(best, depot);
     for (const p of points) {
       const d = sqDist(p, depot);
-      if (d > bestD) { bestD = d; best = p; }
+      if (d > bestD) {
+        bestD = d;
+        best = p;
+      }
     }
     centers.push({ lat: best.lat, lng: best.lng });
   }
@@ -39,7 +50,10 @@ export function splitToDrivers(depot: Pt, points: Pt[], driverCount: number): Pt
     let nextD = -Infinity;
     for (const p of points) {
       const d = Math.min(...centers.map((c) => sqDist(p, c)));
-      if (d > nextD) { nextD = d; next = p; }
+      if (d > nextD) {
+        nextD = d;
+        next = p;
+      }
     }
     centers.push({ lat: next.lat, lng: next.lng });
   }
@@ -53,7 +67,10 @@ export function splitToDrivers(depot: Pt, points: Pt[], driverCount: number): Pt
       let bestD = sqDist(p, centers[0]);
       for (let i = 1; i < driverCount; i++) {
         const d = sqDist(p, centers[i]);
-        if (d < bestD) { bestD = d; best = i; }
+        if (d < bestD) {
+          bestD = d;
+          best = i;
+        }
       }
       next[best].push(p);
     }
@@ -63,7 +80,10 @@ export function splitToDrivers(depot: Pt, points: Pt[], driverCount: number): Pt
       if (next[i].length === 0) continue;
       const lat = next[i].reduce((s, p) => s + p.lat, 0) / next[i].length;
       const lng = next[i].reduce((s, p) => s + p.lng, 0) / next[i].length;
-      if (Math.abs(lat - centers[i].lat) > 1e-8 || Math.abs(lng - centers[i].lng) > 1e-8) {
+      if (
+        Math.abs(lat - centers[i].lat) > 1e-8 ||
+        Math.abs(lng - centers[i].lng) > 1e-8
+      ) {
         centers[i] = { lat, lng };
         moved = true;
       }
@@ -75,7 +95,7 @@ export function splitToDrivers(depot: Pt, points: Pt[], driverCount: number): Pt
   // Enforce per-driver cap: move excess stops to the nearest under-capacity cluster.
   // Takes the point furthest from its current cluster center each pass so the
   // most "borderline" stop moves first, minimising total route disruption.
-  const CAP = 25;
+  const CAP = maxPerDriver;
   const maxPasses = driverCount * CAP;
   for (let pass = 0; pass < maxPasses; pass++) {
     let anyOver = false;
@@ -88,7 +108,10 @@ export function splitToDrivers(depot: Pt, points: Pt[], driverCount: number): Pt
       let farthestD = -1;
       for (let pi = 0; pi < clusters[i].length; pi++) {
         const d = sqDist(clusters[i][pi], centers[i]);
-        if (d > farthestD) { farthestD = d; farthestIdx = pi; }
+        if (d > farthestD) {
+          farthestD = d;
+          farthestIdx = pi;
+        }
       }
       const p = clusters[i][farthestIdx];
 
@@ -98,7 +121,10 @@ export function splitToDrivers(depot: Pt, points: Pt[], driverCount: number): Pt
       for (let j = 0; j < clusters.length; j++) {
         if (j === i || clusters[j].length >= CAP) continue;
         const d = sqDist(p, centers[j]);
-        if (d < bestD) { bestD = d; bestJ = j; }
+        if (d < bestD) {
+          bestD = d;
+          bestJ = j;
+        }
       }
       if (bestJ === -1) break; // all clusters at capacity — leave remaining over-cap
       clusters[i].splice(farthestIdx, 1);

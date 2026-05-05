@@ -30,6 +30,7 @@ interface EntryData {
   resellerCut: number;
   profit: number;
   paymentStatus: 'BELUM_BAYAR' | 'DP' | 'LUNAS';
+  dp: number | null;
   buyerName: string;
   buyerAddress: string | null;
   salesId: string;
@@ -148,10 +149,27 @@ export function FinanceView({
     let penjualan = 0;
     let modal = 0;
     let fee = 0;
+    let countLunas = 0;
+    let countDp = 0;
+    let countBelumBayar = 0;
+    let diterimaLunas = 0;
+    let diterimaDP = 0;
+    let piutang = 0;
     entries.forEach((e) => {
       penjualan += e.hargaJual;
       modal += e.hargaModal;
       fee += e.resellerCut;
+      if (e.paymentStatus === 'LUNAS') {
+        countLunas++;
+        diterimaLunas += e.hargaJual;
+      } else if (e.paymentStatus === 'DP') {
+        countDp++;
+        diterimaDP += e.dp ?? 0;
+        piutang += e.hargaJual - (e.dp ?? 0);
+      } else {
+        countBelumBayar++;
+        piutang += e.hargaJual;
+      }
     });
     const profit = penjualan - modal - fee;
     const avg = entries.length > 0 ? Math.round(penjualan / entries.length) : 0;
@@ -164,6 +182,13 @@ export function FinanceView({
       avg,
       netAfterFee,
       count: entries.length,
+      countLunas,
+      countDp,
+      countBelumBayar,
+      diterimaLunas,
+      diterimaDP,
+      diterima: diterimaLunas + diterimaDP,
+      piutang,
     };
   }, [entries]);
 
@@ -366,6 +391,40 @@ export function FinanceView({
           color={FC.green}
         />
         <MiniStat label="Total transaksi" value={`${totals.count} item`} />
+      </div>
+
+      {/* ── 2b. Payment Breakdown ────────────────────────────────────────── */}
+      <div className="space-y-2">
+        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.08em]">
+          Status Pembayaran
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+          <MiniStat
+            label={`Lunas · ${totals.countLunas}`}
+            value={formatRupiah(totals.diterimaLunas)}
+            color={FC.green}
+          />
+          <MiniStat
+            label={`DP · ${totals.countDp}`}
+            value={formatRupiah(totals.diterimaDP)}
+            color={FC.amber}
+          />
+          <MiniStat
+            label={`Belum Bayar · ${totals.countBelumBayar}`}
+            value={`${totals.countBelumBayar} transaksi`}
+            color={FC.red}
+          />
+          <MiniStat
+            label="Uang Diterima"
+            value={formatRupiah(totals.diterima)}
+            color={FC.green}
+          />
+          <MiniStat
+            label="Piutang"
+            value={formatRupiah(totals.piutang)}
+            color={FC.red}
+          />
+        </div>
       </div>
 
       {/* ── 3. Per-Sales Cards ────────────────────────────────────────────── */}

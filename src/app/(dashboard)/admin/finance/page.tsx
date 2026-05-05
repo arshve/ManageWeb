@@ -14,6 +14,7 @@ export default async function FinancePage() {
       select: {
         id: true,
         paymentStatus: true,
+        dp: true,
         buyerName: true,
         buyerAddress: true,
         salesId: true,
@@ -39,6 +40,7 @@ export default async function FinancePage() {
     resellerCut: e.items.reduce((s, i) => s + (i.resellerCut ?? 0), 0),
     profit: e.items.reduce((s, i) => s + (i.profit ?? 0), 0),
     paymentStatus: e.paymentStatus,
+    dp: e.dp,
     buyerName: e.buyerName,
     buyerAddress: e.buyerAddress,
     salesId: e.salesId,

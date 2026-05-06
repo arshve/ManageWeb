@@ -8,7 +8,7 @@
 import { prisma } from '@/lib/prisma';
 import { requireAuth, isSuperAdmin } from '@/lib/auth';
 import { DashboardShell } from '@/components/dashboard/dashboard-shell';
-import { LivestockForm } from '@/components/dashboard/livestock-form';
+import { LivestockForm, type PricingMap } from '@/components/dashboard/livestock-form';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus } from 'lucide-react';
@@ -21,29 +21,37 @@ export async function LivestockTable({
 } = {}) {
   const profile = await requireAuth();
   const superAdmin = isSuperAdmin(profile.role);
-  const livestock = await prisma.livestock.findMany({
-    orderBy: { createdAt: 'desc' },
-    include: {
-      entryItem: {
-        select: {
-          entry: {
-            select: {
-              id: true,
-              status: true,
-              buyerName: true,
-              sales: { select: { name: true } },
-              delivery: {
-                select: {
-                  status: true,
-                  driver: { select: { name: true } },
+  const [livestock, pricingRows] = await Promise.all([
+    prisma.livestock.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: {
+        entryItem: {
+          select: {
+            entry: {
+              select: {
+                id: true,
+                status: true,
+                buyerName: true,
+                sales: { select: { name: true } },
+                delivery: {
+                  select: {
+                    status: true,
+                    driver: { select: { name: true } },
+                  },
                 },
               },
             },
           },
         },
       },
-    },
-  });
+    }),
+    prisma.pricing.findMany({
+      select: { animalType: true, grade: true, hargaBeli: true, hargaJual: true },
+    }),
+  ]);
+  const pricingTemplate: PricingMap = Object.fromEntries(
+    pricingRows.map((p) => [`${p.animalType}-${p.grade}`, { hargaBeli: p.hargaBeli, hargaJual: p.hargaJual }]),
+  );
 
   // Stat calculations
   const types = ['KAMBING', 'DOMBA', 'SAPI'] as const;
@@ -93,6 +101,7 @@ export async function LivestockTable({
       actions={
         readOnly ? undefined : (
           <LivestockForm
+            pricingTemplate={pricingTemplate}
             trigger={
               <Button>
                 <Plus className="h-4 w-4 mr-2" />
@@ -126,7 +135,7 @@ export async function LivestockTable({
       </div>
 
       {/* Filterable table */}
-      <LivestockTableClient livestock={serialized} readOnly={readOnly} canViewFinancials={superAdmin} />
+      <LivestockTableClient livestock={serialized} pricingTemplate={pricingTemplate} readOnly={readOnly} canViewFinancials={superAdmin} />
     </DashboardShell>
   );
 }

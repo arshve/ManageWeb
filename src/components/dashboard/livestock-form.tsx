@@ -37,6 +37,8 @@ import { toast } from 'sonner';
 import { ImagePlus, X } from 'lucide-react';
 import { parseWeightInput, formatWeight } from '@/lib/format';
 
+export type PricingMap = Record<string, { hargaBeli: number; hargaJual: number }>;
+
 interface LivestockFormProps {
   livestock?: {
     id: string;
@@ -53,9 +55,10 @@ interface LivestockFormProps {
     notes: string | null;
   };
   trigger: React.ReactNode;
+  pricingTemplate?: PricingMap;
 }
 
-export function LivestockForm({ livestock, trigger }: LivestockFormProps) {
+export function LivestockForm({ livestock, trigger, pricingTemplate }: LivestockFormProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const isEdit = !!livestock;
@@ -159,6 +162,14 @@ export function LivestockForm({ livestock, trigger }: LivestockFormProps) {
     return url as string;
   }
 
+  function applyTemplate(nextType: string, nextGrade: string) {
+    if (!pricingTemplate || nextType === 'SAPI') return;
+    const tpl = pricingTemplate[`${nextType}-${nextGrade}`];
+    if (!tpl) return;
+    setHargaJual(tpl.hargaJual.toString());
+    setHargaModal(tpl.hargaBeli.toString());
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
@@ -248,7 +259,11 @@ export function LivestockForm({ livestock, trigger }: LivestockFormProps) {
                 <Label htmlFor="type">Jenis Hewan</Label>
                 <Select
                   value={type}
-                  onValueChange={(val) => setType(val ?? type)}
+                  onValueChange={(val) => {
+                    const next = val ?? type;
+                    setType(next);
+                    applyTemplate(next, grade);
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue>
@@ -270,7 +285,11 @@ export function LivestockForm({ livestock, trigger }: LivestockFormProps) {
                   <Label htmlFor="grade">Grade</Label>
                   <Select
                     value={grade ?? 'A'}
-                    onValueChange={(val) => setGrade(val ?? grade ?? 'A')}
+                    onValueChange={(val) => {
+                      const next = val ?? grade ?? 'A';
+                      setGrade(next);
+                      applyTemplate(type, next);
+                    }}
                   >
                     <SelectTrigger>
                       <SelectValue>
@@ -338,6 +357,11 @@ export function LivestockForm({ livestock, trigger }: LivestockFormProps) {
                 onValueChange={setHargaModal}
                 placeholder="2500000"
               />
+              {pricingTemplate && type !== 'SAPI' && pricingTemplate[`${type}-${grade}`] && (
+                <p className="text-[11px] text-muted-foreground">
+                  Harga otomatis dari Kelola Harga — bisa diubah.
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">

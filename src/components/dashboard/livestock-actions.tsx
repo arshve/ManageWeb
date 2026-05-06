@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { deleteLivestock } from '@/app/actions/livestock';
-import { LivestockForm } from './livestock-form';
+import { LivestockForm, type PricingMap } from './livestock-form';
 import { toast } from 'sonner';
 
 interface LivestockActionsProps {
@@ -38,9 +38,10 @@ interface LivestockActionsProps {
     photoUrl: string | null;
     notes: string | null;
   };
+  pricingTemplate?: PricingMap;
 }
 
-export function LivestockActions({ livestock }: LivestockActionsProps) {
+export function LivestockActions({ livestock, pricingTemplate }: LivestockActionsProps) {
   /**
    * Handles livestock deletion with confirmation dialog.
    * Calls the deleteLivestock server action after user confirms.
@@ -60,6 +61,7 @@ export function LivestockActions({ livestock }: LivestockActionsProps) {
       {/* Edit button — opens the livestock form dialog with pre-filled data */}
       <LivestockForm
         livestock={livestock}
+        pricingTemplate={pricingTemplate}
         trigger={
           <Button variant="ghost" size="icon" className="h-8 w-8">
             <Pencil className="h-3.5 w-3.5" />

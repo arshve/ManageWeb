@@ -15,6 +15,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label'; // <-- Add this import
 import { LivestockPhoto } from '@/components/dashboard/livestock-photo';
 import { LivestockActions } from '@/components/dashboard/livestock-actions';
+import type { PricingMap } from '@/components/dashboard/livestock-form';
 import {
   Select,
   SelectContent,
@@ -83,10 +84,12 @@ function StatusIcon({ isSold }: { isSold: boolean }) {
 
 export function LivestockTableClient({
   livestock,
+  pricingTemplate,
   readOnly = false,
   canViewFinancials = false,
 }: {
   livestock: LivestockItem[];
+  pricingTemplate?: PricingMap;
   readOnly?: boolean;
   canViewFinancials?: boolean;
 }) {
@@ -415,7 +418,7 @@ export function LivestockTableClient({
                       {!readOnly && (
                         <td className="p-3">
                           <div className="flex items-center justify-center">
-                            <LivestockActions livestock={item} />
+                            <LivestockActions livestock={item} pricingTemplate={pricingTemplate} />
                           </div>
                         </td>
                       )}
@@ -446,6 +449,7 @@ export function LivestockTableClient({
                 item={item}
                 readOnly={readOnly}
                 canViewFinancials={canViewFinancials}
+                pricingTemplate={pricingTemplate}
               />
             ))}
             {filtered.length === 0 && (
@@ -468,10 +472,12 @@ function MobileLivestockCard({
   item,
   readOnly,
   canViewFinancials,
+  pricingTemplate,
 }: {
   item: LivestockItem;
   readOnly: boolean;
   canViewFinancials: boolean;
+  pricingTemplate?: PricingMap;
 }) {
   const [expanded, setExpanded] = useState(false);
 

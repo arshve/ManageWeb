@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { prisma } from '@/lib/prisma';
 import { DashboardShell } from '@/components/dashboard/dashboard-shell';
 import { EntryTable } from '@/components/dashboard/entry-table';

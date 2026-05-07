@@ -14,6 +14,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { ChevronDown, ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import { formatDateTime } from '@/lib/format';
+import { formatAuditValue } from '@/lib/audit-format';
 
 export interface LogItem {
   id: string;
@@ -43,7 +44,7 @@ interface Filters {
   q: string;
 }
 
-const ENTITIES = ['Entry', 'Livestock', 'Profile', 'Pricing'];
+const ENTITIES = ['Entry', 'Livestock', 'Profile', 'Pricing', 'Delivery', 'DriverAvailability', 'EntryEditRequest'];
 const ACTIONS = ['CREATE', 'UPDATE', 'DELETE'] as const;
 
 export function LogsClient({
@@ -136,11 +137,11 @@ export function LogsClient({
         >
           <SelectTrigger className="h-8 w-[130px] text-xs">
             <SelectValue>
-              {filters.entity === 'ALL' ? 'Semua Entitas' : filters.entity}
+              {filters.entity === 'ALL' ? 'All Entities' : filters.entity}
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="ALL">Semua Entitas</SelectItem>
+            <SelectItem value="ALL">All Entities</SelectItem>
             {ENTITIES.map((e) => (
               <SelectItem key={e} value={e}>
                 {e}
@@ -154,11 +155,11 @@ export function LogsClient({
         >
           <SelectTrigger className="h-8 w-[130px] text-xs">
             <SelectValue>
-              {filters.action === 'ALL' ? 'Semua Aksi' : filters.action}
+              {filters.action === 'ALL' ? 'All Actions' : filters.action}
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="ALL">Semua Aksi</SelectItem>
+            <SelectItem value="ALL">All Actions</SelectItem>
             {ACTIONS.map((a) => (
               <SelectItem key={a} value={a}>
                 {a}
@@ -287,9 +288,7 @@ function LogRow({ log }: { log: LogItem }) {
       {open && (
         <div className="px-3 pb-3 pl-16">
           {diff.length === 0 ? (
-            <pre className="text-[11px] bg-muted/40 rounded p-2 overflow-x-auto whitespace-pre-wrap">
-              {JSON.stringify(log.after ?? log.before ?? {}, null, 2)}
-            </pre>
+            <FallbackPayload payload={log.after ?? log.before} />
           ) : (
             <dl className="text-[11px] rounded border divide-y bg-muted/20">
               {diff.map((row) => (
@@ -300,10 +299,10 @@ function LogRow({ log }: { log: LogItem }) {
                   <dt className="font-mono text-muted-foreground truncate">
                     {row.key}
                   </dt>
-                  <dd className="text-destructive/90 break-all whitespace-pre-wrap">
+                  <dd className="text-destructive/90 whitespace-pre overflow-x-auto">
                     {row.before}
                   </dd>
-                  <dd className="text-primary break-all whitespace-pre-wrap">
+                  <dd className="text-primary whitespace-pre overflow-x-auto">
                     {row.after}
                   </dd>
                 </div>
@@ -316,6 +315,31 @@ function LogRow({ log }: { log: LogItem }) {
   );
 }
 
+function FallbackPayload({ payload }: { payload: unknown }) {
+  if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+    const entries = Object.entries(payload as Record<string, unknown>).filter(
+      ([k]) => !SKIP_KEYS.has(k),
+    );
+    if (entries.length > 0) {
+      return (
+        <dl className="text-[11px] rounded border divide-y bg-muted/20">
+          {entries.map(([k, v]) => (
+            <div key={k} className="grid grid-cols-[minmax(0,1fr)_minmax(0,4fr)] gap-2 px-2 py-1.5">
+              <dt className="font-mono text-muted-foreground truncate">{k}</dt>
+              <dd className="text-foreground whitespace-pre overflow-x-auto">{formatAuditValue(k, v)}</dd>
+            </div>
+          ))}
+        </dl>
+      );
+    }
+  }
+  return (
+    <pre className="text-[11px] bg-muted/40 rounded p-2 overflow-x-auto whitespace-pre">
+      {JSON.stringify(payload ?? {}, null, 2)}
+    </pre>
+  );
+}
+
 function ActionBadge({ action }: { action: LogItem['action'] }) {
   const map = {
     CREATE: 'bg-primary/10 text-primary',
@@ -325,47 +349,29 @@ function ActionBadge({ action }: { action: LogItem['action'] }) {
   return (
     <Badge
       variant="outline"
-      className={`${map[action]} text-[10px] shrink-0 mt-0.5`}
+      className={`${map[action] ?? ''} text-[10px] shrink-0 mt-0.5`}
     >
       {action}
     </Badge>
   );
 }
 
+const SKIP_KEYS = new Set(['createdAt', 'updatedAt', 'id']);
+
 function computeDiff(
   before: unknown,
   after: unknown,
 ): { key: string; before: string; after: string }[] {
-  const a = (before && typeof before === 'object' ? before : {}) as Record<
-    string,
-    unknown
-  >;
-  const b = (after && typeof after === 'object' ? after : {}) as Record<
-    string,
-    unknown
-  >;
-  const keys = Array.from(
-    new Set([...Object.keys(a), ...Object.keys(b)]),
-  ).sort();
+  const a = (before && typeof before === 'object' ? before : {}) as Record<string, unknown>;
+  const b = (after && typeof after === 'object' ? after : {}) as Record<string, unknown>;
+  const keys = Array.from(new Set([...Object.keys(a), ...Object.keys(b)])).sort();
   const rows: { key: string; before: string; after: string }[] = [];
   for (const key of keys) {
-    if (key === 'updatedAt' || key === 'createdAt') continue;
+    if (SKIP_KEYS.has(key)) continue;
     const av = a[key];
     const bv = b[key];
     if (JSON.stringify(av) === JSON.stringify(bv)) continue;
-    rows.push({
-      key,
-      before: stringify(av),
-      after: stringify(bv),
-    });
+    rows.push({ key, before: formatAuditValue(key, av), after: formatAuditValue(key, bv) });
   }
   return rows;
-}
-
-function stringify(v: unknown): string {
-  if (v === undefined) return '—';
-  if (v === null) return 'null';
-  if (typeof v === 'string') return v;
-  if (typeof v === 'number' || typeof v === 'boolean') return String(v);
-  return JSON.stringify(v);
 }

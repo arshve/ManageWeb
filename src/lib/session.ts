@@ -16,10 +16,8 @@
 import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 
-// VERCEL_DEPLOYMENT_ID changes on every deployment, invalidating all existing sessions.
-// Falls back to 'local' in development so sessions persist across dev server restarts.
 const SECRET = new TextEncoder().encode(
-  `${process.env.SESSION_SECRET || 'millenials-farm-dev-secret-change-in-prod'}:${process.env.VERCEL_DEPLOYMENT_ID || 'local'}`
+  process.env.SESSION_SECRET || 'millenials-farm-dev-secret-change-in-prod',
 );
 
 // Name of the cookie that stores the JWT token
@@ -34,7 +32,8 @@ const COOKIE_NAME = 'mf-session';
  * @returns The signed JWT token string
  */
 export async function createSession(userId: string, role: string) {
-  const token = await new SignJWT({ userId, role })
+  const dep = process.env.VERCEL_DEPLOYMENT_ID ?? 'local';
+  const token = await new SignJWT({ userId, role, dep })
     .setProtectedHeader({ alg: 'HS256' })
     .setExpirationTime('7d')
     .sign(SECRET);
@@ -65,6 +64,8 @@ export async function getSessionUserId(): Promise<string | null> {
 
   try {
     const { payload } = await jwtVerify(token, SECRET);
+    const currentDep = process.env.VERCEL_DEPLOYMENT_ID ?? 'local';
+    if (payload.dep !== currentDep) return null;
     return (payload.userId as string) || null;
   } catch {
     return null;

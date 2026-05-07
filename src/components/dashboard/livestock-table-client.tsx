@@ -9,10 +9,13 @@ import {
   Skull,
   CircleCheck,
   ShoppingBag,
+  Search,
+  X,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { Label } from '@/components/ui/label'; // <-- Add this import
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { LivestockPhoto } from '@/components/dashboard/livestock-photo';
 import { LivestockActions } from '@/components/dashboard/livestock-actions';
 import type { PricingMap } from '@/components/dashboard/livestock-form';
@@ -93,16 +96,18 @@ export function LivestockTableClient({
   readOnly?: boolean;
   canViewFinancials?: boolean;
 }) {
+  const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [conditionFilter, setConditionFilter] = useState('ALL');
   const [gradeFilter, setGradeFilter] = useState('ALL');
   const [weightFilter, setWeightFilter] = useState('ALL');
-  const [sortOrder, setSortOrder] = useState<'newest' | 'sku_asc' | 'sku_desc'>('newest');
+  const [tagFilter, setTagFilter] = useState('ALL');
+  const [sortOrder, setSortOrder] = useState<'newest' | 'sku_asc' | 'sku_desc' | 'harga_asc' | 'harga_desc'>('newest');
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 25;
 
-  useEffect(() => { setPage(1); }, [typeFilter, statusFilter, conditionFilter, gradeFilter, weightFilter]);
+  useEffect(() => { setPage(1); }, [search, typeFilter, statusFilter, conditionFilter, gradeFilter, weightFilter, tagFilter]);
 
   const typeFiltered = useMemo(() => {
     return typeFilter !== 'ALL' ? livestock.filter((l) => l.type === typeFilter) : livestock;
@@ -114,39 +119,49 @@ export function LivestockTableClient({
     return Array.from(set).sort();
   }, [typeFiltered]);
 
-  const weightOptions = useMemo(() => {
-    const set = new Set<string>();
+  const WEIGHT_BUCKET = 50;
+  const weightBuckets = useMemo(() => {
+    const buckets = new Set<number>();
     typeFiltered.forEach((l) => {
-      const w = formatWeight(l.weightMin, l.weightMax);
-      if (w) set.add(w);
+      const w = l.weightMin ?? l.weightMax;
+      if (w != null) buckets.add(Math.floor(w / WEIGHT_BUCKET) * WEIGHT_BUCKET);
     });
-    return Array.from(set).sort();
+    return Array.from(buckets).sort((a, b) => a - b);
   }, [typeFiltered]);
 
   const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
     let result = livestock.filter((item) => {
+      if (q && !item.sku.toLowerCase().includes(q) && !(item.tag?.toLowerCase().includes(q)) && !(item.notes?.toLowerCase().includes(q))) return false;
       if (typeFilter !== 'ALL' && item.type !== typeFilter) return false;
       if (statusFilter === 'SOLD' && !item.isSold) return false;
       if (statusFilter === 'AVAILABLE' && item.isSold) return false;
       if (conditionFilter !== 'ALL' && item.condition !== conditionFilter) return false;
       if (gradeFilter !== 'ALL' && item.grade !== gradeFilter) return false;
-      if (weightFilter !== 'ALL' && formatWeight(item.weightMin, item.weightMax) !== weightFilter) return false;
+      if (weightFilter !== 'ALL') {
+        const lo = Number(weightFilter);
+        const w = item.weightMin ?? item.weightMax;
+        if (w == null || w < lo || w >= lo + WEIGHT_BUCKET) return false;
+      }
+      if (tagFilter === 'WITH_TAG' && !item.tag) return false;
+      if (tagFilter === 'NO_TAG' && item.tag) return false;
       return true;
     });
-    if (sortOrder === 'sku_asc') {
-      result = [...result].sort((a, b) => a.sku.localeCompare(b.sku));
-    } else if (sortOrder === 'sku_desc') {
-      result = [...result].sort((a, b) => b.sku.localeCompare(a.sku));
-    }
+    if (sortOrder === 'sku_asc') result = [...result].sort((a, b) => a.sku.localeCompare(b.sku));
+    else if (sortOrder === 'sku_desc') result = [...result].sort((a, b) => b.sku.localeCompare(a.sku));
+    else if (sortOrder === 'harga_asc') result = [...result].sort((a, b) => (a.hargaJual ?? 0) - (b.hargaJual ?? 0));
+    else if (sortOrder === 'harga_desc') result = [...result].sort((a, b) => (b.hargaJual ?? 0) - (a.hargaJual ?? 0));
     return result;
-  }, [livestock, typeFilter, statusFilter, conditionFilter, gradeFilter, weightFilter, sortOrder]);
+  }, [livestock, search, typeFilter, statusFilter, conditionFilter, gradeFilter, weightFilter, tagFilter, sortOrder]);
 
   const hasFilters =
+    search !== '' ||
     typeFilter !== 'ALL' ||
     statusFilter !== 'ALL' ||
     conditionFilter !== 'ALL' ||
     gradeFilter !== 'ALL' ||
     weightFilter !== 'ALL' ||
+    tagFilter !== 'ALL' ||
     sortOrder !== 'newest';
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
@@ -156,6 +171,25 @@ export function LivestockTableClient({
     <div className="space-y-4">
       {/* Filter bar with labels */}
       <div className="flex items-end gap-3 flex-wrap bg-muted/20 p-3 rounded-lg border border-border/50">
+        {/* Search */}
+        <div className="space-y-1.5 w-full sm:w-auto">
+          <Label className="text-xs text-muted-foreground">Cari</Label>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="SKU, tag, catatan..."
+              className="h-8 pl-8 pr-8 text-xs w-full sm:w-[200px]"
+            />
+            {search && (
+              <button type="button" onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+
         <div className="space-y-1.5">
           <Label className="text-xs text-muted-foreground">Jenis Hewan</Label>
           <Select
@@ -237,22 +271,26 @@ export function LivestockTableClient({
           </Select>
         </div>
 
-        {typeFilter === 'SAPI' && weightOptions.length > 0 && (
+        {weightBuckets.length > 0 && (
           <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">Berat</Label>
+            <Label className="text-xs text-muted-foreground">Berat (kg)</Label>
             <Select
               value={weightFilter}
               onValueChange={(val) => setWeightFilter(val ?? weightFilter)}
             >
-              <SelectTrigger className="h-8 w-[130px] text-xs">
+              <SelectTrigger className="h-8 w-[140px] text-xs">
                 <SelectValue>
-                  {weightFilter === 'ALL' ? 'Semua Berat' : weightFilter}
+                  {weightFilter === 'ALL'
+                    ? 'Semua Berat'
+                    : `${weightFilter}–${Number(weightFilter) + WEIGHT_BUCKET} kg`}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="ALL">Semua Berat</SelectItem>
-                {weightOptions.map((w) => (
-                  <SelectItem key={w} value={w}>{w}</SelectItem>
+                {weightBuckets.map((lo) => (
+                  <SelectItem key={lo} value={String(lo)}>
+                    {lo}–{lo + WEIGHT_BUCKET} kg
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -260,20 +298,41 @@ export function LivestockTableClient({
         )}
 
         <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">Tag</Label>
+          <Select
+            value={tagFilter}
+            onValueChange={(val) => setTagFilter(val ?? tagFilter)}
+          >
+            <SelectTrigger className="h-8 w-[130px] text-xs">
+              <SelectValue>
+                {{ ALL: 'Semua Tag', WITH_TAG: 'Ada Tag', NO_TAG: 'Tanpa Tag' }[tagFilter] ?? tagFilter}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">Semua Tag</SelectItem>
+              <SelectItem value="WITH_TAG">Ada Tag</SelectItem>
+              <SelectItem value="NO_TAG">Tanpa Tag</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-1.5">
           <Label className="text-xs text-muted-foreground">Urutkan</Label>
           <Select
             value={sortOrder}
             onValueChange={(val) => setSortOrder(val as typeof sortOrder)}
           >
-            <SelectTrigger className="h-8 w-[130px] text-xs">
+            <SelectTrigger className="h-8 w-[160px] text-xs">
               <SelectValue>
-                {{ newest: 'Terbaru', sku_asc: 'SKU ↑', sku_desc: 'SKU ↓' }[sortOrder]}
+                {{ newest: 'Terbaru', sku_asc: 'SKU A-Z', sku_desc: 'SKU Z-A', harga_asc: 'Harga ↑', harga_desc: 'Harga ↓' }[sortOrder]}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="newest">Terbaru</SelectItem>
-              <SelectItem value="sku_asc">SKU ↑</SelectItem>
-              <SelectItem value="sku_desc">SKU ↓</SelectItem>
+              <SelectItem value="sku_asc">SKU A-Z</SelectItem>
+              <SelectItem value="sku_desc">SKU Z-A</SelectItem>
+              <SelectItem value="harga_asc">Harga ↑</SelectItem>
+              <SelectItem value="harga_desc">Harga ↓</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -282,11 +341,13 @@ export function LivestockTableClient({
           <button
             type="button"
             onClick={() => {
+              setSearch('');
               setTypeFilter('ALL');
               setStatusFilter('ALL');
               setConditionFilter('ALL');
               setGradeFilter('ALL');
               setWeightFilter('ALL');
+              setTagFilter('ALL');
               setSortOrder('newest');
             }}
             className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors mb-2 ml-1"

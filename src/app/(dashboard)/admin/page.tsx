@@ -25,10 +25,16 @@ export default async function AdminDashboardPage() {
     }),
     prisma.entry.findMany({
       where: { requests: { none: { isFulfilled: false } } },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { sortAt: 'desc' },
       include: {
         items: { include: { livestock: true } },
         requests: { where: { isFulfilled: false }, select: { id: true, type: true, grade: true, weightMin: true, weightMax: true, hargaJual: true } },
+        editRequests: {
+          where: { status: 'PENDING' },
+          take: 1,
+          orderBy: { createdAt: 'desc' },
+          include: { proposedBy: { select: { name: true } } },
+        },
         sales: { select: { id: true, name: true } },
         delivery: {
           select: { status: true, driver: { select: { name: true } } },
@@ -41,6 +47,17 @@ export default async function AdminDashboardPage() {
       orderBy: { name: 'asc' },
     }),
   ]);
+
+  const pendingEditLivestockIds = allEntries
+    .flatMap((e) => e.editRequests)
+    .flatMap((req) => (req.itemChanges as Array<{ entryItemId: string; livestockId: string; hargaJual: number }>).map((ic) => ic.livestockId));
+  const pendingLivestocks = pendingEditLivestockIds.length > 0
+    ? await prisma.livestock.findMany({
+        where: { id: { in: pendingEditLivestockIds } },
+        select: { id: true, sku: true, type: true, grade: true, tag: true },
+      })
+    : [];
+  const pendingLivestockMap = Object.fromEntries(pendingLivestocks.map((l) => [l.id, l]));
 
   const totalRevenue = approvedEntries.reduce(
     (sum, e) => sum + e.items.reduce((s, i) => s + i.hargaJual, 0),
@@ -74,6 +91,7 @@ export default async function AdminDashboardPage() {
       notes: entry.notes,
       isSent: entry.isSent,
       createdAt: entry.createdAt.toISOString(),
+      updatedAt: entry.updatedAt.toISOString(),
       delivery: entry.delivery
         ? { status: entry.delivery.status, driverName: entry.delivery.driver?.name ?? null }
         : null,
@@ -116,6 +134,19 @@ export default async function AdminDashboardPage() {
         weightMin: r.weightMin,
         weightMax: r.weightMax,
         hargaJual: r.hargaJual,
+      })),
+      editRequests: entry.editRequests.map((req) => ({
+        id: req.id,
+        proposedByName: req.proposedBy.name,
+        createdAt: req.createdAt.toISOString(),
+        itemChanges: (req.itemChanges as Array<{ entryItemId: string; livestockId: string; hargaJual: number }>).map((ic) => ({
+          entryItemId: ic.entryItemId,
+          newLivestockId: ic.livestockId,
+          newLivestockSku: pendingLivestockMap[ic.livestockId]?.sku ?? ic.livestockId,
+          newLivestockType: pendingLivestockMap[ic.livestockId]?.type ?? '',
+          newLivestockGrade: pendingLivestockMap[ic.livestockId]?.grade ?? null,
+          newHargaJual: ic.hargaJual,
+        })),
       })),
       sales: { id: entry.sales.id, name: entry.sales.name },
     };

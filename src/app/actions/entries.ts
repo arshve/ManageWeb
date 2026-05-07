@@ -1,6 +1,7 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
+import { Prisma } from '@/generated/prisma/client';
 import { requireAuth, requireRole } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
 import { generateInvoiceNo } from '@/lib/format';
@@ -234,7 +235,7 @@ export async function approveEntry(id: string) {
   const [updated] = await prisma.$transaction([
     prisma.entry.update({
       where: { id },
-      data: { status: 'APPROVED', approvedAt: new Date(), approvedBy: admin.id },
+      data: { status: 'APPROVED', approvedAt: new Date(), approvedBy: admin.id, sortAt: new Date() },
     }),
     prisma.livestock.updateMany({
       where: { id: { in: livestockIds } },
@@ -321,6 +322,7 @@ export async function updateEntry(id: string, formData: FormData) {
     const u = await tx.entry.update({
       where: { id },
       data: {
+        sortAt: new Date(),
         dp: formData.get('dp') ? Number(formData.get('dp')) : null,
         totalBayar: formData.get('totalBayar') ? Number(formData.get('totalBayar')) : null,
         paymentStatus:
@@ -529,5 +531,235 @@ export async function updateEntryRequests(entryId: string, requestsJson: string)
   revalidatePath('/admin');
   revalidatePath('/sales');
   revalidatePath('/admin/antrian');
+  return { success: true };
+}
+
+export async function getAvailableLivestockForSwap(type: string) {
+  await requireAuth();
+  return prisma.livestock.findMany({
+    where: { type: type as 'KAMBING' | 'DOMBA' | 'SAPI', isSold: false },
+    select: { id: true, sku: true, type: true, grade: true, tag: true, weightMin: true, weightMax: true, hargaJual: true, condition: true, photoUrl: true },
+    orderBy: { sku: 'asc' },
+  });
+}
+
+// ─── Entry Edit Request (sales proposes → admin approves) ───────────────────
+
+interface ItemChange {
+  entryItemId: string;
+  livestockId: string;
+  hargaJual: number;
+}
+
+export async function proposeEntryEdit(entryId: string, formData: FormData) {
+  const profile = await requireAuth();
+
+  const entry = await prisma.entry.findUnique({
+    where: { id: entryId },
+    include: { items: { include: { livestock: true } } },
+  });
+  if (!entry) return { error: 'Entry tidak ditemukan' };
+
+  if (
+    profile.role !== 'ADMIN' &&
+    profile.role !== 'SUPER_ADMIN' &&
+    entry.salesId !== profile.id
+  ) {
+    return { error: 'Anda tidak berhak mengubah entry ini' };
+  }
+
+  if (entry.status !== 'APPROVED') {
+    return { error: 'Hanya entry yang sudah disetujui yang dapat diajukan perubahannya' };
+  }
+
+  // Block if there's already a PENDING request
+  const existing = await prisma.entryEditRequest.findFirst({
+    where: { entryId, status: 'PENDING' },
+  });
+  if (existing) {
+    return { error: 'Sudah ada permintaan perubahan yang menunggu persetujuan' };
+  }
+
+  const itemChanges: ItemChange[] = JSON.parse(formData.get('itemChanges') as string);
+  if (!Array.isArray(itemChanges) || itemChanges.length === 0) {
+    return { error: 'Tidak ada perubahan item' };
+  }
+
+  // Validate: every entryItemId belongs to this entry; every NEW livestockId is unsold
+  for (const ic of itemChanges) {
+    const entryItem = entry.items.find((i) => i.id === ic.entryItemId);
+    if (!entryItem) return { error: `Item tidak ditemukan: ${ic.entryItemId}` };
+    // If livestock is different, check it's available
+    if (ic.livestockId !== entryItem.livestockId) {
+      const lv = await prisma.livestock.findUnique({ where: { id: ic.livestockId } });
+      if (!lv) return { error: `Hewan tidak ditemukan: ${ic.livestockId}` };
+      if (lv.isSold) return { error: `Hewan ${lv.sku} sudah terjual` };
+    }
+  }
+
+  const request = await prisma.entryEditRequest.create({
+    data: { entryId, proposedById: profile.id, itemChanges: itemChanges as unknown as Prisma.InputJsonValue, status: 'PENDING' },
+  });
+
+  await prisma.entry.update({ where: { id: entryId }, data: { sortAt: new Date() } });
+
+  await logAudit({
+    actor: profile,
+    action: 'CREATE',
+    entity: 'EntryEditRequest',
+    entityId: request.id,
+    label: `${entry.invoiceNo} — perubahan diajukan`,
+    after: { itemChanges },
+  });
+
+  revalidatePath('/admin');
+  revalidatePath('/sales');
+  revalidatePath('/admin/entries');
+  return { success: true };
+}
+
+export async function approveEntryEdit(requestId: string) {
+  const admin = await requireRole('ADMIN', 'SUPER_ADMIN');
+
+  const request = await prisma.entryEditRequest.findUnique({
+    where: { id: requestId },
+    include: {
+      entry: { include: { items: { include: { livestock: true } } } },
+    },
+  });
+  if (!request) return { error: 'Permintaan perubahan tidak ditemukan' };
+  if (request.status !== 'PENDING') return { error: 'Permintaan ini sudah diproses' };
+
+  const itemChanges = request.itemChanges as unknown as ItemChange[];
+
+  // Validate: new livestocks aren't sold by someone else
+  for (const ic of itemChanges) {
+    const entryItem = request.entry.items.find((i) => i.id === ic.entryItemId);
+    if (!entryItem) return { error: `Item tidak ditemukan: ${ic.entryItemId}` };
+    if (ic.livestockId !== entryItem.livestockId) {
+      const lv = await prisma.livestock.findUnique({ where: { id: ic.livestockId } });
+      if (!lv) return { error: `Hewan tidak ditemukan` };
+      if (lv.isSold) return { error: `Hewan ${lv.sku} sudah terjual oleh entry lain. Tolak dan minta sales pilih hewan lain.` };
+    }
+  }
+
+  await prisma.$transaction(async (tx) => {
+    for (const ic of itemChanges) {
+      const entryItem = request.entry.items.find((i) => i.id === ic.entryItemId)!;
+      const livestock = ic.livestockId !== entryItem.livestockId
+        ? await tx.livestock.findUniqueOrThrow({ where: { id: ic.livestockId } })
+        : entryItem.livestock;
+
+      // Swap livestock if changed
+      if (ic.livestockId !== entryItem.livestockId) {
+        await tx.livestock.update({ where: { id: entryItem.livestockId }, data: { isSold: false } });
+        await tx.livestock.update({ where: { id: ic.livestockId }, data: { isSold: true } });
+      }
+
+      const hargaModal = livestock.hargaModal ?? entryItem.hargaModal;
+      const resellerCut = entryItem.resellerCut;
+      const hpp = hargaModal !== null ? hargaModal + (resellerCut ?? 0) : null;
+      const profit = hpp !== null ? ic.hargaJual - hpp : null;
+
+      await tx.entryItem.update({
+        where: { id: ic.entryItemId },
+        data: { livestockId: ic.livestockId, hargaJual: ic.hargaJual, hargaModal, hpp, profit },
+      });
+    }
+
+    await tx.entryEditRequest.update({
+      where: { id: requestId },
+      data: { status: 'APPROVED', reviewedById: admin.id, reviewedAt: new Date() },
+    });
+
+    await tx.entry.update({
+      where: { id: request.entryId },
+      data: { sortAt: new Date() },
+    });
+  });
+
+  await logAudit({
+    actor: admin,
+    action: 'UPDATE',
+    entity: 'EntryEditRequest',
+    entityId: requestId,
+    label: `${request.entry.invoiceNo} — perubahan disetujui`,
+    before: { status: 'PENDING' },
+    after: { status: 'APPROVED', reviewedById: admin.id },
+  });
+
+  revalidatePath('/admin');
+  revalidatePath('/sales');
+  revalidatePath('/admin/entries');
+  return { success: true };
+}
+
+export async function rejectEntryEdit(requestId: string) {
+  const admin = await requireRole('ADMIN', 'SUPER_ADMIN');
+
+  const request = await prisma.entryEditRequest.findUnique({
+    where: { id: requestId },
+    include: { entry: { select: { invoiceNo: true } } },
+  });
+  if (!request) return { error: 'Permintaan perubahan tidak ditemukan' };
+  if (request.status !== 'PENDING') return { error: 'Permintaan ini sudah diproses' };
+
+  await prisma.entryEditRequest.update({
+    where: { id: requestId },
+    data: { status: 'REJECTED', reviewedById: admin.id, reviewedAt: new Date() },
+  });
+
+  await logAudit({
+    actor: admin,
+    action: 'UPDATE',
+    entity: 'EntryEditRequest',
+    entityId: requestId,
+    label: `${request.entry.invoiceNo} — perubahan ditolak`,
+    before: { status: 'PENDING' },
+    after: { status: 'REJECTED', reviewedById: admin.id },
+  });
+
+  revalidatePath('/admin');
+  revalidatePath('/sales');
+  revalidatePath('/admin/entries');
+  return { success: true };
+}
+
+export async function cancelEntryEdit(requestId: string) {
+  const profile = await requireAuth();
+
+  const request = await prisma.entryEditRequest.findUnique({
+    where: { id: requestId },
+    include: { entry: { select: { invoiceNo: true, salesId: true } } },
+  });
+  if (!request) return { error: 'Permintaan perubahan tidak ditemukan' };
+  if (request.status !== 'PENDING') return { error: 'Permintaan ini sudah diproses' };
+
+  if (
+    profile.role !== 'ADMIN' &&
+    profile.role !== 'SUPER_ADMIN' &&
+    request.proposedById !== profile.id
+  ) {
+    return { error: 'Anda tidak berhak membatalkan permintaan ini' };
+  }
+
+  await prisma.entryEditRequest.update({
+    where: { id: requestId },
+    data: { status: 'REJECTED', reviewedById: profile.id, reviewedAt: new Date() },
+  });
+
+  await logAudit({
+    actor: profile,
+    action: 'UPDATE',
+    entity: 'EntryEditRequest',
+    entityId: requestId,
+    label: `${request.entry.invoiceNo} — perubahan dibatalkan pengaju`,
+    before: { status: 'PENDING' },
+    after: { status: 'REJECTED' },
+  });
+
+  revalidatePath('/admin');
+  revalidatePath('/sales');
+  revalidatePath('/admin/entries');
   return { success: true };
 }

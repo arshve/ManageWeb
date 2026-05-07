@@ -54,12 +54,26 @@ import {
   ArrowDown,
   ChevronDown,
   Calendar,
+  Beef,
 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
+import { LivestockPicker, type PickerLivestock } from '@/components/dashboard/livestock-picker';
 import {
   updateEntry,
   approveEntry,
   rejectEntry,
   deleteEntry,
+  proposeEntryEdit,
+  approveEntryEdit,
+  rejectEntryEdit,
+  cancelEntryEdit,
+  getAvailableLivestockForSwap,
 } from '@/app/actions/entries';
 import { toast } from 'sonner';
 import {
@@ -115,6 +129,7 @@ export interface EntryData {
   buktiTransfer: string[];
   isSent: boolean;
   createdAt: string;
+  updatedAt: string;
   delivery: {
     status: string;
     driverName: string | null;
@@ -140,21 +155,24 @@ export interface EntryData {
     weightMax: number | null;
     hargaJual: number;
   }[];
+  editRequests: {
+    id: string;
+    proposedByName: string;
+    createdAt: string;
+    itemChanges: {
+      entryItemId: string;
+      newLivestockId: string;
+      newLivestockSku: string;
+      newLivestockType: string;
+      newLivestockGrade: string | null;
+      newHargaJual: number;
+    }[];
+  }[];
 }
 
 export interface SalesUser {
   id: string;
   name: string;
-}
-
-export interface AvailableLivestock {
-  id: string;
-  sku: string;
-  type: string;
-  grade: string | null;
-  weightMin: number | null;
-  weightMax: number | null;
-  tag: string | null;
 }
 
 const PENGIRIMAN_LABEL: Record<string, string> = {
@@ -177,7 +195,8 @@ type SortField =
   | 'sales'
   | 'hargaJual'
   | 'profit'
-  | 'createdAt';
+  | 'createdAt'
+  | 'updatedAt';
 type SortDir = 'asc' | 'desc';
 
 export function EntryTable({
@@ -256,6 +275,9 @@ export function EntryTable({
     }
 
     result = [...result].sort((a, b) => {
+      const aPending = a.editRequests.length > 0 ? 1 : 0;
+      const bPending = b.editRequests.length > 0 ? 1 : 0;
+      if (bPending !== aPending) return bPending - aPending;
       let cmp = 0;
       switch (sortField) {
         case 'invoiceNo':
@@ -276,6 +298,10 @@ export function EntryTable({
         case 'createdAt':
           cmp =
             new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+          break;
+        case 'updatedAt':
+          cmp =
+            new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
           break;
       }
       return sortDir === 'asc' ? cmp : -cmp;
@@ -478,13 +504,15 @@ export function EntryTable({
               )}
               <th className="text-center p-3 font-medium">Bayar</th>
               <th className="text-center p-3 font-medium w-32">Status</th>
-              <th
-                className="text-center p-3 font-medium cursor-pointer select-none hover:bg-muted/80"
-                onClick={() => toggleSort('createdAt')}
-              >
-                <span className="inline-flex items-center gap-1">
-                  Tanggal <SortIcon field="createdAt" />
-                </span>
+              <th className="text-center p-3 font-medium">
+                <div className="inline-flex flex-col items-center gap-0.5">
+                  <button className="inline-flex items-center gap-1 hover:text-foreground cursor-pointer select-none" onClick={() => toggleSort('createdAt')}>
+                    Dibuat <SortIcon field="createdAt" />
+                  </button>
+                  <button className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground cursor-pointer select-none" onClick={() => toggleSort('updatedAt')}>
+                    Diperbarui <SortIcon field="updatedAt" />
+                  </button>
+                </div>
               </th>
               <th className="text-center p-3 font-medium">Aksi</th>
             </tr>
@@ -643,9 +671,14 @@ interface ItemPriceState {
   resellerCut: string;
   tag: string;
   livestock: EntryItemData['livestock'];
+  originalHargaJual: number;
+  originalLivestockId: string;
+  pendingLivestockId: string | null;
+  pendingLivestockSku: string | null;
+  pendingLivestockGrade: string | null;
 }
 
-function useEntryRow(entry: EntryData, onSaved: () => void) {
+function useEntryRow(entry: EntryData, onSaved: () => void, isAdmin = false) {
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     buyerName: entry.buyerName,
@@ -667,6 +700,11 @@ function useEntryRow(entry: EntryData, onSaved: () => void) {
       resellerCut: i.resellerCut?.toString() ?? '',
       tag: i.livestock.tag ?? '',
       livestock: i.livestock,
+      originalHargaJual: i.hargaJual,
+      originalLivestockId: i.livestock.id,
+      pendingLivestockId: null,
+      pendingLivestockSku: null,
+      pendingLivestockGrade: null,
     })),
   );
   const [buktiTransferUrls, setBuktiTransferUrls] = useState<string[]>(
@@ -683,45 +721,77 @@ function useEntryRow(entry: EntryData, onSaved: () => void) {
     );
   }
 
+  const isSalesOnApproved = !isAdmin && entry.status === 'APPROVED';
+  const pendingRequest = entry.editRequests?.[0] ?? null;
+
   async function handleSave() {
     setLoading(true);
     try {
       const totalHargaJual = itemPrices.reduce((s, i) => s + (Number(i.hargaJual) || 0), 0);
+
+      // Item changes that differ from original (livestock swap or hargaJual change)
+      const itemChanges = itemPrices
+        .filter((ip) =>
+          ip.pendingLivestockId !== null ||
+          Number(ip.hargaJual) !== ip.originalHargaJual,
+        )
+        .map((ip) => ({
+          entryItemId: ip.id,
+          livestockId: ip.pendingLivestockId ?? ip.originalLivestockId,
+          hargaJual: Number(ip.hargaJual),
+        }));
+
+      if (isSalesOnApproved && itemChanges.length > 0) {
+        if (pendingRequest) {
+          toast.error('Sudah ada permintaan perubahan yang menunggu persetujuan admin');
+          setLoading(false);
+          return;
+        }
+        const fd = new FormData();
+        fd.set('itemChanges', JSON.stringify(itemChanges));
+        const res = await proposeEntryEdit(entry.id, fd);
+        if ('error' in res) {
+          toast.error(String(res.error));
+          setLoading(false);
+          return;
+        }
+        toast.success('Perubahan harga/hewan diajukan ke admin');
+      }
+
+      // Non-item fields always go through updateEntry directly
       const formData = new FormData();
       formData.set('buyerName', form.buyerName);
       formData.set('buyerPhone', form.buyerPhone);
       formData.set('buyerAddress', form.buyerAddress);
       formData.set('buyerMaps', form.buyerMaps);
       formData.set('paymentStatus', form.paymentStatus);
-      if (form.paymentStatus === 'DP') {
-        formData.set('dp', form.dp);
-      }
-      if (form.paymentStatus === 'LUNAS') {
-        formData.set('totalBayar', String(totalHargaJual));
-      }
+      if (form.paymentStatus === 'DP') formData.set('dp', form.dp);
+      if (form.paymentStatus === 'LUNAS') formData.set('totalBayar', String(totalHargaJual));
       formData.set('pengiriman', form.pengiriman);
       formData.set('salesId', form.salesId);
       formData.set('isSent', form.isSent.toString());
       formData.set('notes', form.notes);
-      formData.set('itemPrices', JSON.stringify(
-        itemPrices.map((ip) => ({
-          id: ip.id,
-          hargaJual: ip.hargaJual,
-          hargaModal: ip.hargaModal,
-          resellerCut: ip.resellerCut,
-          tag: ip.tag,
-        })),
-      ));
       buktiTransferUrls.forEach((url) => formData.append('buktiTransfer', url));
-      if (buktiTransferUrls.length === 0) {
-        formData.set('buktiTransferCleared', 'true');
+      if (buktiTransferUrls.length === 0) formData.set('buktiTransferCleared', 'true');
+
+      // Admin or sales-on-PENDING: item changes also go through updateEntry
+      if (!isSalesOnApproved) {
+        formData.set('itemPrices', JSON.stringify(
+          itemPrices.map((ip) => ({
+            id: ip.id,
+            hargaJual: ip.hargaJual,
+            hargaModal: ip.hargaModal,
+            resellerCut: ip.resellerCut,
+            tag: ip.tag,
+          })),
+        ));
       }
 
       const result = await updateEntry(entry.id, formData);
       if ('error' in result) {
         toast.error(String(result.error));
       } else {
-        toast.success('Entry diperbarui');
+        if (!isSalesOnApproved || itemChanges.length === 0) toast.success('Entry diperbarui');
         onSaved();
       }
     } catch {
@@ -750,39 +820,242 @@ function useEntryRow(entry: EntryData, onSaved: () => void) {
     else toast.success('Entry dihapus');
   }
 
+  async function handleApproveEdit() {
+    if (!pendingRequest) return;
+    const result = await approveEntryEdit(pendingRequest.id);
+    if ('error' in result) toast.error(String(result.error));
+    else toast.success('Perubahan disetujui');
+  }
+
+  async function handleRejectEdit() {
+    if (!pendingRequest) return;
+    if (!confirm('Tolak perubahan ini?')) return;
+    const result = await rejectEntryEdit(pendingRequest.id);
+    if ('error' in result) toast.error(String(result.error));
+    else toast.success('Perubahan ditolak');
+  }
+
+  async function handleCancelEdit() {
+    if (!pendingRequest) return;
+    if (!confirm('Batalkan permintaan perubahan ini?')) return;
+    const result = await cancelEntryEdit(pendingRequest.id);
+    if ('error' in result) toast.error(String(result.error));
+    else toast.success('Permintaan dibatalkan');
+  }
+
+  function swapLivestock(entryItemId: string, livestockId: string, sku: string, grade: string | null) {
+    setItemPrices((prev) =>
+      prev.map((ip) =>
+        ip.id === entryItemId
+          ? { ...ip, pendingLivestockId: livestockId, pendingLivestockSku: sku, pendingLivestockGrade: grade }
+          : ip,
+      ),
+    );
+  }
+
+  function resetSwap(entryItemId: string) {
+    setItemPrices((prev) =>
+      prev.map((ip) =>
+        ip.id === entryItemId
+          ? { ...ip, pendingLivestockId: null, pendingLivestockSku: null, pendingLivestockGrade: null }
+          : ip,
+      ),
+    );
+  }
+
   return {
     form,
     update,
     itemPrices,
     updateItemPrice,
+    swapLivestock,
+    resetSwap,
     loading,
     buktiTransferUrls,
     setBuktiTransferUrls,
+    isSalesOnApproved,
+    pendingRequest,
     handleSave,
     handleApprove,
     handleReject,
     handleDelete,
+    handleApproveEdit,
+    handleRejectEdit,
+    handleCancelEdit,
   };
+}
+
+function LivestockSwapDialog({
+  currentLivestock,
+  pendingLivestockSku,
+  onSwap,
+  onReset,
+}: {
+  currentLivestock: EntryItemData['livestock'];
+  pendingLivestockSku: string | null;
+  onSwap: (livestockId: string, sku: string, grade: string | null) => void;
+  onReset: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [options, setOptions] = useState<PickerLivestock[]>([]);
+  const [loadingOpts, setLoadingOpts] = useState(false);
+
+  useEffect(() => {
+    if (!open || options.length > 0) return;
+    setLoadingOpts(true);
+    getAvailableLivestockForSwap(currentLivestock.type).then((res) => {
+      if (!('error' in res)) setOptions(res as PickerLivestock[]);
+      setLoadingOpts(false);
+    });
+  }, [open, currentLivestock.type, options.length]);
+
+  const selectedId = pendingLivestockSku
+    ? (options.find((o) => o.sku === pendingLivestockSku)?.id ?? null)
+    : null;
+
+  return (
+    <>
+      {pendingLivestockSku ? (
+        <span className="inline-flex items-center gap-1">
+          <Button size="sm" variant="secondary" className="h-6 text-xs px-2 gap-1" onClick={() => setOpen(true)}>
+            <Beef className="h-3 w-3" />
+            {pendingLivestockSku}
+          </Button>
+          <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-muted-foreground" onClick={onReset} title="Batal ganti">
+            <X className="h-3 w-3" />
+          </Button>
+        </span>
+      ) : (
+        <Button size="sm" variant="outline" className="h-6 text-xs px-2 gap-1" onClick={() => setOpen(true)}>
+          <Beef className="h-3 w-3" />
+          Ganti
+        </Button>
+      )}
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Ganti Hewan</DialogTitle>
+            <DialogDescription>
+              Saat ini: <span className="font-mono">{currentLivestock.sku}</span>
+              {currentLivestock.grade ? ` · ${currentLivestock.grade}` : ''}
+            </DialogDescription>
+          </DialogHeader>
+          {loadingOpts ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">Memuat hewan tersedia...</p>
+          ) : (
+            <LivestockPicker
+              livestock={options}
+              selectedIds={selectedId ? [selectedId] : []}
+              onToggle={(id) => {
+                const lv = options.find((o) => o.id === id);
+                if (!lv) return;
+                onSwap(lv.id, lv.sku, lv.grade);
+                setOpen(false);
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function PendingEditBanner({
+  pendingRequest,
+  isAdmin,
+  entry,
+  onApprove,
+  onReject,
+  onCancel,
+  loading,
+}: {
+  pendingRequest: EntryData['editRequests'][0];
+  isAdmin: boolean;
+  entry: EntryData;
+  onApprove: () => void;
+  onReject: () => void;
+  onCancel: () => void;
+  loading: boolean;
+}) {
+  return (
+    <div className="rounded-md border border-yellow-300 bg-yellow-50 dark:bg-yellow-950/20 p-3 space-y-2">
+      <div className="flex items-center gap-2 text-xs font-medium text-yellow-800 dark:text-yellow-300">
+        <Clock className="h-3.5 w-3.5" />
+        <span>Perubahan diajukan oleh {pendingRequest.proposedByName}</span>
+      </div>
+      {isAdmin && (
+        <div className="space-y-1.5">
+          {pendingRequest.itemChanges.map((ic) => {
+            const originalItem = entry.items.find((i) => i.id === ic.entryItemId);
+            return (
+              <div key={ic.entryItemId} className="text-xs text-muted-foreground">
+                <span className="line-through">{originalItem?.livestock.sku ?? ic.entryItemId}</span>
+                {' → '}
+                <span className="font-medium text-foreground">{ic.newLivestockSku}</span>
+                {ic.newLivestockType && (
+                  <span> ({ic.newLivestockType}{ic.newLivestockGrade ? ' ' + ic.newLivestockGrade : ''})</span>
+                )}
+                {originalItem && originalItem.hargaJual !== ic.newHargaJual && (
+                  <span>
+                    {' · '}
+                    <span className="line-through">{formatRupiah(originalItem.hargaJual)}</span>
+                    {' → '}
+                    <span className="font-medium text-foreground">{formatRupiah(ic.newHargaJual)}</span>
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <div className="flex gap-2">
+        {isAdmin ? (
+          <>
+            <Button size="sm" className="h-7 text-xs" onClick={onApprove} disabled={loading}>
+              <Check className="h-3 w-3 mr-1" />
+              Setujui
+            </Button>
+            <Button size="sm" variant="outline" className="h-7 text-xs text-destructive border-destructive/50" onClick={onReject} disabled={loading}>
+              <X className="h-3 w-3 mr-1" />
+              Tolak
+            </Button>
+          </>
+        ) : (
+          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={onCancel} disabled={loading}>
+            <XCircle className="h-3 w-3 mr-1" />
+            Batalkan Permintaan
+          </Button>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function EntryEditFields({
   entry,
   isAdmin,
   canViewFinancials,
+  isSalesOnApproved,
   form,
   update,
   itemPrices,
   updateItemPrice,
+  swapLivestock,
+  resetSwap,
   setBuktiTransferUrls,
   salesUsers,
 }: {
   entry: EntryData;
   isAdmin: boolean;
   canViewFinancials: boolean;
+  isSalesOnApproved: boolean;
   form: ReturnType<typeof useEntryRow>['form'];
   update: ReturnType<typeof useEntryRow>['update'];
   itemPrices: ItemPriceState[];
   updateItemPrice: ReturnType<typeof useEntryRow>['updateItemPrice'];
+  swapLivestock: ReturnType<typeof useEntryRow>['swapLivestock'];
+  resetSwap: ReturnType<typeof useEntryRow>['resetSwap'];
   setBuktiTransferUrls: ReturnType<typeof useEntryRow>['setBuktiTransferUrls'];
   salesUsers: SalesUser[];
 }) {
@@ -802,19 +1075,26 @@ function EntryEditFields({
               key={ip.id}
               className={`rounded-md border p-2 space-y-1.5 ${isMatiItem ? 'border-destructive/40 bg-destructive/5' : 'bg-muted/20'}`}
             >
-              <p className="text-xs font-medium">
+              <p className="text-xs font-medium flex flex-wrap items-center gap-1.5">
                 {typeLabel}{lv.grade ? ` · ${lv.grade}` : ''}
-                {isMatiItem && <span className="ml-2 text-destructive text-[10px] font-semibold">MATI</span>}
-                <span className="ml-2 text-muted-foreground font-mono text-[10px]">{lv.sku}</span>
+                {isMatiItem && <span className="text-destructive text-[10px] font-semibold">MATI</span>}
+                <span className="text-muted-foreground font-mono text-[10px]">{lv.sku}</span>
+                {isSalesOnApproved && (
+                  <LivestockSwapDialog
+                    currentLivestock={lv}
+                    pendingLivestockSku={ip.pendingLivestockSku}
+                    onSwap={(livestockId, sku, grade) => swapLivestock(ip.id, livestockId, sku, grade)}
+                    onReset={() => resetSwap(ip.id)}
+                  />
+                )}
               </p>
               <div className={`grid gap-1.5 ${canViewFinancials ? 'grid-cols-2 sm:grid-cols-4' : isAdmin ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-2'}`}>
                 <div className="space-y-0.5">
                   <Label className="text-[10px]">Tag</Label>
                   <Input
                     value={ip.tag}
-                    onChange={(e) => updateItemPrice(ip.id, 'tag', e.target.value)}
-                    className="h-7 text-xs"
-                    placeholder="MF-00X"
+                    readOnly
+                    className="h-7 text-xs bg-muted/50 cursor-default"
                   />
                 </div>
                 <div className="space-y-0.5">
@@ -849,6 +1129,11 @@ function EntryEditFields({
             </div>
           );
         })}
+        {isSalesOnApproved && (
+          <p className="text-[11px] text-muted-foreground">
+            Perubahan hewan &amp; Harga Jual perlu persetujuan admin.
+          </p>
+        )}
         {itemPrices.length > 1 && (
           <div className="flex justify-between text-xs font-medium pt-1 border-t">
             <span>Total Harga Jual</span>
@@ -1003,11 +1288,18 @@ function EntryRow({
     setBuktiTransferUrls,
     itemPrices,
     updateItemPrice,
+    swapLivestock,
+    resetSwap,
+    isSalesOnApproved,
+    pendingRequest,
     handleSave,
     handleApprove,
     handleReject,
     handleDelete,
-  } = useEntryRow(entry, onSaved);
+    handleApproveEdit,
+    handleRejectEdit,
+    handleCancelEdit,
+  } = useEntryRow(entry, onSaved, isAdmin);
 
   const isMati = entry.items.some((i) => i.livestock.condition === 'MATI');
   const rowClass = isMati
@@ -1103,9 +1395,17 @@ function EntryRow({
             isSent={entry.isSent}
             delivery={entry.delivery}
           />
+          {pendingRequest && (
+            <span className="mt-1 inline-block text-[9px] font-medium text-yellow-700 bg-yellow-100 dark:bg-yellow-900/40 dark:text-yellow-300 px-1.5 py-0.5 rounded-full">
+              Perubahan Diajukan
+            </span>
+          )}
         </td>
         <td className="p-3 text-xs text-muted-foreground whitespace-nowrap text-center">
-          {formatDateTime(new Date(entry.createdAt))}
+          <div>{formatDateTime(new Date(entry.createdAt))}</div>
+          {new Date(entry.updatedAt).getTime() - new Date(entry.createdAt).getTime() > 5000 && (
+            <div className="text-[10px] text-muted-foreground/70 mt-0.5">{formatDateTime(new Date(entry.updatedAt))}</div>
+          )}
         </td>
         <td className="p-3 text-center">
           <div className="flex items-center justify-center gap-1">
@@ -1116,8 +1416,8 @@ function EntryRow({
                   size="icon"
                   className="h-8 w-8 text-primary"
                   onClick={handleSave}
-                  disabled={loading}
-                  title="Simpan"
+                  disabled={loading || (isAdmin && !!pendingRequest)}
+                  title={isAdmin && pendingRequest ? 'Selesaikan permintaan perubahan dulu' : 'Simpan'}
                 >
                   <Save className="h-3.5 w-3.5" />
                 </Button>
@@ -1186,18 +1486,32 @@ function EntryRow({
       {/* Inline edit row */}
       {isEditing && (
         <tr className="border-b bg-muted/20">
-          <td colSpan={isAdmin ? 12 : 8} className="p-4">
+          <td colSpan={isAdmin ? 12 : 8} className="p-4 space-y-3">
             <EntryEditFields
               entry={entry}
               isAdmin={isAdmin}
               canViewFinancials={canViewFinancials}
+              isSalesOnApproved={isSalesOnApproved}
               form={form}
               update={update}
               setBuktiTransferUrls={setBuktiTransferUrls}
               itemPrices={itemPrices}
               updateItemPrice={updateItemPrice}
+              swapLivestock={swapLivestock}
+              resetSwap={resetSwap}
               salesUsers={salesUsers}
             />
+            {pendingRequest && (
+              <PendingEditBanner
+                pendingRequest={pendingRequest}
+                isAdmin={isAdmin}
+                entry={entry}
+                onApprove={handleApproveEdit}
+                onReject={handleRejectEdit}
+                onCancel={handleCancelEdit}
+                loading={loading}
+              />
+            )}
           </td>
         </tr>
       )}
@@ -1232,11 +1546,18 @@ function MobileEntryCard({
     setBuktiTransferUrls,
     itemPrices,
     updateItemPrice,
+    swapLivestock,
+    resetSwap,
+    isSalesOnApproved,
+    pendingRequest,
     handleSave,
     handleApprove,
     handleReject,
     handleDelete,
-  } = useEntryRow(entry, onSaved);
+    handleApproveEdit,
+    handleRejectEdit,
+    handleCancelEdit,
+  } = useEntryRow(entry, onSaved, isAdmin);
 
   const open = expanded || isEditing;
   const isMati = entry.items.some((i) => i.livestock.condition === 'MATI');
@@ -1272,7 +1593,12 @@ function MobileEntryCard({
           <div className="text-sm font-medium truncate">{entry.buyerName}</div>
           <div className="text-xs text-muted-foreground truncate mt-0.5">{livestockSummary}</div>
         </div>
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+          {pendingRequest && (
+            <span className="text-[9px] font-medium text-yellow-700 bg-yellow-100 dark:bg-yellow-900/40 dark:text-yellow-300 px-1.5 py-0.5 rounded-full">
+              Perubahan Diajukan
+            </span>
+          )}
           <StatusIcon status={entry.status} />
           <KirimIcon isSent={entry.isSent} />
           <DeliveryIcon delivery={entry.delivery} />
@@ -1293,15 +1619,35 @@ function MobileEntryCard({
               entry={entry}
               isAdmin={isAdmin}
               canViewFinancials={canViewFinancials}
+              isSalesOnApproved={isSalesOnApproved}
               form={form}
               update={update}
               setBuktiTransferUrls={setBuktiTransferUrls}
               itemPrices={itemPrices}
               updateItemPrice={updateItemPrice}
+              swapLivestock={swapLivestock}
+              resetSwap={resetSwap}
               salesUsers={salesUsers}
             />
+            {pendingRequest && (
+              <PendingEditBanner
+                pendingRequest={pendingRequest}
+                isAdmin={isAdmin}
+                entry={entry}
+                onApprove={handleApproveEdit}
+                onReject={handleRejectEdit}
+                onCancel={handleCancelEdit}
+                loading={loading}
+              />
+            )}
             <div className="flex gap-2 pt-2 border-t">
-              <Button size="sm" className="flex-1" onClick={handleSave} disabled={loading}>
+              <Button
+                size="sm"
+                className="flex-1"
+                onClick={handleSave}
+                disabled={loading || (isAdmin && !!pendingRequest)}
+                title={isAdmin && pendingRequest ? 'Selesaikan permintaan perubahan dulu' : undefined}
+              >
                 <Save className="h-3.5 w-3.5 mr-1" />
                 Simpan
               </Button>
@@ -1405,7 +1751,11 @@ function MobileEntryCard({
             <div className="flex items-center justify-between px-3 py-2 bg-muted/20">
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground min-w-0">
                 <Calendar className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">{formatDateTime(new Date(entry.createdAt))}</span>
+                <span className="truncate">
+                  {new Date(entry.updatedAt).getTime() - new Date(entry.createdAt).getTime() > 5000
+                    ? <>{formatDateTime(new Date(entry.updatedAt))} <span className="text-[10px]">(diperbarui)</span></>
+                    : formatDateTime(new Date(entry.createdAt))}
+                </span>
                 {entry.pengiriman && (
                   <span className="shrink-0 bg-muted text-muted-foreground text-[10px] font-medium px-1.5 py-0.5 rounded">
                     {formatPengiriman(entry.pengiriman)}

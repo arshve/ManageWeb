@@ -68,6 +68,12 @@ enum EntryStatus {
   REJECTED
 }
 
+enum EntryEditRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum PaymentStatus {
   BELUM_BAYAR
   DP
@@ -98,6 +104,8 @@ model Profile {
   lastLocationAt DateTime?
   deliveries     Delivery[]
   availability   DriverAvailability[]
+  proposedEdits  EntryEditRequest[]   @relation("EditRequestProposer")
+  reviewedEdits  EntryEditRequest[]   @relation("EditRequestReviewer")
   createdAt      DateTime             @default(now())
   updatedAt      DateTime             @updatedAt
 }
@@ -146,10 +154,13 @@ model Entry {
   approvedBy    String?
   deliveryDate  DateTime?     @db.Date
   delivery      Delivery?
+  editRequests  EntryEditRequest[]
+  sortAt        DateTime      @default(now())
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
   @@index([deliveryDate])
+  @@index([sortAt])
 }
 
 model EntryItem {
@@ -185,6 +196,23 @@ model EntryRequest {
 
   @@index([entryId])
   @@index([type, grade])
+}
+
+model EntryEditRequest {
+  id           String                 @id @default(cuid())
+  entryId      String
+  entry        Entry                  @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  proposedById String
+  proposedBy   Profile                @relation("EditRequestProposer", fields: [proposedById], references: [id])
+  status       EntryEditRequestStatus @default(PENDING)
+  itemChanges  Json
+  reviewedById String?
+  reviewedBy   Profile?               @relation("EditRequestReviewer", fields: [reviewedById], references: [id])
+  reviewedAt   DateTime?
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+
+  @@index([entryId, status])
 }
 
 model Delivery {

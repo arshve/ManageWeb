@@ -221,11 +221,8 @@ export default function NewEntryPage() {
                             <Label className="text-[10px]">Tag</Label>
                             <Input
                               value={item.tag}
-                              onChange={(e) =>
-                                updateItem(lv.id, 'tag', e.target.value)
-                              }
-                              placeholder="MF-00X"
-                              className="h-7 text-xs"
+                              readOnly
+                              className="h-7 text-xs bg-muted/50 cursor-default"
                             />
                           </div>
                           <div className="flex-1 space-y-0.5">

@@ -13,7 +13,8 @@ type LogInput = {
     | 'Profile'
     | 'Pricing'
     | 'Delivery'
-    | 'DriverAvailability';
+    | 'DriverAvailability'
+    | 'EntryEditRequest';
   entityId: string;
   label?: string | null;
   before?: unknown;

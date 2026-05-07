@@ -16,9 +16,10 @@
 import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 
-// Encode the secret key for use with jose. Falls back to a dev secret if not set.
+// VERCEL_DEPLOYMENT_ID changes on every deployment, invalidating all existing sessions.
+// Falls back to 'local' in development so sessions persist across dev server restarts.
 const SECRET = new TextEncoder().encode(
-  process.env.SESSION_SECRET || 'millenials-farm-dev-secret-change-in-prod',
+  `${process.env.SESSION_SECRET || 'millenials-farm-dev-secret-change-in-prod'}:${process.env.VERCEL_DEPLOYMENT_ID || 'local'}`
 );
 
 // Name of the cookie that stores the JWT token

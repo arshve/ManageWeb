@@ -32,6 +32,7 @@ export const metadata: Metadata = {
     title: "MF Farm",
   },
   icons: {
+    icon: "/icon.png",
     apple: "/apple-touch-icon.png",
   },
 };

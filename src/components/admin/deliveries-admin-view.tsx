@@ -23,6 +23,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Lightbox } from '@/components/ui/lightbox';
+import { parseLatLngCoord } from '@/lib/delivery/geo';
 import { navigationUrl } from '@/lib/delivery/maps';
 import {
   DeliveryMap,
@@ -36,30 +38,6 @@ import { Input } from '@/components/ui/input';
 import { StatusToken, intentVars, DELIVERY_STATUS } from '@/components/ui/status-token';
 import { StatCard } from '@/components/ui/stat-card';
 
-function PhotoLightbox({ url, onClose }: { url: string; onClose: () => void }) {
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose(); }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      <div className="relative max-w-3xl w-full mx-4" onClick={(e) => e.stopPropagation()}>
-        <button
-          onClick={onClose}
-          className="absolute -top-9 right-0 text-white/80 hover:text-white text-sm font-medium"
-        >
-          Tutup ✕
-        </button>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={url} alt="Bukti kirim" className="w-full rounded-xl object-contain max-h-[80vh]" />
-      </div>
-    </div>
-  );
-}
 
 const SERIF = "var(--font-dm-serif), 'DM Serif Display', serif";
 
@@ -118,14 +96,6 @@ type Driver = {
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
-function parseLatLng(input: string): { lat: number; lng: number } | null {
-  const m = input.trim().match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/);
-  if (!m) return null;
-  const lat = Number(m[1]), lng = Number(m[2]);
-  if (!isFinite(lat) || !isFinite(lng)) return null;
-  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
-  return { lat, lng };
-}
 
 function initials(name: string) {
   return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
@@ -207,11 +177,11 @@ export function DeliveriesAdminView({
   const [bucketDrivers, setBucketDrivers] = useState<Record<number, string>>({});
   const [startInput, setStartInput] = useState(defaultStart);
   const [maxPerDriver, setMaxPerDriver] = useState(30);
-  const [mapDepot, setMapDepot] = useState(() => parseLatLng(defaultStart) ?? initialDepot);
+  const [mapDepot, setMapDepot] = useState(() => parseLatLngCoord(defaultStart) ?? initialDepot);
 
   function updateStartInput(next: string) {
     setStartInput(next);
-    const p = parseLatLng(next);
+    const p = parseLatLngCoord(next);
     if (p) setMapDepot(p);
   }
 
@@ -297,8 +267,10 @@ export function DeliveriesAdminView({
   const unscheduledSafePage = Math.min(unscheduledPage, unscheduledTotalPages - 1);
   const pagedUnscheduled = filteredUnscheduled.slice(unscheduledSafePage * UNSCHEDULED_PAGE_SIZE, (unscheduledSafePage + 1) * UNSCHEDULED_PAGE_SIZE);
 
-  const deliveredCount = scheduled.filter((e) => e.delivery?.status === 'DELIVERED').length;
-  const failedCount = scheduled.filter((e) => e.delivery?.status === 'FAILED').length;
+  const { deliveredCount, failedCount } = useMemo(() => ({
+    deliveredCount: scheduled.filter((e) => e.delivery?.status === 'DELIVERED').length,
+    failedCount: scheduled.filter((e) => e.delivery?.status === 'FAILED').length,
+  }), [scheduled]);
 
   const groupedByDriver = useMemo(() => {
     const map = new Map<string, ScheduledEntry[]>();
@@ -399,7 +371,7 @@ export function DeliveriesAdminView({
 
   return (
     <div className="flex flex-col gap-4">
-      {lightboxUrl && <PhotoLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />}
+      <Lightbox src={lightboxUrl ?? ''} alt="Bukti kirim" open={!!lightboxUrl} onClose={() => setLightboxUrl(null)} />
 
       {/* ── Date nav ── */}
       <div className="rounded-xl border bg-card px-4 py-3 flex flex-wrap items-center gap-2">
@@ -1175,7 +1147,7 @@ function UnscheduledRow({
   const td = 'px-3 py-3 text-sm';
 
   function saveCoords() {
-    const parsed = parseLatLng(coordInput);
+    const parsed = parseLatLngCoord(coordInput);
     if (!parsed && coordInput.trim() !== '') { toast.error('Format: lat,lng (contoh: -6.123,106.456)'); return; }
     startTransition(async () => {
       const r = await updateEntryCoordinates(e.id, parsed?.lat ?? null, parsed?.lng ?? null);
@@ -1267,7 +1239,7 @@ function UnscheduledCard({
   );
 
   function saveCoords() {
-    const parsed = parseLatLng(coordInput);
+    const parsed = parseLatLngCoord(coordInput);
     if (!parsed && coordInput.trim() !== '') { toast.error('Format: lat,lng'); return; }
     startTransition(async () => {
       const r = await updateEntryCoordinates(e.id, parsed?.lat ?? null, parsed?.lng ?? null);

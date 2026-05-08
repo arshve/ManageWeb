@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useTransition } from 'react';
+import { useState, useEffect, useMemo, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -120,22 +120,40 @@ export function DriverRunView({
     return () => { supabase.removeChannel(channel); };
   }, []);
 
-  const assignedStops = stops.filter((s) => s.status === 'ASSIGNED');
-  const totalAssignedItems = assignedStops.flatMap((s) => s.entry.items).length;
-  const totalLoaded = assignedStops.flatMap((s) => s.entry.items).filter((i) => checkedItems.has(i.itemId)).length;
-  const hasPartial = assignedStops.some(
-    (s) => s.entry.items.some((i) => checkedItems.has(i.itemId)) && !s.entry.items.every((i) => checkedItems.has(i.itemId)),
-  );
-  const hasSkipped = assignedStops.some(
-    (s) => s.entry.items.every((i) => !checkedItems.has(i.itemId)),
-  );
-  const needsConfirm = hasPartial || hasSkipped;
-  const partialOrSkippedEntries = assignedStops
-    .filter((s) => !s.entry.items.every((i) => checkedItems.has(i.itemId)))
-    .map((s) => {
-      const loaded = s.entry.items.filter((i) => checkedItems.has(i.itemId)).length;
-      return `${s.entry.buyerName} (${loaded}/${s.entry.items.length} dimuat)`;
-    });
+  const {
+    assignedStops,
+    totalAssignedItems,
+    totalLoaded,
+    hasPartial,
+    hasSkipped,
+    needsConfirm,
+    partialOrSkippedEntries,
+  } = useMemo(() => {
+    const assigned = stops.filter((s) => s.status === 'ASSIGNED');
+    const allItems = assigned.flatMap((s) => s.entry.items);
+    const loaded = allItems.filter((i) => checkedItems.has(i.itemId)).length;
+    const partial = assigned.some(
+      (s) => s.entry.items.some((i) => checkedItems.has(i.itemId)) && !s.entry.items.every((i) => checkedItems.has(i.itemId)),
+    );
+    const skipped = assigned.some(
+      (s) => s.entry.items.every((i) => !checkedItems.has(i.itemId)),
+    );
+    const pEntries = assigned
+      .filter((s) => !s.entry.items.every((i) => checkedItems.has(i.itemId)))
+      .map((s) => {
+        const loadedCount = s.entry.items.filter((i) => checkedItems.has(i.itemId)).length;
+        return `${s.entry.buyerName} (${loadedCount}/${s.entry.items.length} dimuat)`;
+      });
+    return {
+      assignedStops: assigned,
+      totalAssignedItems: allItems.length,
+      totalLoaded: loaded,
+      hasPartial: partial,
+      hasSkipped: skipped,
+      needsConfirm: partial || skipped,
+      partialOrSkippedEntries: pEntries,
+    };
+  }, [stops, checkedItems]);
 
   function handleToggleItem(itemId: string, checked: boolean) {
     setCheckedItems((prev) => {

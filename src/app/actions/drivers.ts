@@ -20,15 +20,14 @@ export async function setDriverAvailability(
   const date = parseDateOnly(deliveryDate);
   if (!date) return { error: 'Tanggal tidak valid' };
 
-  await prisma.$transaction(
-    driverIds.map((driverId) =>
-      prisma.driverAvailability.upsert({
-        where: { driverId_date: { driverId, date } },
-        create: { driverId, date, isActive },
-        update: { isActive },
-      }),
-    ),
-  );
+  await prisma.$transaction([
+    prisma.driverAvailability.deleteMany({
+      where: { driverId: { in: driverIds }, date },
+    }),
+    prisma.driverAvailability.createMany({
+      data: driverIds.map((driverId) => ({ driverId, date: date!, isActive })),
+    }),
+  ]);
 
   await logAudit({
     actor: admin,

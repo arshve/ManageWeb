@@ -7,6 +7,7 @@ import { logAudit } from '@/lib/audit';
 import { solveTSP } from '@/lib/delivery/tsp';
 import { splitToDrivers } from '@/lib/delivery/split';
 import { resolveLocation } from '@/lib/delivery/geocode';
+import { parseLatLngCoord } from '@/lib/delivery/geo';
 import { getDefaultDepot } from '@/lib/delivery/depot';
 import { generateInvoiceNo } from '@/lib/format';
 
@@ -15,15 +16,6 @@ const DEFAULT_DEPOT = {
   ...getDefaultDepot(),
 };
 
-function parseLatLngString(input: string): { lat: number; lng: number } | null {
-  const m = input.trim().match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/);
-  if (!m) return null;
-  const lat = Number(m[1]);
-  const lng = Number(m[2]);
-  if (!isFinite(lat) || !isFinite(lng)) return null;
-  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
-  return { lat, lng };
-}
 
 function parseDateOnly(input: string): Date | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input)) return null;
@@ -40,19 +32,16 @@ export async function assignDeliveryDate(
   const date = parseDateOnly(deliveryDate);
   if (!date) return { error: 'Tanggal tidak valid' };
 
-  await prisma.$transaction(async (tx) => {
-    await tx.entry.updateMany({
+  await prisma.$transaction([
+    prisma.entry.updateMany({
       where: { id: { in: entryIds }, status: 'APPROVED' },
       data: { deliveryDate: date },
-    });
-    for (const entryId of entryIds) {
-      await tx.delivery.upsert({
-        where: { entryId },
-        create: { entryId, status: 'PENDING' },
-        update: {},
-      });
-    }
-  });
+    }),
+    prisma.delivery.createMany({
+      data: entryIds.map((entryId) => ({ entryId, status: 'PENDING' })),
+      skipDuplicates: true,
+    }),
+  ]);
 
   await logAudit({
     actor: admin,
@@ -200,7 +189,7 @@ export async function generateRoutes(
   let depot = { ...DEFAULT_DEPOT };
   if (startInput && startInput.trim()) {
     const trimmed = startInput.trim();
-    const direct = parseLatLngString(trimmed);
+    const direct = parseLatLngCoord(trimmed);
     if (direct) {
       depot = { id: 'DEPOT', ...direct };
     } else {
@@ -256,19 +245,17 @@ export async function generateRoutes(
     });
   });
 
-  await prisma.$transaction(
-    assignments.map((a) =>
-      prisma.delivery.upsert({
-        where: { entryId: a.entryId },
-        create: {
-          entryId: a.entryId,
-          sequence: a.sequence,
-          status: 'PENDING',
-        },
-        update: { sequence: a.sequence, status: 'PENDING', driverId: null },
-      }),
-    ),
-  );
+  await prisma.$transaction(async (tx) => {
+    await Promise.all(
+      assignments.map((a) =>
+        tx.delivery.upsert({
+          where: { entryId: a.entryId },
+          create: { entryId: a.entryId, sequence: a.sequence, status: 'PENDING' },
+          update: { sequence: a.sequence, status: 'PENDING', driverId: null },
+        }),
+      ),
+    );
+  });
 
   await logAudit({
     actor: admin,
@@ -297,16 +284,18 @@ export async function assignDriversToBuckets(
 
   // FIX: DriverAvailability query removed because drivers are available by default
 
-  await prisma.$transaction(
-    buckets.flatMap((b) =>
-      b.entryIds.map((entryId) =>
-        prisma.delivery.update({
-          where: { entryId },
-          data: { driverId: b.driverId, status: 'ASSIGNED' },
-        }),
+  await prisma.$transaction(async (tx) => {
+    await Promise.all(
+      buckets.flatMap((b) =>
+        b.entryIds.map((entryId) =>
+          tx.delivery.update({
+            where: { entryId },
+            data: { driverId: b.driverId, status: 'ASSIGNED' },
+          }),
+        ),
       ),
-    ),
-  );
+    );
+  });
 
   await logAudit({
     actor: admin,
@@ -625,18 +614,21 @@ export async function backfillCoordinates(entryIds?: string[]) {
 
   let resolved = 0;
   let failed = 0;
-  for (const e of entries) {
-    const input = e.buyerMaps || e.buyerAddress || '';
-    const loc = await resolveLocation(input);
-    if (loc) {
-      await prisma.entry.update({
-        where: { id: e.id },
-        data: { buyerLat: loc.lat, buyerLng: loc.lng },
-      });
-      resolved++;
-    } else {
-      failed++;
-    }
+  const CONCURRENCY = 5;
+  for (let i = 0; i < entries.length; i += CONCURRENCY) {
+    const batch = entries.slice(i, i + CONCURRENCY);
+    await Promise.all(
+      batch.map(async (e) => {
+        const input = e.buyerMaps || e.buyerAddress || '';
+        const loc = await resolveLocation(input);
+        if (loc) {
+          await prisma.entry.update({ where: { id: e.id }, data: { buyerLat: loc.lat, buyerLng: loc.lng } });
+          resolved++;
+        } else {
+          failed++;
+        }
+      }),
+    );
   }
 
   revalidatePath('/admin/deliveries');

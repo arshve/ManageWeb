@@ -108,6 +108,8 @@ model Profile {
   reviewedEdits  EntryEditRequest[]   @relation("EditRequestReviewer")
   createdAt      DateTime             @default(now())
   updatedAt      DateTime             @updatedAt
+
+  @@index([role, isActive])
 }
 
 model Livestock {
@@ -127,6 +129,8 @@ model Livestock {
   entryItem EntryItem?
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
+
+  @@index([isSold, condition])
 }
 
 model Entry {
@@ -161,6 +165,8 @@ model Entry {
 
   @@index([deliveryDate])
   @@index([sortAt])
+  @@index([status, deliveryDate])
+  @@index([salesId, sortAt])
 }
 
 model EntryItem {

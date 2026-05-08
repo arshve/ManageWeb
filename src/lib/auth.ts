@@ -11,12 +11,13 @@
  *   const u = await requireRole("ADMIN", "MANAGE");   // accepts either role
  */
 
+import { cache } from 'react';
 import { prisma } from '@/lib/prisma';
 import { redirect } from 'next/navigation';
 import { getSessionUserId } from '@/lib/session';
 import type { Role } from '@/generated/prisma';
 
-export async function getProfile() {
+export const getProfile = cache(async function getProfile() {
   const userId = await getSessionUserId();
   if (!userId) return null;
 
@@ -25,7 +26,7 @@ export async function getProfile() {
   });
 
   return profile;
-}
+});
 
 export async function requireAuth() {
   const profile = await getProfile();

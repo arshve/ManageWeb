@@ -1,5 +1,3 @@
-import imageCompression from 'browser-image-compression';
-
 const DEFAULT_OPTS = {
   maxSizeMB: 0.6,
   maxWidthOrHeight: 1280,
@@ -11,6 +9,7 @@ const DEFAULT_OPTS = {
 export async function compressImage(file: File): Promise<File> {
   if (!file.type.startsWith('image/')) return file;
   try {
+    const { default: imageCompression } = await import('browser-image-compression');
     const compressed = await imageCompression(file, DEFAULT_OPTS);
     const baseName = file.name.replace(/\.[^.]+$/, '');
     const newName = `${baseName}.webp`;

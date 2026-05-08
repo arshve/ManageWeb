@@ -18,9 +18,9 @@
 
 'use client';
 
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { memo, useCallback, useState, useMemo, useRef, useEffect } from 'react';
 import { Pagination } from '@/components/ui/pagination';
-import { createPortal } from 'react-dom';
+import { Lightbox } from '@/components/ui/lightbox';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { RupiahInput } from '@/components/ui/rupiah-input';
@@ -213,6 +213,7 @@ export function EntryTable({
   salesUsers?: SalesUser[];
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
+  const handleClearEditing = useCallback(() => setEditingId(null), []);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [paymentFilter, setPaymentFilter] = useState('ALL');
@@ -527,9 +528,9 @@ export function EntryTable({
                 isAdmin={isAdmin}
                 canViewFinancials={canViewFinancials}
                 isEditing={editingId === entry.id}
-                onEdit={() => setEditingId(entry.id)}
-                onCancel={() => setEditingId(null)}
-                onSaved={() => setEditingId(null)}
+                onEdit={setEditingId}
+                onCancel={handleClearEditing}
+                onSaved={handleClearEditing}
                 salesUsers={salesUsers}
               />
             ))}
@@ -558,9 +559,9 @@ export function EntryTable({
             isAdmin={isAdmin}
             canViewFinancials={canViewFinancials}
             isEditing={editingId === entry.id}
-            onEdit={() => setEditingId(entry.id)}
-            onCancel={() => setEditingId(null)}
-            onSaved={() => setEditingId(null)}
+            onEdit={setEditingId}
+            onCancel={handleClearEditing}
+            onSaved={handleClearEditing}
             salesUsers={salesUsers}
           />
         ))}
@@ -1289,7 +1290,7 @@ function EntryEditFields({
   );
 }
 
-function EntryRow({
+const EntryRow = memo(function EntryRow({
   entry,
   isAdmin,
   canViewFinancials,
@@ -1303,7 +1304,7 @@ function EntryRow({
   isAdmin: boolean;
   canViewFinancials: boolean;
   isEditing: boolean;
-  onEdit: () => void;
+  onEdit: (id: string) => void;
   onCancel: () => void;
   onSaved: () => void;
   salesUsers: SalesUser[];
@@ -1487,7 +1488,7 @@ function EntryRow({
                   variant="ghost"
                   size="icon"
                   className="size-8"
-                  onClick={onEdit}
+                  onClick={() => onEdit(entry.id)}
                   title="Edit"
                 >
                   <Pencil className="h-3.5 w-3.5" />
@@ -1548,9 +1549,9 @@ function EntryRow({
       )}
     </>
   );
-}
+});
 
-function MobileEntryCard({
+const MobileEntryCard = memo(function MobileEntryCard({
   entry,
   isAdmin,
   canViewFinancials,
@@ -1564,7 +1565,7 @@ function MobileEntryCard({
   isAdmin: boolean;
   canViewFinancials: boolean;
   isEditing: boolean;
-  onEdit: () => void;
+  onEdit: (id: string) => void;
   onCancel: () => void;
   onSaved: () => void;
   salesUsers: SalesUser[];
@@ -1809,7 +1810,7 @@ function MobileEntryCard({
                 {entry.status === 'APPROVED' && entry.buktiTransfer.length > 0 && (
                   <PdfMenu entryId={entry.id} />
                 )}
-                <Button variant="ghost" size="icon" className="size-8" onClick={onEdit} title="Edit">
+                <Button variant="ghost" size="icon" className="size-8" onClick={() => onEdit(entry.id)} title="Edit">
                   <Pencil className="h-3.5 w-3.5" />
                 </Button>
                 <Button variant="ghost" size="icon" className="size-8 text-destructive" onClick={handleDelete} title="Hapus">
@@ -1822,7 +1823,7 @@ function MobileEntryCard({
       )}
     </div>
   );
-}
+});
 
 function BandLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -1989,44 +1990,6 @@ function StatusIcon({ status }: { status: string }) {
  */
 function BuktiPreviewItem({ url, label }: { url: string; label: string }) {
   const [open, setOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
-
-  // Ensure portal target is available (client-side only)
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  const lightbox =
-    mounted && open
-      ? createPortal(
-          <div
-            className="fixed inset-0 z-[99999] bg-black/70 flex items-center justify-center p-4"
-            onClick={() => setOpen(false)}
-          >
-            <div
-              className="relative max-w-lg w-full rounded-lg overflow-hidden shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <Image
-                src={url}
-                alt={label}
-                width={640}
-                height={480}
-                sizes="(max-width: 640px) 100vw, 640px"
-                className="w-full h-auto object-contain"
-              />
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="absolute top-2 right-2 bg-black/50 hover:bg-black/80 text-white rounded-full p-1 transition-colors"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-          </div>,
-          document.body,
-        )
-      : null;
 
   return (
     <>
@@ -2048,7 +2011,7 @@ function BuktiPreviewItem({ url, label }: { url: string; label: string }) {
           {label}
         </span>
       </button>
-      {lightbox}
+      <Lightbox src={url} alt={label} open={open} onClose={() => setOpen(false)} />
     </>
   );
 }

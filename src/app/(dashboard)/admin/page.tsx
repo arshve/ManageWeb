@@ -14,16 +14,25 @@ const SERIF = "var(--font-dm-serif), 'DM Serif Display', serif";
 export default async function AdminDashboardPage() {
   const profile = await requireAuth();
   const superAdmin = isSuperAdmin(profile.role);
-  const totalLivestock = await prisma.livestock.count();
-  const soldLivestock = await prisma.livestock.count({ where: { isSold: true } });
-  const totalEntries = await prisma.entry.count();
-  const pendingEntries = await prisma.entry.count({ where: { status: 'PENDING' } });
-  const totalSales = await prisma.profile.count({ where: { role: 'SALES', isActive: true } });
 
-  const [approvedEntries, allEntries, salesUsers] = await Promise.all([
-    prisma.entry.findMany({
-      where: { status: 'APPROVED' },
-      include: { items: { select: { hargaJual: true, hargaModal: true, profit: true } } },
+  const [
+    totalLivestock,
+    soldLivestock,
+    totalEntries,
+    pendingEntries,
+    totalSales,
+    revenueAgg,
+    allEntries,
+    salesUsers,
+  ] = await Promise.all([
+    prisma.livestock.count(),
+    prisma.livestock.count({ where: { isSold: true } }),
+    prisma.entry.count(),
+    prisma.entry.count({ where: { status: 'PENDING' } }),
+    prisma.profile.count({ where: { role: 'SALES', isActive: true } }),
+    prisma.entryItem.aggregate({
+      _sum: { hargaJual: true, hargaModal: true },
+      where: { entry: { status: 'APPROVED' } },
     }),
     prisma.entry.findMany({
       where: { requests: { none: { isFulfilled: false } } },
@@ -61,14 +70,8 @@ export default async function AdminDashboardPage() {
     : [];
   const pendingLivestockMap = Object.fromEntries(pendingLivestocks.map((l) => [l.id, l]));
 
-  const totalRevenue = approvedEntries.reduce(
-    (sum, e) => sum + e.items.reduce((s, i) => s + i.hargaJual, 0),
-    0,
-  );
-  const totalModal = approvedEntries.reduce(
-    (sum, e) => sum + e.items.reduce((s, i) => s + (i.hargaModal ?? 0), 0),
-    0,
-  );
+  const totalRevenue = revenueAgg._sum.hargaJual ?? 0;
+  const totalModal = revenueAgg._sum.hargaModal ?? 0;
 
   const serialized = allEntries.map((entry) => {
     const first = entry.items[0]?.livestock;

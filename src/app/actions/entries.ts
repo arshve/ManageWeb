@@ -194,13 +194,17 @@ export async function createEntry(formData: FormData) {
       },
     });
 
-    for (const raw of rawItems) {
-      const update: Record<string, unknown> = {};
-      if (raw.tag) update.tag = raw.tag;
-      if (status === 'APPROVED') update.isSold = true;
-      if (Object.keys(update).length > 0) {
-        await tx.livestock.update({ where: { id: raw.livestockId }, data: update });
-      }
+    if (status === 'APPROVED') {
+      await tx.livestock.updateMany({
+        where: { id: { in: livestockIds } },
+        data: { isSold: true },
+      });
+    }
+    const tagItems = rawItems.filter((r) => r.tag);
+    if (tagItems.length > 0) {
+      await Promise.all(
+        tagItems.map((r) => tx.livestock.update({ where: { id: r.livestockId }, data: { tag: r.tag } })),
+      );
     }
 
     return created;
@@ -382,7 +386,6 @@ export async function updateEntry(id: string, formData: FormData) {
 
   revalidatePath('/admin');
   revalidatePath('/sales');
-  revalidatePath('/catalogue');
   return { success: true };
 }
 
@@ -633,11 +636,24 @@ export async function directEditEntryItems(entryId: string, formData: FormData) 
     return { error: 'Tidak ada perubahan item' };
   }
 
+  const swappedIds = itemChanges
+    .filter((ic) => {
+      const ei = entry.items.find((i) => i.id === ic.entryItemId);
+      return ei && ic.livestockId !== ei.livestockId;
+    })
+    .map((ic) => ic.livestockId);
+
+  const newLivestockMap = swappedIds.length > 0
+    ? Object.fromEntries(
+        (await prisma.livestock.findMany({ where: { id: { in: swappedIds } } })).map((l) => [l.id, l]),
+      )
+    : {};
+
   for (const ic of itemChanges) {
     const entryItem = entry.items.find((i) => i.id === ic.entryItemId);
     if (!entryItem) return { error: `Item tidak ditemukan: ${ic.entryItemId}` };
     if (ic.livestockId !== entryItem.livestockId) {
-      const lv = await prisma.livestock.findUnique({ where: { id: ic.livestockId } });
+      const lv = newLivestockMap[ic.livestockId];
       if (!lv) return { error: `Hewan tidak ditemukan: ${ic.livestockId}` };
       if (lv.isSold) return { error: `Hewan ${lv.sku} sudah terjual` };
     }
@@ -646,9 +662,7 @@ export async function directEditEntryItems(entryId: string, formData: FormData) 
   await prisma.$transaction(async (tx) => {
     for (const ic of itemChanges) {
       const entryItem = entry.items.find((i) => i.id === ic.entryItemId)!;
-      const livestock = ic.livestockId !== entryItem.livestockId
-        ? await tx.livestock.findUniqueOrThrow({ where: { id: ic.livestockId } })
-        : entryItem.livestock;
+      const livestock = newLivestockMap[ic.livestockId] ?? entryItem.livestock;
 
       if (ic.livestockId !== entryItem.livestockId) {
         await tx.livestock.update({ where: { id: entryItem.livestockId }, data: { isSold: false } });
@@ -699,12 +713,24 @@ export async function approveEntryEdit(requestId: string) {
 
   const itemChanges = request.itemChanges as unknown as ItemChange[];
 
-  // Validate: new livestocks aren't sold by someone else
+  const approveSwappedIds = itemChanges
+    .filter((ic) => {
+      const ei = request.entry.items.find((i) => i.id === ic.entryItemId);
+      return ei && ic.livestockId !== ei.livestockId;
+    })
+    .map((ic) => ic.livestockId);
+
+  const approveNewLivestockMap = approveSwappedIds.length > 0
+    ? Object.fromEntries(
+        (await prisma.livestock.findMany({ where: { id: { in: approveSwappedIds } } })).map((l) => [l.id, l]),
+      )
+    : {};
+
   for (const ic of itemChanges) {
     const entryItem = request.entry.items.find((i) => i.id === ic.entryItemId);
     if (!entryItem) return { error: `Item tidak ditemukan: ${ic.entryItemId}` };
     if (ic.livestockId !== entryItem.livestockId) {
-      const lv = await prisma.livestock.findUnique({ where: { id: ic.livestockId } });
+      const lv = approveNewLivestockMap[ic.livestockId];
       if (!lv) return { error: `Hewan tidak ditemukan` };
       if (lv.isSold) return { error: `Hewan ${lv.sku} sudah terjual oleh entry lain. Tolak dan minta sales pilih hewan lain.` };
     }
@@ -713,11 +739,8 @@ export async function approveEntryEdit(requestId: string) {
   await prisma.$transaction(async (tx) => {
     for (const ic of itemChanges) {
       const entryItem = request.entry.items.find((i) => i.id === ic.entryItemId)!;
-      const livestock = ic.livestockId !== entryItem.livestockId
-        ? await tx.livestock.findUniqueOrThrow({ where: { id: ic.livestockId } })
-        : entryItem.livestock;
+      const livestock = approveNewLivestockMap[ic.livestockId] ?? entryItem.livestock;
 
-      // Swap livestock if changed
       if (ic.livestockId !== entryItem.livestockId) {
         await tx.livestock.update({ where: { id: entryItem.livestockId }, data: { isSold: false } });
         await tx.livestock.update({ where: { id: ic.livestockId }, data: { isSold: true } });

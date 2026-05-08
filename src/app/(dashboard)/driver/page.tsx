@@ -54,7 +54,12 @@ export default async function DriverPage({
           buyerLng: true,
           sales: { select: { name: true } },
           items: {
-            include: { livestock: { select: { sku: true, tag: true, type: true, grade: true, photoUrl: true } } },
+            select: {
+              id: true,
+              loadedAt: true,
+              loadedBy: true,
+              livestock: { select: { sku: true, tag: true, type: true, grade: true, photoUrl: true } },
+            },
           },
         },
       },
@@ -132,7 +137,11 @@ export default async function DriverPage({
             buyerLat: d.entry.buyerLat,
             buyerLng: d.entry.buyerLng,
             salesName: d.entry.sales.name,
-            items: d.entry.items.map((i) => i.livestock),
+            items: d.entry.items.map((i) => ({
+              itemId: i.id,
+              loadedAt: i.loadedAt?.toISOString() ?? null,
+              ...i.livestock,
+            })),
           },
         }))}
       />

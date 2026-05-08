@@ -68,8 +68,11 @@ export default async function AdminDeliveriesPage({
           },
         },
         items: {
-          include: {
-            livestock: { select: { id: true, sku: true, type: true, grade: true, tag: true } },
+          select: {
+            id: true,
+            loadedAt: true,
+            loadedBy: true,
+            livestock: { select: { id: true, sku: true, type: true, grade: true, tag: true, photoUrl: true, condition: true, weightMin: true, weightMax: true } },
           },
         },
         sales: {
@@ -137,10 +140,16 @@ export default async function AdminDeliveriesPage({
     animalType: e.items[0]?.livestock?.type,
     animalGrade: e.items[0]?.livestock?.grade,
     items: e.items.map((i) => ({
+      itemId: i.id,
+      loadedAt: i.loadedAt?.toISOString() ?? null,
       sku: i.livestock?.sku,
       tag: i.livestock?.tag,
       type: i.livestock?.type,
       grade: i.livestock?.grade,
+      photoUrl: i.livestock?.photoUrl ?? null,
+      condition: i.livestock?.condition ?? null,
+      weightMin: i.livestock?.weightMin ?? null,
+      weightMax: i.livestock?.weightMax ?? null,
     })),
     salesName: e.sales?.name,
     buyerLat: e.buyerLat,

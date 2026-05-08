@@ -8,6 +8,7 @@ import { solveTSP } from '@/lib/delivery/tsp';
 import { splitToDrivers } from '@/lib/delivery/split';
 import { resolveLocation } from '@/lib/delivery/geocode';
 import { getDefaultDepot } from '@/lib/delivery/depot';
+import { generateInvoiceNo } from '@/lib/format';
 
 const DEFAULT_DEPOT = {
   id: 'DEPOT',
@@ -348,23 +349,179 @@ async function requireDriverOwnership(deliveryId: string) {
   return { profile, delivery } as const;
 }
 
+export async function toggleItemLoaded(itemId: string, loaded: boolean) {
+  const profile = await requireAuth();
+
+  const item = await prisma.entryItem.findUnique({
+    where: { id: itemId },
+    include: {
+      entry: {
+        select: {
+          invoiceNo: true,
+          delivery: { select: { driverId: true, status: true } },
+        },
+      },
+      livestock: { select: { tag: true, sku: true } },
+    },
+  });
+  if (!item) return { error: 'Item tidak ditemukan' };
+
+  const delivery = item.entry.delivery;
+  if (!delivery) return { error: 'Delivery tidak ditemukan' };
+  if (delivery.status !== 'ASSIGNED') return { error: 'Tidak bisa ubah checklist setelah perjalanan dimulai' };
+
+  const isAdmin = profile.role === 'ADMIN' || profile.role === 'SUPER_ADMIN';
+  if (!isAdmin && delivery.driverId !== profile.id) return { error: 'Bukan delivery Anda' };
+
+  await prisma.entryItem.update({
+    where: { id: itemId },
+    data: {
+      loadedAt: loaded ? new Date() : null,
+      loadedBy: loaded ? profile.id : null,
+    },
+  });
+
+  const tag = item.livestock?.tag ?? item.livestock?.sku ?? itemId;
+  await logAudit({
+    actor: profile,
+    action: 'UPDATE',
+    entity: 'Entry',
+    entityId: item.entry.invoiceNo,
+    label: `${item.entry.invoiceNo} — ${tag} ${loaded ? 'dimuat' : 'batal muat'}`,
+    after: { loaded },
+  });
+
+  revalidatePath('/driver');
+  revalidatePath('/admin/deliveries');
+  return { success: true };
+}
+
+export async function bulkToggleItemsLoaded(deliveryId: string, loaded: boolean) {
+  const profile = await requireAuth();
+
+  const delivery = await prisma.delivery.findUnique({
+    where: { id: deliveryId },
+    select: { driverId: true, status: true, entryId: true },
+  });
+  if (!delivery) return { error: 'Delivery tidak ditemukan' };
+  if (delivery.status !== 'ASSIGNED') return { error: 'Tidak bisa ubah checklist setelah perjalanan dimulai' };
+
+  const isAdmin = profile.role === 'ADMIN' || profile.role === 'SUPER_ADMIN';
+  if (!isAdmin && delivery.driverId !== profile.id) return { error: 'Bukan delivery Anda' };
+
+  await prisma.entryItem.updateMany({
+    where: { entryId: delivery.entryId },
+    data: {
+      loadedAt: loaded ? new Date() : null,
+      loadedBy: loaded ? profile.id : null,
+    },
+  });
+
+  revalidatePath('/driver');
+  revalidatePath('/admin/deliveries');
+  return { success: true };
+}
+
 export async function startDeliveryRun(deliveryDate: string) {
   const profile = await requireAuth();
   if (profile.role !== 'DRIVER') return { error: 'Hanya driver' };
   const date = parseDateOnly(deliveryDate);
   if (!date) return { error: 'Tanggal tidak valid' };
 
-  await prisma.delivery.updateMany({
+  const deliveries = await prisma.delivery.findMany({
     where: {
       driverId: profile.id,
       status: 'ASSIGNED',
       entry: { deliveryDate: date },
     },
-    data: { status: 'ON_DELIVERY' },
+    include: {
+      entry: {
+        select: {
+          id: true,
+          invoiceNo: true,
+          salesId: true,
+          pengiriman: true,
+          buyerName: true,
+          buyerPhone: true,
+          buyerAddress: true,
+          buyerMaps: true,
+          buyerLat: true,
+          buyerLng: true,
+          notes: true,
+          items: { select: { id: true, loadedAt: true, hargaJual: true, hargaModal: true, resellerCut: true, hpp: true, profit: true, livestockId: true } },
+        },
+      },
+    },
+  });
+
+  if (deliveries.length === 0) return { error: 'Tidak ada delivery untuk dimulai' };
+
+  const totalItems = deliveries.flatMap((d) => d.entry.items).length;
+  const totalLoaded = deliveries.flatMap((d) => d.entry.items).filter((i) => i.loadedAt).length;
+  if (totalLoaded === 0) return { error: 'Tidak ada hewan yang dimuat. Centang minimal satu hewan.' };
+
+  let fullLoad = 0;
+  let partialLoad = 0;
+  let skipped = 0;
+  let splitEntries = 0;
+
+  await prisma.$transaction(async (tx) => {
+    for (const delivery of deliveries) {
+      const items = delivery.entry.items;
+      const loadedItems = items.filter((i) => i.loadedAt);
+      const unloadedItems = items.filter((i) => !i.loadedAt);
+
+      if (loadedItems.length === items.length) {
+        // All loaded — flip to ON_DELIVERY
+        await tx.delivery.update({ where: { id: delivery.id }, data: { status: 'ON_DELIVERY' } });
+        fullLoad++;
+      } else if (loadedItems.length > 0) {
+        // Partial — split unloaded items into new entry
+        const newEntry = await tx.entry.create({
+          data: {
+            invoiceNo: generateInvoiceNo(),
+            status: 'APPROVED',
+            salesId: delivery.entry.salesId,
+            buyerName: delivery.entry.buyerName,
+            buyerPhone: delivery.entry.buyerPhone,
+            buyerAddress: delivery.entry.buyerAddress,
+            buyerMaps: delivery.entry.buyerMaps,
+            buyerLat: delivery.entry.buyerLat,
+            buyerLng: delivery.entry.buyerLng,
+            pengiriman: delivery.entry.pengiriman,
+            notes: `Sisa muatan dari ${delivery.entry.invoiceNo}${delivery.entry.notes ? `. ${delivery.entry.notes}` : ''}`,
+            deliveryDate: null,
+          },
+        });
+        await tx.entryItem.updateMany({
+          where: { id: { in: unloadedItems.map((i) => i.id) } },
+          data: { entryId: newEntry.id, loadedAt: null, loadedBy: null },
+        });
+        await tx.delivery.update({ where: { id: delivery.id }, data: { status: 'ON_DELIVERY' } });
+        partialLoad++;
+        splitEntries++;
+      } else {
+        // Nothing loaded — unschedule the whole entry
+        await tx.delivery.delete({ where: { id: delivery.id } });
+        await tx.entry.update({ where: { id: delivery.entry.id }, data: { deliveryDate: null } });
+        skipped++;
+      }
+    }
+  });
+
+  await logAudit({
+    actor: profile,
+    action: 'UPDATE',
+    entity: 'Delivery',
+    entityId: deliveryDate,
+    label: `Start delivery run ${deliveryDate} — ${profile.name}`,
+    after: { assigned: deliveries.length, totalItems, totalLoaded, fullLoad, partialLoad, skipped, splitEntries },
   });
 
   revalidatePath('/driver');
-  return { success: true };
+  revalidatePath('/admin/deliveries');
+  revalidatePath('/admin/entries');
+  return { success: true, skipped, splitEntries };
 }
 
 export async function markDelivered(deliveryId: string, notes?: string, proofPhotoUrl?: string) {

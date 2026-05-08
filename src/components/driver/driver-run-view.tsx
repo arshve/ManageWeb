@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useEffect, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,9 +16,23 @@ import {
   startDeliveryRun,
   markDelivered,
   markFailed,
+  toggleItemLoaded,
+  bulkToggleItemsLoaded,
 } from '@/app/actions/deliveries';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import { navigationUrl } from '@/lib/delivery/maps';
 import { LivestockPhoto } from '@/components/dashboard/livestock-photo';
+import { supabase } from '@/lib/supabase';
 import {
   MapPin,
   MessageCircle,
@@ -48,6 +62,8 @@ type Stop = {
     buyerLng: number | null;
     salesName: string;
     items: {
+      itemId: string;
+      loadedAt: string | null;
       sku: string;
       tag: string | null;
       type: string;
@@ -76,8 +92,88 @@ export function DriverRunView({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [togglePending, startToggleTransition] = useTransition();
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const notStarted =
     stops.length > 0 && stops.every((s) => s.status === 'ASSIGNED');
+
+  const [checkedItems, setCheckedItems] = useState<Set<string>>(
+    () => new Set(
+      stops.flatMap((s) => s.entry.items)
+        .filter((i) => i.loadedAt)
+        .map((i) => i.itemId),
+    ),
+  );
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('entryitem-loadout-driver')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'EntryItem' }, (payload) => {
+        const row = payload.new as { id: string; loadedAt: string | null };
+        setCheckedItems((prev) => {
+          const next = new Set(prev);
+          if (row.loadedAt) next.add(row.id); else next.delete(row.id);
+          return next;
+        });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
+  const assignedStops = stops.filter((s) => s.status === 'ASSIGNED');
+  const totalAssignedItems = assignedStops.flatMap((s) => s.entry.items).length;
+  const totalLoaded = assignedStops.flatMap((s) => s.entry.items).filter((i) => checkedItems.has(i.itemId)).length;
+  const hasPartial = assignedStops.some(
+    (s) => s.entry.items.some((i) => checkedItems.has(i.itemId)) && !s.entry.items.every((i) => checkedItems.has(i.itemId)),
+  );
+  const hasSkipped = assignedStops.some(
+    (s) => s.entry.items.every((i) => !checkedItems.has(i.itemId)),
+  );
+  const needsConfirm = hasPartial || hasSkipped;
+  const partialOrSkippedEntries = assignedStops
+    .filter((s) => !s.entry.items.every((i) => checkedItems.has(i.itemId)))
+    .map((s) => {
+      const loaded = s.entry.items.filter((i) => checkedItems.has(i.itemId)).length;
+      return `${s.entry.buyerName} (${loaded}/${s.entry.items.length} dimuat)`;
+    });
+
+  function handleToggleItem(itemId: string, checked: boolean) {
+    setCheckedItems((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(itemId); else next.delete(itemId);
+      return next;
+    });
+    startToggleTransition(async () => {
+      const r = await toggleItemLoaded(itemId, checked);
+      if (r && 'error' in r) {
+        toast.error(r.error);
+        setCheckedItems((prev) => {
+          const next = new Set(prev);
+          if (checked) next.delete(itemId); else next.add(itemId);
+          return next;
+        });
+      }
+    });
+  }
+
+  function handleToggleAll(deliveryId: string, items: Stop['entry']['items'], checked: boolean) {
+    setCheckedItems((prev) => {
+      const next = new Set(prev);
+      items.forEach((i) => { if (checked) next.add(i.itemId); else next.delete(i.itemId); });
+      return next;
+    });
+    startToggleTransition(async () => {
+      const r = await bulkToggleItemsLoaded(deliveryId, checked);
+      if (r && 'error' in r) {
+        toast.error(r.error);
+        setCheckedItems((prev) => {
+          const next = new Set(prev);
+          items.forEach((i) => { if (checked) next.delete(i.itemId); else next.add(i.itemId); });
+          return next;
+        });
+      }
+    });
+  }
 
   // Find the first stop that is not DELIVERED or FAILED
   const current = stops.find(
@@ -101,10 +197,20 @@ export function DriverRunView({
   }
 
   function handleStart() {
+    if (needsConfirm) { setConfirmOpen(true); return; }
+    doStart();
+  }
+
+  function doStart() {
     startTransition(async () => {
       const r = await startDeliveryRun(deliveryDate);
       if ('error' in r) toast.error(r.error);
-      else toast.success('Rute dimulai! Hati-hati di jalan.');
+      else {
+        const extras: string[] = [];
+        if ('skipped' in r && r.skipped > 0) extras.push(`${r.skipped} stop dikembalikan ke unscheduled`);
+        if ('splitEntries' in r && r.splitEntries > 0) extras.push(`${r.splitEntries} entry dipecah`);
+        toast.success('Rute dimulai! Hati-hati di jalan.' + (extras.length ? ` (${extras.join(', ')})` : ''));
+      }
     });
   }
 
@@ -175,15 +281,52 @@ export function DriverRunView({
 
       {/* ── Start Route Button ── */}
       {isToday && notStarted && (
-        <button
-          className="w-full h-14 rounded-xl text-base font-bold flex items-center justify-center gap-2.5 transition-all disabled:opacity-60"
-          style={{ background: 'var(--primary)', color: 'var(--sidebar-primary)', fontFamily: SERIF, boxShadow: '0 4px 24px oklch(0.22 0.065 145 / 0.25)' }}
-          onClick={handleStart}
-          disabled={pending}
-        >
-          <Navigation className="size-5" />
-          Mulai Perjalanan Rute
-        </button>
+        <>
+          <div className="rounded-xl border bg-card overflow-hidden">
+            <div className="px-4 py-2.5 border-b bg-muted/30 flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-muted-foreground">Checklist Muatan</span>
+              <span className={cn(
+                'text-xs font-semibold px-2 py-0.5 rounded-full',
+                totalLoaded === totalAssignedItems && totalAssignedItems > 0
+                  ? 'bg-success-bg text-success-fg'
+                  : totalLoaded > 0
+                    ? 'bg-warning-bg text-warning-fg'
+                    : 'bg-muted text-muted-foreground',
+              )}>
+                {totalLoaded}/{totalAssignedItems} dimuat
+              </span>
+            </div>
+            <p className="px-4 py-2 text-xs text-muted-foreground border-b">
+              Centang setiap hewan yang sudah naik ke kendaraan sebelum berangkat.
+            </p>
+          </div>
+          <button
+            className="w-full h-14 rounded-xl text-base font-bold flex items-center justify-center gap-2.5 transition-all disabled:opacity-60"
+            style={{ background: 'var(--primary)', color: 'var(--sidebar-primary)', fontFamily: SERIF, boxShadow: '0 4px 24px oklch(0.22 0.065 145 / 0.25)' }}
+            onClick={handleStart}
+            disabled={pending || totalLoaded === 0}
+          >
+            <Navigation className="size-5" />
+            Mulai Perjalanan Rute
+          </button>
+          <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Ada hewan yang belum dimuat</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Stop berikut akan dikembalikan ke unscheduled:{' '}
+                  {partialOrSkippedEntries.join(', ')}.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Batal</AlertDialogCancel>
+                <AlertDialogAction onClick={() => { setConfirmOpen(false); doStart(); }}>
+                  Lanjutkan
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </>
       )}
 
       {/* ── Stop Cards ── active first, done/failed last */}
@@ -200,6 +343,10 @@ export function DriverRunView({
             stop={s}
             isCurrent={isToday && current?.id === s.id && !notStarted}
             readOnly={!isToday}
+            checkedItems={checkedItems}
+            onToggleItem={handleToggleItem}
+            onToggleAll={handleToggleAll}
+            toggleDisabled={togglePending}
           />
         ))}
 
@@ -223,10 +370,18 @@ function StopCard({
   stop,
   isCurrent,
   readOnly,
+  checkedItems,
+  onToggleItem,
+  onToggleAll,
+  toggleDisabled,
 }: {
   stop: Stop;
   isCurrent: boolean;
   readOnly: boolean;
+  checkedItems: Set<string>;
+  onToggleItem: (itemId: string, checked: boolean) => void;
+  onToggleAll: (deliveryId: string, items: Stop['entry']['items'], checked: boolean) => void;
+  toggleDisabled: boolean;
 }) {
   const [notes, setNotes] = useState('');
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -392,33 +547,72 @@ function StopCard({
         </div>
 
         {/* ── Animal Details ── */}
-        <div className="rounded-lg border bg-muted/30 overflow-hidden">
-          <div className="px-3 py-2 border-b bg-muted/30">
-            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
-              Detail Hewan · Sales: {stop.entry.salesName}
-            </p>
-          </div>
-          <div className="p-3 flex flex-col gap-2">
-            {stop.entry.items.map((lv) => {
-              const typeLabel =
-                lv.type.charAt(0) + lv.type.slice(1).toLowerCase() +
-                (lv.grade ? ' Grade ' + lv.grade : '');
-              return (
-                <div key={lv.sku} className="flex gap-3 items-center">
-                  <LivestockPhoto
-                    photoUrl={lv.photoUrl}
-                    alt={lv.sku}
-                    thumbnailClassName="size-12"
-                  />
-                  <div className="text-sm flex-1 min-w-0">
-                    <p className="font-semibold text-foreground truncate">{typeLabel}</p>
-                    <p className="text-xs text-muted-foreground truncate">Tag: {lv.tag || '—'}</p>
+        {(() => {
+          const isAssigned = stop.status === 'ASSIGNED';
+          const loadedCount = stop.entry.items.filter((i) => checkedItems.has(i.itemId)).length;
+          const total = stop.entry.items.length;
+          const allLoaded = loadedCount === total;
+          return (
+            <div className="rounded-lg border bg-muted/30 overflow-hidden">
+              <div className="px-3 py-2 border-b bg-muted/30 flex items-center justify-between">
+                <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
+                  Detail Hewan · Sales: {stop.entry.salesName}
+                </p>
+                {isAssigned && (
+                  <div className="flex items-center gap-2">
+                    <span className={cn(
+                      'text-xs font-semibold px-1.5 py-0.5 rounded-full',
+                      allLoaded ? 'bg-success-bg text-success-fg' : loadedCount > 0 ? 'bg-warning-bg text-warning-fg' : 'bg-muted text-muted-foreground',
+                    )}>
+                      {loadedCount}/{total}
+                    </span>
+                    <button
+                      className="text-[10px] text-muted-foreground underline underline-offset-2 disabled:opacity-40"
+                      disabled={toggleDisabled}
+                      onClick={() => onToggleAll(stop.id, stop.entry.items, !allLoaded)}
+                    >
+                      {allLoaded ? 'Hapus semua' : 'Centang semua'}
+                    </button>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+                )}
+              </div>
+              <div className="p-3 flex flex-col gap-2">
+                {stop.entry.items.map((lv) => {
+                  const typeLabel =
+                    lv.type.charAt(0) + lv.type.slice(1).toLowerCase() +
+                    (lv.grade ? ' Grade ' + lv.grade : '');
+                  const isChecked = checkedItems.has(lv.itemId);
+                  return (
+                    <div
+                      key={lv.itemId}
+                      className={cn('flex gap-3 items-center rounded-lg transition-colors', isAssigned ? 'cursor-pointer hover:bg-muted/60 -mx-1 px-1 py-1' : '')}
+                      onClick={isAssigned && !toggleDisabled ? () => onToggleItem(lv.itemId, !isChecked) : undefined}
+                    >
+                      {isAssigned && (
+                        <Checkbox
+                          checked={isChecked}
+                          disabled={toggleDisabled}
+                          onCheckedChange={(v) => onToggleItem(lv.itemId, !!v)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="shrink-0"
+                        />
+                      )}
+                      <LivestockPhoto
+                        photoUrl={lv.photoUrl}
+                        alt={lv.sku}
+                        thumbnailClassName="size-12"
+                      />
+                      <div className="text-sm flex-1 min-w-0">
+                        <p className={cn('font-semibold truncate', isAssigned && isChecked ? 'text-success-fg' : 'text-foreground')}>{typeLabel}</p>
+                        <p className="text-xs text-muted-foreground truncate">Tag: {lv.tag || '—'}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* ── Driver Action Forms ── */}
         {!done && isCurrent && !readOnly && (

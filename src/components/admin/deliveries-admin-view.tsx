@@ -13,7 +13,16 @@ import {
   resetRoutes,
   clearSchedule,
   updateEntryCoordinates,
+  toggleItemLoaded,
+  bulkToggleItemsLoaded,
 } from '@/app/actions/deliveries';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { navigationUrl } from '@/lib/delivery/maps';
 import {
   DeliveryMap,
@@ -61,7 +70,7 @@ type ScheduledEntry = {
   sku: string | undefined;
   animalType?: string;
   animalGrade?: string | null;
-  items: { sku: string | undefined; tag: string | null | undefined; type: string | undefined; grade: string | null | undefined }[];
+  items: { itemId: string; loadedAt: string | null; sku: string | undefined; tag: string | null | undefined; type: string | undefined; grade: string | null | undefined; photoUrl: string | null; condition: string | null; weightMin: number | null; weightMax: number | null }[];
   salesName?: string;
   buyerName: string;
   buyerAddress: string | null;
@@ -145,7 +154,54 @@ export function DeliveriesAdminView({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [togglePending, startToggleTransition] = useTransition();
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+
+  const [checkedItems, setCheckedItems] = useState<Set<string>>(
+    () => new Set(
+      scheduled.flatMap((e) => e.items)
+        .filter((i) => i.loadedAt)
+        .map((i) => i.itemId),
+    ),
+  );
+
+  function handleAdminToggleItem(itemId: string, checked: boolean) {
+    setCheckedItems((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(itemId); else next.delete(itemId);
+      return next;
+    });
+    startToggleTransition(async () => {
+      const r = await toggleItemLoaded(itemId, checked);
+      if (r && 'error' in r) {
+        toast.error(r.error);
+        setCheckedItems((prev) => {
+          const next = new Set(prev);
+          if (checked) next.delete(itemId); else next.add(itemId);
+          return next;
+        });
+      }
+    });
+  }
+
+  function handleAdminToggleAll(deliveryId: string, items: ScheduledEntry['items'], checked: boolean) {
+    setCheckedItems((prev) => {
+      const next = new Set(prev);
+      items.forEach((i) => { if (checked) next.add(i.itemId); else next.delete(i.itemId); });
+      return next;
+    });
+    startToggleTransition(async () => {
+      const r = await bulkToggleItemsLoaded(deliveryId, checked);
+      if (r && 'error' in r) {
+        toast.error(r.error);
+        setCheckedItems((prev) => {
+          const next = new Set(prev);
+          items.forEach((i) => { if (checked) next.delete(i.itemId); else next.add(i.itemId); });
+          return next;
+        });
+      }
+    });
+  }
   const [selectedUnscheduled, setSelectedUnscheduled] = useState<Set<string>>(new Set());
   const [buckets, setBuckets] = useState<string[][] | null>(null);
   const [bucketDrivers, setBucketDrivers] = useState<Record<number, string>>({});
@@ -162,6 +218,21 @@ export function DeliveriesAdminView({
   const [driverLocs, setDriverLocs] = useState<Map<string, { lastLat: number | null; lastLng: number | null; lastLocationAt: string | null }>>(
     () => new Map(drivers.map((d) => [d.id, { lastLat: d.lastLat, lastLng: d.lastLng, lastLocationAt: d.lastLocationAt }])),
   );
+
+  useEffect(() => {
+    const loadoutChannel = supabase
+      .channel('entryitem-loadout-admin')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'EntryItem' }, (payload) => {
+        const row = payload.new as { id: string; loadedAt: string | null };
+        setCheckedItems((prev) => {
+          const next = new Set(prev);
+          if (row.loadedAt) next.add(row.id); else next.delete(row.id);
+          return next;
+        });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(loadoutChannel); };
+  }, []);
 
   useEffect(() => {
     const channel = supabase
@@ -744,6 +815,9 @@ export function DeliveriesAdminView({
             const driverName = isUnassigned ? 'Belum di-assign' : (stops[0]?.delivery?.driver?.name ?? driverId);
             const doneCount = stops.filter((s) => s.delivery?.status === 'DELIVERED').length;
             const failCount = stops.filter((s) => s.delivery?.status === 'FAILED').length;
+            const assignedStopsInBucket = stops.filter((s) => s.delivery?.status === 'ASSIGNED');
+            const bucketTotalItems = assignedStopsInBucket.flatMap((s) => s.items).length;
+            const bucketLoadedItems = assignedStopsInBucket.flatMap((s) => s.items).filter((i) => checkedItems.has(i.itemId)).length;
             return (
               <div key={driverId} className="rounded-xl border bg-card overflow-hidden">
                 {/* group header */}
@@ -761,6 +835,14 @@ export function DeliveriesAdminView({
                         <span className="text-[10px] text-muted-foreground">{stops.length} stop</span>
                         {doneCount > 0 && <span className="text-[10px] text-success-fg">✓ {doneCount} terkirim</span>}
                         {failCount > 0 && <span className="text-[10px] text-danger-fg">✗ {failCount} gagal</span>}
+                        {bucketTotalItems > 0 && (
+                          <span className={cn(
+                            'text-[10px] font-semibold px-1.5 py-0.5 rounded-full',
+                            bucketLoadedItems === bucketTotalItems ? 'bg-success-bg text-success-fg' : bucketLoadedItems > 0 ? 'bg-warning-bg text-warning-fg' : 'bg-muted text-muted-foreground',
+                          )}>
+                            {bucketLoadedItems}/{bucketTotalItems} dimuat
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -799,17 +881,51 @@ export function DeliveriesAdminView({
                               </span>
                             </td>
                             <td className={td}>
+                              {s.delivery?.status === 'ASSIGNED' && s.delivery.id && (
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className={cn(
+                                    'text-[10px] font-semibold px-1.5 py-0.5 rounded-full',
+                                    s.items.every((i) => checkedItems.has(i.itemId)) ? 'bg-success-bg text-success-fg' : s.items.some((i) => checkedItems.has(i.itemId)) ? 'bg-warning-bg text-warning-fg' : 'bg-muted text-muted-foreground',
+                                  )}>
+                                    {s.items.filter((i) => checkedItems.has(i.itemId)).length}/{s.items.length}
+                                  </span>
+                                  <button
+                                    className="text-[10px] text-muted-foreground underline underline-offset-2 disabled:opacity-40"
+                                    disabled={togglePending}
+                                    onClick={() => handleAdminToggleAll(s.delivery!.id, s.items, !s.items.every((i) => checkedItems.has(i.itemId)))}
+                                  >
+                                    {s.items.every((i) => checkedItems.has(i.itemId)) ? 'Hapus' : 'Semua'}
+                                  </button>
+                                </div>
+                              )}
                               <div className="flex flex-col gap-1">
-                                {s.items.map((item) => (
-                                  <div key={item.sku ?? item.tag}>
-                                    <div className="font-medium text-foreground text-xs">
-                                      {item.type ? item.type.charAt(0) + item.type.slice(1).toLowerCase() : ''}{item.grade ? ` ${item.grade}` : ''}
+                                {s.items.map((item) => {
+                                  const isChecked = checkedItems.has(item.itemId);
+                                  const isAssigned = s.delivery?.status === 'ASSIGNED';
+                                  return (
+                                    <div
+                                      key={item.itemId}
+                                      className={cn('flex items-center gap-1.5', isAssigned ? 'cursor-pointer' : '')}
+                                      onClick={isAssigned && !togglePending ? () => handleAdminToggleItem(item.itemId, !isChecked) : undefined}
+                                    >
+                                      {isAssigned && (
+                                        <Checkbox
+                                          checked={isChecked}
+                                          disabled={togglePending}
+                                          onCheckedChange={(v) => handleAdminToggleItem(item.itemId, !!v)}
+                                          onClick={(e) => e.stopPropagation()}
+                                          className="size-3.5 shrink-0"
+                                        />
+                                      )}
+                                      <div>
+                                        <div className={cn('font-medium text-xs', isAssigned && isChecked ? 'text-success-fg' : 'text-foreground')}>
+                                          {item.type ? item.type.charAt(0) + item.type.slice(1).toLowerCase() : ''}{item.grade ? ` ${item.grade}` : ''}
+                                        </div>
+                                        <LivestockTagPreview item={item} />
+                                      </div>
                                     </div>
-                                    <span className="font-mono text-[11px] bg-muted/50 px-1.5 py-0.5 rounded text-muted-foreground">
-                                      {item.tag ?? item.sku}
-                                    </span>
-                                  </div>
-                                ))}
+                                  );
+                                })}
                               </div>
                             </td>
                             <td className={td}>
@@ -906,16 +1022,60 @@ export function DeliveriesAdminView({
                             )}
                           </div>
                         </div>
-                        <div className="flex flex-wrap gap-1 text-xs">
-                          {s.items.map((item) => (
-                            <span key={item.sku ?? item.tag} className="inline-flex items-center gap-1">
-                              <span className="font-medium text-foreground">
-                                {item.type ? item.type.charAt(0) + item.type.slice(1).toLowerCase() : ''}{item.grade ? ` ${item.grade}` : ''}
+                        {s.delivery?.status === 'ASSIGNED' && s.delivery.id ? (
+                          <div className="rounded-lg border bg-muted/20 overflow-hidden">
+                            <div className="flex items-center justify-between px-2.5 py-1.5 border-b bg-muted/30">
+                              <span className={cn(
+                                'text-[10px] font-semibold px-1.5 py-0.5 rounded-full',
+                                s.items.every((i) => checkedItems.has(i.itemId)) ? 'bg-success-bg text-success-fg' : s.items.some((i) => checkedItems.has(i.itemId)) ? 'bg-warning-bg text-warning-fg' : 'bg-muted text-muted-foreground',
+                              )}>
+                                {s.items.filter((i) => checkedItems.has(i.itemId)).length}/{s.items.length} dimuat
                               </span>
-                              <span className="font-mono bg-muted/50 px-1.5 py-0.5 rounded text-muted-foreground text-[10px]">{item.tag ?? item.sku}</span>
-                            </span>
-                          ))}
-                        </div>
+                              <button
+                                className="text-[10px] text-muted-foreground underline underline-offset-2 disabled:opacity-40"
+                                disabled={togglePending}
+                                onClick={() => handleAdminToggleAll(s.delivery!.id, s.items, !s.items.every((i) => checkedItems.has(i.itemId)))}
+                              >
+                                {s.items.every((i) => checkedItems.has(i.itemId)) ? 'Hapus semua' : 'Centang semua'}
+                              </button>
+                            </div>
+                            <div className="px-2.5 py-2 flex flex-col gap-2">
+                              {s.items.map((item) => {
+                                const isChecked = checkedItems.has(item.itemId);
+                                return (
+                                  <div
+                                    key={item.itemId}
+                                    className="flex items-center gap-2 cursor-pointer"
+                                    onClick={!togglePending ? () => handleAdminToggleItem(item.itemId, !isChecked) : undefined}
+                                  >
+                                    <Checkbox
+                                      checked={isChecked}
+                                      disabled={togglePending}
+                                      onCheckedChange={(v) => handleAdminToggleItem(item.itemId, !!v)}
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="size-4 shrink-0"
+                                    />
+                                    <span className={cn('text-xs font-medium', isChecked ? 'text-success-fg' : 'text-foreground')}>
+                                      {item.type ? item.type.charAt(0) + item.type.slice(1).toLowerCase() : ''}{item.grade ? ` ${item.grade}` : ''}
+                                    </span>
+                                    <span className="ml-auto"><LivestockTagPreview item={item} /></span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex flex-wrap gap-1 text-xs">
+                            {s.items.map((item) => (
+                              <span key={item.itemId} className="inline-flex items-center gap-1">
+                                <span className="font-medium text-foreground">
+                                  {item.type ? item.type.charAt(0) + item.type.slice(1).toLowerCase() : ''}{item.grade ? ` ${item.grade}` : ''}
+                                </span>
+                                <LivestockTagPreview item={item} />
+                              </span>
+                            ))}
+                          </div>
+                        )}
                         {s.buyerAddress && <p className="text-xs text-muted-foreground line-clamp-2">{s.buyerAddress}</p>}
                         {s.buyerPhone && <p className="text-xs text-muted-foreground">{s.buyerPhone}</p>}
                       </div>
@@ -935,6 +1095,60 @@ export function DeliveriesAdminView({
       </div>
 
     </div>
+  );
+}
+
+// ─── Livestock tag — click to preview ─────────────────────────────────────────
+
+type LivestockPreviewItem = ScheduledEntry['items'][number];
+
+function LivestockTagPreview({ item }: { item: LivestockPreviewItem }) {
+  const [open, setOpen] = useState(false);
+  const tag = item.tag ?? item.sku ?? '—';
+  const typeLabel = item.type
+    ? item.type.charAt(0) + item.type.slice(1).toLowerCase() + (item.grade ? ` Grade ${item.grade}` : '')
+    : '—';
+  const conditionLabel = item.condition === 'SEHAT' ? 'Sehat' : item.condition === 'SAKIT' ? 'Sakit' : item.condition === 'MATI' ? 'Mati' : null;
+  const weight = item.weightMin != null || item.weightMax != null
+    ? [item.weightMin, item.weightMax].filter(Boolean).join(' – ') + ' kg'
+    : null;
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); setOpen(true); }}
+        className="font-mono text-[11px] bg-muted/50 hover:bg-muted px-1.5 py-0.5 rounded text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2 decoration-dotted"
+      >
+        {tag}
+      </button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-xs p-0 overflow-hidden">
+          <DialogHeader className="sr-only">
+            <DialogTitle>{tag}</DialogTitle>
+          </DialogHeader>
+          {item.photoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={item.photoUrl} alt={tag} className="w-full aspect-square object-cover" />
+          ) : (
+            <div className="w-full aspect-square bg-muted flex items-center justify-center">
+              <span className="text-muted-foreground text-sm">Tidak ada foto</span>
+            </div>
+          )}
+          <div className="px-4 py-3 flex flex-col gap-1.5">
+            <p className="font-mono font-bold text-base text-foreground">{tag}</p>
+            <p className="text-sm text-muted-foreground">{typeLabel}</p>
+            {conditionLabel && (
+              <p className={cn(
+                'text-xs font-medium',
+                item.condition === 'SEHAT' ? 'text-success-fg' : item.condition === 'SAKIT' ? 'text-warning-fg' : 'text-danger-fg',
+              )}>{conditionLabel}</p>
+            )}
+            {weight && <p className="text-xs text-muted-foreground">Berat: {weight}</p>}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 

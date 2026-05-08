@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/auth';
 import { DashboardShell } from '@/components/dashboard/dashboard-shell';
@@ -73,7 +74,8 @@ export default async function SalesDeliveriesPage({
             sequence: true,
             status: true,
             driverId: true,
-            notes: true, // Fetch catatan dari driver
+            notes: true,
+            proofPhotoUrl: true,
             driver: { select: { id: true, name: true } },
           },
         },
@@ -134,7 +136,7 @@ export default async function SalesDeliveriesPage({
       title="Rute Pengiriman"
       description={`Jadwal pengiriman — ${dateStr}`}
     >
-      <div className="space-y-6">
+      <div className="flex flex-col gap-6">
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Peta Rute & Driver</CardTitle>
@@ -168,7 +170,7 @@ export default async function SalesDeliveriesPage({
           <CardHeader>
             <CardTitle className="text-base">Rute — {dateStr}</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="flex flex-col gap-4">
             {Array.from(groups.entries()).map(([driverId, stops]) => {
               const driverName =
                 driverId === '__unassigned__'
@@ -192,7 +194,7 @@ export default async function SalesDeliveriesPage({
                   <div className="hidden lg:block overflow-x-auto">
                     <table className="w-full text-sm text-left">
                       <thead>
-                        <tr className="border-b border-gray-100 bg-gray-50/30">
+                        <tr className="border-b border-border bg-muted/30">
                           <th className="px-4 py-2.5 font-medium text-xs text-muted-foreground w-10">
                             #
                           </th>
@@ -214,8 +216,10 @@ export default async function SalesDeliveriesPage({
                           <th className="px-3 py-2.5 font-medium text-xs text-muted-foreground w-28 text-center">
                             Status
                           </th>
+                          <th className="px-3 py-2.5 font-medium text-xs text-muted-foreground w-20 text-center">
+                            Bukti
+                          </th>
                           <th className="px-4 py-2.5 font-medium text-xs text-muted-foreground w-12 text-right">
-                            {' '}
                             Maps
                           </th>
                         </tr>
@@ -238,7 +242,7 @@ export default async function SalesDeliveriesPage({
                                 {(s.delivery?.sequence ?? 0) + 1}
                               </td>
                               <td className="px-3 py-3">
-                                <div className="space-y-1">
+                                <div className="flex flex-col gap-1">
                                   {s.items.map((item) => (
                                     <div key={item.livestock?.sku ?? item.livestock?.tag}>
                                       <div className="font-medium text-foreground text-xs">
@@ -301,6 +305,21 @@ export default async function SalesDeliveriesPage({
                                   status={s.delivery?.status ?? 'PENDING'}
                                 />
                               </td>
+                              <td className="px-3 py-3 text-center">
+                                {s.delivery?.proofPhotoUrl ? (
+                                  <a href={s.delivery.proofPhotoUrl} target="_blank" rel="noreferrer">
+                                    <Image
+                                      src={s.delivery.proofPhotoUrl}
+                                      alt="Bukti kirim"
+                                      width={56}
+                                      height={56}
+                                      className="size-14 object-cover rounded-md border mx-auto"
+                                    />
+                                  </a>
+                                ) : (
+                                  <span className="text-muted-foreground">—</span>
+                                )}
+                              </td>
                               <td className="px-4 py-3 text-right">
                                 {href && (
                                   <a
@@ -308,7 +327,7 @@ export default async function SalesDeliveriesPage({
                                     target="_blank"
                                     rel="noreferrer"
                                     title="Buka di Maps"
-                                    className="inline-flex items-center justify-center w-7 h-7 rounded-md border text-muted-foreground hover:bg-muted hover:text-foreground transition-colors text-base"
+                                    className="inline-flex items-center justify-center size-7 rounded-md border text-muted-foreground hover:bg-muted hover:text-foreground transition-colors text-base"
                                   >
                                     ↗
                                   </a>
@@ -334,11 +353,11 @@ export default async function SalesDeliveriesPage({
                       return (
                         <div
                           key={s.id}
-                          className="p-4 space-y-3 hover:bg-muted/30 transition-colors"
+                          className="p-4 flex flex-col gap-3 hover:bg-muted/30 transition-colors"
                         >
                           <div className="flex items-start justify-between">
                             <div className="flex items-center gap-2">
-                              <span className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground">
+                              <span className="size-6 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground">
                                 {(s.delivery?.sequence ?? 0) + 1}
                               </span>
                               <div className="flex flex-wrap gap-1">
@@ -366,7 +385,7 @@ export default async function SalesDeliveriesPage({
                           </div>
 
                           <div className="text-sm text-muted-foreground bg-muted/20 p-2 rounded-md border border-border/50">
-                            <div className="space-y-0.5 mb-1">
+                            <div className="flex flex-col gap-0.5 mb-1">
                               {s.items.map((item) => (
                                 <span key={item.livestock?.sku ?? item.livestock?.tag} className="font-medium text-foreground text-xs block">
                                   {item.livestock?.type
@@ -399,6 +418,19 @@ export default async function SalesDeliveriesPage({
                               </span>
                               {s.delivery.notes}
                             </div>
+                          )}
+
+                          {/* Proof photo for Mobile */}
+                          {s.delivery?.proofPhotoUrl && (
+                            <a href={s.delivery.proofPhotoUrl} target="_blank" rel="noreferrer" className="block">
+                              <Image
+                                src={s.delivery.proofPhotoUrl}
+                                alt="Bukti kirim"
+                                width={120}
+                                height={120}
+                                className="rounded-md border object-cover"
+                              />
+                            </a>
                           )}
 
                           <div className="pt-2 flex justify-end">

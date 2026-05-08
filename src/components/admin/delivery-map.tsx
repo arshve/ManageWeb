@@ -235,7 +235,7 @@ export function DeliveryMap({
   const center: [number, number] = [depot.lat, depot.lng];
 
   return (
-    <div className="space-y-2">
+    <div className="flex flex-col gap-2">
     {routingFailed && (
       <p className="text-xs text-warning-fg bg-warning-bg border border-warning-ring/40 rounded px-3 py-2">
         ⚠ Gagal memuat rute jalan dari OSRM — menampilkan garis lurus. Periksa koneksi internet lalu refresh halaman.

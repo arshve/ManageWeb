@@ -17,7 +17,7 @@ import { compressImage } from '@/lib/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { RupiahInput } from '@/components/ui/rupiah-input';
-import { Label } from '@/components/ui/label';
+import { Field, FieldLabel } from '@/components/ui/field';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
@@ -243,10 +243,10 @@ export function LivestockForm({ livestock, trigger, pricingTemplate }: Livestock
               {isEdit ? 'Edit Hewan' : 'Tambah Hewan Baru'}
             </DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="sku">SKU / Kode</Label>
+              <Field>
+                <FieldLabel htmlFor="sku">SKU / Kode</FieldLabel>
                 <Input
                   id="sku"
                   value={sku}
@@ -254,9 +254,9 @@ export function LivestockForm({ livestock, trigger, pricingTemplate }: Livestock
                   placeholder="MF-001K-A"
                   required
                 />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="type">Jenis Hewan</Label>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="type">Jenis Hewan</FieldLabel>
                 <Select
                   value={type}
                   onValueChange={(val) => {
@@ -276,13 +276,13 @@ export function LivestockForm({ livestock, trigger, pricingTemplate }: Livestock
                     <SelectItem value="SAPI">Sapi</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
+              </Field>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               {type !== 'SAPI' && (
-                <div className="space-y-2">
-                  <Label htmlFor="grade">Grade</Label>
+                <Field>
+                  <FieldLabel htmlFor="grade">Grade</FieldLabel>
                   <Select
                     value={grade ?? 'A'}
                     onValueChange={(val) => {
@@ -304,10 +304,10 @@ export function LivestockForm({ livestock, trigger, pricingTemplate }: Livestock
                       <SelectItem value="D">D</SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
+                </Field>
               )}
-              <div className="space-y-2">
-                <Label htmlFor="condition">Kondisi</Label>
+              <Field>
+                <FieldLabel htmlFor="condition">Kondisi</FieldLabel>
                 <Select
                   value={condition}
                   onValueChange={(val) => setCondition(val ?? condition)}
@@ -323,12 +323,12 @@ export function LivestockForm({ livestock, trigger, pricingTemplate }: Livestock
                     <SelectItem value="MATI">Mati</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
+              </Field>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="weight">Berat (kg)</Label>
+              <Field>
+                <FieldLabel htmlFor="weight">Berat (kg)</FieldLabel>
                 <Input
                   id="weight"
                   type="text"
@@ -337,20 +337,20 @@ export function LivestockForm({ livestock, trigger, pricingTemplate }: Livestock
                   onChange={(e) => setWeight(e.target.value)}
                   placeholder={type === 'SAPI' ? '250-300' : '45'}
                 />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="hargaJual">Harga Jual</Label>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="hargaJual">Harga Jual</FieldLabel>
                 <RupiahInput
                   id="hargaJual"
                   value={hargaJual}
                   onValueChange={setHargaJual}
                   placeholder="3500000"
                 />
-              </div>
+              </Field>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="hargaModal">Modal</Label>
+            <Field>
+              <FieldLabel htmlFor="hargaModal">Modal</FieldLabel>
               <RupiahInput
                 id="hargaModal"
                 value={hargaModal}
@@ -362,20 +362,20 @@ export function LivestockForm({ livestock, trigger, pricingTemplate }: Livestock
                   Harga otomatis dari Kelola Harga — bisa diubah.
                 </p>
               )}
-            </div>
+            </Field>
 
-            <div className="space-y-2">
-              <Label htmlFor="tag">Tag</Label>
+            <Field>
+              <FieldLabel htmlFor="tag">Tag</FieldLabel>
               <Input
                 id="tag"
                 value={tag}
                 onChange={(e) => setTag(e.target.value)}
                 placeholder="BSD-01 / K-01 / MF-01"
               />
-            </div>
+            </Field>
 
-            <div className="space-y-2">
-              <Label>Foto Hewan</Label>
+            <Field>
+              <FieldLabel>Foto Hewan</FieldLabel>
               {photoPreview ? (
                 <div className="relative w-full rounded-lg overflow-hidden border bg-muted">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -391,7 +391,7 @@ export function LivestockForm({ livestock, trigger, pricingTemplate }: Livestock
                       variant="secondary"
                       onClick={() => fileInputRef.current?.click()}
                     >
-                      <ImagePlus className="h-4 w-4 mr-1" />
+                      <ImagePlus className="size-4 mr-1" />
                       Ganti Foto
                     </Button>
                     <Button
@@ -400,7 +400,7 @@ export function LivestockForm({ livestock, trigger, pricingTemplate }: Livestock
                       variant="destructive"
                       onClick={handleRemovePhoto}
                     >
-                      <X className="h-4 w-4 mr-1" />
+                      <X className="size-4 mr-1" />
                       Hapus
                     </Button>
                   </div>
@@ -416,7 +416,7 @@ export function LivestockForm({ livestock, trigger, pricingTemplate }: Livestock
                   onClick={() => fileInputRef.current?.click()}
                   className="w-full h-32 rounded-lg border-2 border-dashed border-muted-foreground/30 bg-muted/40 hover:bg-muted/70 hover:border-muted-foreground/50 transition-colors flex flex-col items-center justify-center gap-2 text-muted-foreground cursor-pointer"
                 >
-                  <ImagePlus className="h-8 w-8" />
+                  <ImagePlus className="size-8" />
                   <span className="text-sm font-medium">
                     Klik untuk pilih foto
                   </span>
@@ -431,17 +431,17 @@ export function LivestockForm({ livestock, trigger, pricingTemplate }: Livestock
                 className="hidden"
                 onChange={handleFileChange}
               />
-            </div>
+            </Field>
 
-            <div className="space-y-2">
-              <Label htmlFor="notes">Catatan</Label>
+            <Field>
+              <FieldLabel htmlFor="notes">Catatan</FieldLabel>
               <Textarea
                 id="notes"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={2}
               />
-            </div>
+            </Field>
 
             <Button type="submit" className="w-full" disabled={loading}>
               {loading

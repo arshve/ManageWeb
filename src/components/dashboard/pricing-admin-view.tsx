@@ -38,7 +38,7 @@ function PricingDeleteButton({ id, label }: { id: string; label: string }) {
     <Button
       variant="ghost"
       size="icon"
-      className="h-8 w-8 text-destructive"
+      className="size-8 text-destructive"
       onClick={handleDelete}
       disabled={loading}
     >
@@ -71,7 +71,7 @@ function PricingMobileRow({ pricing }: { pricing: PricingRow }) {
         <PricingForm
           pricing={pricing}
           trigger={
-            <Button variant="ghost" size="icon" className="h-8 w-8">
+            <Button variant="ghost" size="icon" className="size-8">
               <Pencil className="h-3.5 w-3.5" />
             </Button>
           }
@@ -145,7 +145,7 @@ export function PricingAdminView({ pricing }: { pricing: PricingRow[] }) {
                           <PricingForm
                             pricing={p}
                             trigger={
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <Button variant="ghost" size="icon" className="size-8">
                                 <Pencil className="h-3.5 w-3.5" />
                               </Button>
                             }
@@ -163,7 +163,7 @@ export function PricingAdminView({ pricing }: { pricing: PricingRow[] }) {
             </div>
 
             {/* Mobile cards */}
-            <div className="md:hidden p-3 space-y-2">
+            <div className="md:hidden p-3 flex flex-col gap-2">
               {rows.map((p) => (
                 <PricingMobileRow key={p.id} pricing={p} />
               ))}

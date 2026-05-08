@@ -281,7 +281,7 @@ function LogRow({ log }: { log: LogItem }) {
           </div>
         </div>
         <ChevronDown
-          className={`h-4 w-4 text-muted-foreground shrink-0 mt-1 transition-transform ${
+          className={`size-4 text-muted-foreground shrink-0 mt-1 transition-transform ${
             open ? 'rotate-180' : ''
           }`}
         />

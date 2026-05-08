@@ -113,7 +113,7 @@ export function DriverRunView({
     stops.length > 0 ? Math.round((deliveredCount / stops.length) * 100) : 0;
 
   return (
-    <div className="space-y-4 pb-8">
+    <div className="flex flex-col gap-4 pb-8">
       {/* ── Sticky Date Nav ── */}
       <div className="sticky top-0 z-10 -mx-4 px-4 py-3 bg-background/80 backdrop-blur-md border-b">
         <div className="flex flex-wrap items-center gap-2">
@@ -126,7 +126,7 @@ export function DriverRunView({
             ←
           </Button>
           <div className="relative flex-1 sm:flex-none">
-            <CalendarDays className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <CalendarDays className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
             <Input
               type="date"
               value={deliveryDate}
@@ -181,13 +181,13 @@ export function DriverRunView({
           onClick={handleStart}
           disabled={pending}
         >
-          <Navigation className="h-5 w-5" />
+          <Navigation className="size-5" />
           Mulai Perjalanan Rute
         </button>
       )}
 
       {/* ── Stop Cards ── active first, done/failed last */}
-      <div className="space-y-4">
+      <div className="flex flex-col gap-4">
         {[...stops]
           .sort((a, b) => {
             const done = (s: Stop) => s.status === 'DELIVERED' || s.status === 'FAILED';
@@ -205,8 +205,8 @@ export function DriverRunView({
 
         {stops.length === 0 && (
           <div className="flex flex-col items-center justify-center p-12 text-center border rounded-xl bg-muted/20 border-dashed mt-8">
-            <div className="w-14 h-14 rounded-full flex items-center justify-center mb-4 bg-primary/10">
-              <Clock className="h-7 w-7 text-success-fg" />
+            <div className="size-14 rounded-full flex items-center justify-center mb-4 bg-primary/10">
+              <Clock className="size-7 text-success-fg" />
             </div>
             <h3 className="font-bold text-lg" style={{ fontFamily: SERIF }}>Tidak Ada Jadwal</h3>
             <p className="text-sm text-muted-foreground mt-1 max-w-xs">
@@ -313,7 +313,7 @@ function StopCard({
       >
         <div className="flex items-center gap-2.5">
           <span
-            className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
+            className="size-7 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
             style={{ background: 'var(--token-ring)', fontFamily: SERIF }}
           >
             {stop.sequence + 1}
@@ -329,7 +329,7 @@ function StopCard({
         <StatusToken intent={ds.intent}>{ds.label}</StatusToken>
       </div>
 
-      <div className="p-4 space-y-4">
+      <div className="p-4 flex flex-col gap-4">
         {/* ── Buyer Info ── */}
         <div>
           <h3 className="text-xl font-bold leading-tight" style={{ fontFamily: SERIF }}>
@@ -352,12 +352,12 @@ function StopCard({
                 'flex-1 gap-2 bg-info-bg hover:bg-info-bg/80 text-info-fg border-info-ring/40',
               )}
             >
-              <MapPin className="w-4 h-4" />
+              <MapPin className="size-4" />
               Buka Maps
             </a>
           ) : (
             <Button variant="outline" disabled className="flex-1 gap-2">
-              <MapPin className="w-4 h-4" />
+              <MapPin className="size-4" />
               Maps (N/A)
             </Button>
           )}
@@ -372,7 +372,7 @@ function StopCard({
                 'flex-1 gap-2 bg-success-bg hover:bg-success-bg/80 text-success-fg border-success-ring/40',
               )}
             >
-              <MessageCircle className="w-4 h-4" />
+              <MessageCircle className="size-4" />
               Chat WA
             </a>
           ) : stop.entry.buyerPhone ? (
@@ -380,12 +380,12 @@ function StopCard({
               href={`tel:${stop.entry.buyerPhone}`}
               className={cn(buttonVariants({ variant: 'outline' }), 'flex-1 gap-2')}
             >
-              <Phone className="w-4 h-4" />
+              <Phone className="size-4" />
               Telepon
             </a>
           ) : (
             <Button variant="outline" disabled className="flex-1 gap-2">
-              <Phone className="w-4 h-4" />
+              <Phone className="size-4" />
               No. HP (N/A)
             </Button>
           )}
@@ -398,7 +398,7 @@ function StopCard({
               Detail Hewan · Sales: {stop.entry.salesName}
             </p>
           </div>
-          <div className="p-3 space-y-2">
+          <div className="p-3 flex flex-col gap-2">
             {stop.entry.items.map((lv) => {
               const typeLabel =
                 lv.type.charAt(0) + lv.type.slice(1).toLowerCase() +
@@ -408,7 +408,7 @@ function StopCard({
                   <LivestockPhoto
                     photoUrl={lv.photoUrl}
                     alt={lv.sku}
-                    thumbnailClassName="w-12 h-12"
+                    thumbnailClassName="size-12"
                   />
                   <div className="text-sm flex-1 min-w-0">
                     <p className="font-semibold text-foreground truncate">{typeLabel}</p>
@@ -422,7 +422,7 @@ function StopCard({
 
         {/* ── Driver Action Forms ── */}
         {!done && isCurrent && !readOnly && (
-          <div className="pt-3 border-t space-y-3">
+          <div className="pt-3 border-t flex flex-col gap-3">
             <Textarea
               placeholder="Catatan pengiriman (opsional)"
               value={notes}
@@ -436,9 +436,9 @@ function StopCard({
                 <img src={photoPreview} alt="Bukti kirim" className="w-full max-h-48 object-cover" />
                 <button
                   onClick={clearPhoto}
-                  className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 flex items-center justify-center"
+                  className="absolute top-2 right-2 size-7 rounded-full bg-black/60 flex items-center justify-center"
                 >
-                  <X className="w-4 h-4 text-white" />
+                  <X className="size-4 text-white" />
                 </button>
                 <div className="absolute bottom-0 left-0 right-0 px-3 py-1.5 bg-black/50">
                   <p className="text-[11px] text-white/80">Foto bukti pengiriman</p>
@@ -446,7 +446,7 @@ function StopCard({
               </div>
             ) : (
               <label className="flex items-center gap-2.5 px-4 py-2.5 rounded-lg border border-dashed cursor-pointer transition-colors hover:bg-muted/40">
-                <Camera className="w-4 h-4 text-muted-foreground" />
+                <Camera className="size-4 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">Foto bukti kirim (opsional)</span>
                 <input
                   type="file"
@@ -464,7 +464,7 @@ function StopCard({
                 disabled={busy}
                 onClick={handleDelivered}
               >
-                <CheckCircle2 className="w-4 h-4" />
+                <CheckCircle2 className="size-4" />
                 {busy ? 'Menyimpan…' : 'Terkirim'}
               </button>
               <Button
@@ -473,7 +473,7 @@ function StopCard({
                 disabled={busy}
                 onClick={handleFailed}
               >
-                <AlertCircle className="w-4 h-4" />
+                <AlertCircle className="size-4" />
                 Gagal
               </Button>
             </div>
@@ -482,14 +482,14 @@ function StopCard({
 
         {/* ── Completed Notes + Proof ── */}
         {done && (stop.notes || stop.proofPhotoUrl) && (
-          <div className="space-y-2">
+          <div className="flex flex-col gap-2">
             {stop.proofPhotoUrl && (
               <a href={stop.proofPhotoUrl} target="_blank" rel="noreferrer" className="block rounded-lg overflow-hidden border relative group">
                 <img src={stop.proofPhotoUrl} alt="Bukti kirim" className="w-full max-h-48 object-cover" />
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
                 <div className="absolute bottom-0 left-0 right-0 px-3 py-1.5 bg-black/40">
                   <p className="text-[11px] text-white/90 flex items-center gap-1.5">
-                    <Camera className="w-3 h-3" />
+                    <Camera className="size-3" />
                     Bukti pengiriman — ketuk untuk buka
                   </p>
                 </div>

@@ -15,7 +15,7 @@ import { Lightbox } from '@/components/ui/lightbox';
 export function LivestockPhoto({
   photoUrl,
   alt,
-  thumbnailClassName = 'w-10 h-10',
+  thumbnailClassName = 'size-10',
   priority = false,
   interactive = true,
 }: {
@@ -33,7 +33,7 @@ export function LivestockPhoto({
       <div
         className={`${thumbnailClassName} rounded bg-muted flex items-center justify-center flex-shrink-0`}
       >
-        <Beef className="h-4 w-4 text-muted-foreground/40" />
+        <Beef className="size-4 text-muted-foreground/40" />
       </div>
     );
   }

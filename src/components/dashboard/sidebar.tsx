@@ -104,7 +104,7 @@ export function Sidebar({ role, userName }: SidebarProps) {
         onClick={() => setOpen(true)}
         className="fixed top-4 left-4 z-50 md:hidden bg-sidebar text-sidebar-foreground p-2 rounded-lg shadow-lg"
       >
-        <Menu className="h-5 w-5" />
+        <Menu className="size-5" />
       </button>
 
       {/* Dark overlay when mobile menu is open */}
@@ -131,12 +131,12 @@ export function Sidebar({ role, userName }: SidebarProps) {
             </span>
           </Link>
           <button onClick={() => setOpen(false)} className="md:hidden">
-            <X className="h-5 w-5" />
+            <X className="size-5" />
           </button>
         </div>
 
         {/* Navigation links — different links based on role */}
-        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+        <nav className="flex-1 p-3 flex flex-col gap-1 overflow-y-auto">
           {links.map((link) => {
             // Determine if this link is active (current page)
             const isActive =
@@ -156,7 +156,7 @@ export function Sidebar({ role, userName }: SidebarProps) {
                     : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
                 )}
               >
-                <link.icon className="h-4 w-4" />
+                <link.icon className="size-4" />
                 {link.label}
               </Link>
             );
@@ -172,7 +172,7 @@ export function Sidebar({ role, userName }: SidebarProps) {
             href="/"
             className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-sidebar-foreground/70 hover:bg-sidebar-accent/50 transition-colors"
           >
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft className="size-4" />
             Ke Website
           </Link> */}
           {role !== 'ADMIN' && role !== 'SUPER_ADMIN' && <ChangePasswordButton />}
@@ -181,7 +181,7 @@ export function Sidebar({ role, userName }: SidebarProps) {
             onClick={handleLogout}
             className="w-full justify-start gap-3 px-3 text-sm text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
           >
-            <LogOut className="h-4 w-4" />
+            <LogOut className="size-4" />
             Logout
           </Button>
         </div>

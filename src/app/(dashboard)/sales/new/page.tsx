@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { RupiahInput } from '@/components/ui/rupiah-input';
-import { Label } from '@/components/ui/label';
+import { Field, FieldLabel } from '@/components/ui/field';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
@@ -163,7 +163,7 @@ export default function NewEntryPage() {
       title="Tambah Entry Baru"
       description="Pilih hewan dan isi data pembeli"
     >
-      <form action={handleSubmit} className="space-y-5 max-w-2xl">
+      <form action={handleSubmit} className="flex flex-col gap-5 max-w-2xl">
         {/* ── Mode Toggle ── */}
         <div className="flex rounded-lg border overflow-hidden text-sm font-medium">
           {(['LANGSUNG', 'ANTRIAN'] as const).map((m) => (
@@ -184,7 +184,7 @@ export default function NewEntryPage() {
 
         {/* ── Pilih Hewan (Langsung) ── */}
         {mode === 'LANGSUNG' && (
-          <section className="rounded-xl border bg-card p-4 space-y-3">
+          <section className="rounded-xl border bg-card p-4 flex flex-col gap-3">
             <h3 className="font-semibold text-sm">Pilih Hewan</h3>
             <LivestockPicker
               livestock={livestock}
@@ -193,7 +193,7 @@ export default function NewEntryPage() {
             />
 
             {selectedItems.length > 0 && (
-              <div className="border-t pt-3 space-y-2">
+              <div className="border-t pt-3 flex flex-col gap-2">
                 <p className="text-xs font-medium text-muted-foreground">
                   {selectedItems.length} hewan dipilih
                 </p>
@@ -217,16 +217,16 @@ export default function NewEntryPage() {
                           {lv.sku}
                         </p>
                         <div className="flex gap-2 mt-1.5">
-                          <div className="flex-1 space-y-0.5">
-                            <Label className="text-[10px]">Tag</Label>
+                          <Field className="flex-1">
+                            <FieldLabel className="text-[10px]">Tag</FieldLabel>
                             <Input
                               value={item.tag}
                               readOnly
                               className="h-7 text-xs bg-muted/50 cursor-default"
                             />
-                          </div>
-                          <div className="flex-1 space-y-0.5">
-                            <Label className="text-[10px]">Harga Jual *</Label>
+                          </Field>
+                          <Field className="flex-1">
+                            <FieldLabel className="text-[10px]">Harga Jual *</FieldLabel>
                             <RupiahInput
                               value={item.hargaJual}
                               onValueChange={(v) =>
@@ -235,7 +235,7 @@ export default function NewEntryPage() {
                               className="h-7 text-xs"
                               placeholder="3500000"
                             />
-                          </div>
+                          </Field>
                         </div>
                       </div>
                       <button
@@ -243,7 +243,7 @@ export default function NewEntryPage() {
                         onClick={() => handleToggle(lv.id)}
                         className="text-muted-foreground hover:text-destructive mt-0.5 shrink-0"
                       >
-                        <X className="h-4 w-4" />
+                        <X className="size-4" />
                       </button>
                     </div>
                   );
@@ -259,7 +259,7 @@ export default function NewEntryPage() {
 
         {/* ── Daftar Permintaan (Antrian) ── */}
         {mode === 'ANTRIAN' && (
-          <section className="rounded-xl border bg-card p-4 space-y-3">
+          <section className="rounded-xl border bg-card p-4 flex flex-col gap-3">
             <div>
               <h3 className="font-semibold text-sm">Daftar Permintaan</h3>
               <p className="text-xs text-muted-foreground mt-0.5">
@@ -278,33 +278,33 @@ export default function NewEntryPage() {
         )}
 
         {/* ── Data Pembeli ── */}
-        <section className="rounded-xl border bg-card p-4 space-y-4">
+        <section className="rounded-xl border bg-card p-4 flex flex-col gap-4">
           <h3 className="font-semibold text-sm">Data Pembeli</h3>
-          <div className="space-y-1.5">
-            <Label htmlFor="buyerName">Nama Pembeli *</Label>
+          <Field>
+            <FieldLabel htmlFor="buyerName">Nama Pembeli *</FieldLabel>
             <Input id="buyerName" name="buyerName" required />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="buyerPhone">No. Telepon</Label>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="buyerPhone">No. Telepon</FieldLabel>
             <Input id="buyerPhone" name="buyerPhone" type="tel" />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="buyerAddress">Alamat Lengkap</Label>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="buyerAddress">Alamat Lengkap</FieldLabel>
             <Textarea id="buyerAddress" name="buyerAddress" rows={2} />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="buyerMaps">Link Google Maps</Label>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="buyerMaps">Link Google Maps</FieldLabel>
             <Input
               id="buyerMaps"
               name="buyerMaps"
               placeholder="https://maps.google.com/..."
             />
-          </div>
+          </Field>
         </section>
 
         {/* ── Pengiriman (Langsung only) ── */}
         {mode === 'LANGSUNG' && (
-          <section className="rounded-xl border bg-card p-4 space-y-4">
+          <section className="rounded-xl border bg-card p-4 flex flex-col gap-4">
             <h3 className="font-semibold text-sm">Pengiriman</h3>
             <input type="hidden" name="pengiriman" value={pengiriman} />
             <Select
@@ -328,7 +328,7 @@ export default function NewEntryPage() {
         )}
 
         {/* ── Pembayaran ── */}
-        <section className="rounded-xl border bg-card p-4 space-y-4">
+        <section className="rounded-xl border bg-card p-4 flex flex-col gap-4">
           <h3 className="font-semibold text-sm">Pembayaran</h3>
           {(mode === 'LANGSUNG' ? totalHargaJual : totalAntrianHarga) > 0 && (
             <div className="flex justify-between text-sm text-muted-foreground border-b pb-2">
@@ -342,8 +342,8 @@ export default function NewEntryPage() {
               </span>
             </div>
           )}
-          <div className="space-y-1.5">
-            <Label>Status Pembayaran</Label>
+          <Field>
+            <FieldLabel>Status Pembayaran</FieldLabel>
             <Select
               value={paymentStatus}
               onValueChange={(val) => setPaymentStatus(val ?? 'BELUM_BAYAR')}
@@ -359,21 +359,21 @@ export default function NewEntryPage() {
                 <SelectItem value="LUNAS">Lunas</SelectItem>
               </SelectContent>
             </Select>
-          </div>
+          </Field>
           {paymentStatus === 'DP' && (
-            <div className="space-y-1.5">
-              <Label htmlFor="dp">Jumlah DP</Label>
+            <Field>
+              <FieldLabel htmlFor="dp">Jumlah DP</FieldLabel>
               <RupiahInput id="dp" name="dp" placeholder="1000000" />
-            </div>
+            </Field>
           )}
-          <div className="space-y-1.5">
-            <Label>Bukti Transfer</Label>
+          <Field>
+            <FieldLabel>Bukti Transfer</FieldLabel>
             <BuktiTransferUpload onChange={setBuktiTransferUrls} />
-          </div>
+          </Field>
         </section>
 
         {/* ── Catatan ── */}
-        <section className="rounded-xl border bg-card p-4 space-y-3">
+        <section className="rounded-xl border bg-card p-4 flex flex-col gap-3">
           <h3 className="font-semibold text-sm">Catatan</h3>
           <Textarea name="notes" rows={2} placeholder="Catatan tambahan..." />
         </section>

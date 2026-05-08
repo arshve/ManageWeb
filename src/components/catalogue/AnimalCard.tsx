@@ -57,9 +57,9 @@ export function AnimalCard({ item, priority = false }: AnimalCardProps) {
   return (
     <article
       className={[
-        'group relative flex flex-col bg-white dark:bg-neutral-900',
+        'group relative flex flex-col bg-card',
         'rounded-2xl lg:rounded-3xl overflow-hidden',
-        'border border-neutral-200/80 dark:border-neutral-800',
+        'border border-border/80',
         /* mobile: tap scale */
         'active:scale-[0.98] transition-transform duration-150',
         /* desktop: lift + shadow */
@@ -69,7 +69,7 @@ export function AnimalCard({ item, priority = false }: AnimalCardProps) {
       ].join(' ')}
     >
       {/* ── Image ──────────────────────────────────────────────────────────── */}
-      <div className="relative aspect-[4/3] bg-neutral-100 dark:bg-neutral-800 overflow-hidden">
+      <div className="relative aspect-[4/3] bg-muted overflow-hidden">
         {item.photoUrl ? (
           <Image
             src={item.photoUrl}
@@ -82,7 +82,7 @@ export function AnimalCard({ item, priority = false }: AnimalCardProps) {
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <Beef className="h-14 w-14 text-neutral-300 dark:text-neutral-600" />
+            <Beef className="size-14 text-muted-foreground" />
           </div>
         )}
 
@@ -91,10 +91,10 @@ export function AnimalCard({ item, priority = false }: AnimalCardProps) {
           <span
             className={[
               'inline-flex items-center px-2 py-1 rounded-lg',
-              'bg-white/90 dark:bg-neutral-900/90 backdrop-blur-sm',
+              'bg-card/90 backdrop-blur-sm',
               'text-[10px] font-mono font-semibold tracking-wider',
-              'text-neutral-700 dark:text-neutral-300',
-              'border border-neutral-200/60 dark:border-neutral-700/60',
+              'text-foreground',
+              'border border-border/60',
             ].join(' ')}
           >
             {item.sku}
@@ -124,7 +124,7 @@ export function AnimalCard({ item, priority = false }: AnimalCardProps) {
       <div className="flex flex-col flex-1 p-4 gap-3">
         {/* Title row */}
         <div className="flex items-start justify-between gap-2">
-          <h3 className="font-bold text-base text-neutral-900 dark:text-neutral-100 leading-snug">
+          <h3 className="font-bold text-base text-foreground leading-snug">
             {typeInfo.emoji} {typeInfo.label}
             {item.grade ? ` Grade ${item.grade}` : ''}
           </h3>
@@ -133,7 +133,7 @@ export function AnimalCard({ item, priority = false }: AnimalCardProps) {
 
         {/* Weight */}
         {weight && (
-          <div className="flex items-center gap-1.5 text-sm text-neutral-500 dark:text-neutral-400">
+          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
             <Scale className="w-3.5 h-3.5 shrink-0" />
             <span>{weight}</span>
           </div>
@@ -141,7 +141,7 @@ export function AnimalCard({ item, priority = false }: AnimalCardProps) {
 
         {/* Tag */}
         {item.tag && (
-          <p className="text-[11px] text-neutral-400 dark:text-neutral-500 font-mono truncate">
+          <p className="text-[11px] text-muted-foreground font-mono truncate">
             #{item.tag}
           </p>
         )}
@@ -150,13 +150,13 @@ export function AnimalCard({ item, priority = false }: AnimalCardProps) {
         <div className="flex-1" />
 
         {/* Price + CTA */}
-        <div className="pt-2 border-t border-neutral-100 dark:border-neutral-800 space-y-3">
+        <div className="pt-2 border-t border-border flex flex-col gap-3">
           {item.hargaJual ? (
-            <p className="text-xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight">
+            <p className="text-xl font-bold text-foreground tracking-tight">
               {formatRupiah(item.hargaJual)}
             </p>
           ) : (
-            <p className="text-sm text-neutral-400 dark:text-neutral-500 italic">
+            <p className="text-sm text-muted-foreground italic">
               Harga on request
             </p>
           )}
@@ -174,15 +174,15 @@ export function AnimalCard({ item, priority = false }: AnimalCardProps) {
             className={[
               'w-full flex items-center justify-center gap-2',
               'min-h-[44px] px-4 py-2.5 rounded-xl',
-              'bg-neutral-900 dark:bg-neutral-100',
-              'text-white dark:text-neutral-900',
+              'bg-primary',
+              'text-primary-foreground',
               'text-sm font-semibold',
               'active:scale-95 transition-all duration-150',
               'lg:group-hover:gap-3',
             ].join(' ')}
           >
             Hubungi Kami
-            <ArrowRight className="w-4 h-4 lg:transition-transform lg:duration-200 lg:group-hover:translate-x-0.5" />
+            <ArrowRight className="size-4 lg:transition-transform lg:duration-200 lg:group-hover:translate-x-0.5" />
           </button>
         </div>
       </div>

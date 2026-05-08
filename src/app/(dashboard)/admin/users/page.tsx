@@ -26,7 +26,7 @@ export default async function UsersPage() {
           isSuperAdmin={superAdmin}
           trigger={
             <Button>
-              <Plus className="h-4 w-4 mr-2" />
+              <Plus className="size-4 mr-2" />
               Tambah User
             </Button>
           }

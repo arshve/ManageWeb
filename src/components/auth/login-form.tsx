@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { FieldGroup, Field, FieldLabel } from '@/components/ui/field';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowLeft } from 'lucide-react';
@@ -109,31 +109,33 @@ export function LoginForm() {
             <p className="text-muted-foreground text-sm mt-1">Masuk ke dashboard pengelolaan</p>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-5">
-            <div className="space-y-1.5">
-              <Label htmlFor="username">Username</Label>
-              <Input
-                id="username"
-                type="text"
-                placeholder="username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                required
-                className="h-11"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="h-11"
-              />
-            </div>
+          <form onSubmit={handleLogin} className="flex flex-col gap-5">
+            <FieldGroup>
+              <Field>
+                <FieldLabel htmlFor="username">Username</FieldLabel>
+                <Input
+                  id="username"
+                  type="text"
+                  placeholder="username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                  className="h-11"
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="password">Password</FieldLabel>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="h-11"
+                />
+              </Field>
+            </FieldGroup>
             {error && (
               <p className="text-sm text-destructive">{error}</p>
             )}
@@ -146,7 +148,7 @@ export function LoginForm() {
             href="/"
             className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mt-6"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="size-4" />
             Kembali ke Website
           </Link>
         </div>

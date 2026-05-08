@@ -82,9 +82,9 @@ export function LivestockPicker({
   const showGrades = typeFilter !== 'SAPI';
 
   return (
-    <div className="space-y-3">
+    <div className="flex flex-col gap-3">
       {/* Filter bar */}
-      <div className="space-y-2">
+      <div className="flex flex-col gap-2">
         {/* Type pills */}
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-xs text-muted-foreground mr-1">Jenis:</span>
@@ -259,7 +259,7 @@ function LivestockCard({
     >
       {/* Selection indicator */}
       {isSelected && (
-        <div className="absolute top-1 right-1 w-4 h-4 rounded-full bg-primary flex items-center justify-center z-10">
+        <div className="absolute top-1 right-1 size-4 rounded-full bg-primary flex items-center justify-center z-10">
           <Check className="h-2.5 w-2.5 text-primary-foreground" />
         </div>
       )}
@@ -275,13 +275,13 @@ function LivestockCard({
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <Beef className="h-5 w-5 text-muted-foreground/20" />
+            <Beef className="size-5 text-muted-foreground/20" />
           </div>
         )}
       </div>
 
       {/* Info */}
-      <div className="space-y-0">
+      <div className="flex flex-col gap-0">
         <p className="font-mono text-[10px] font-medium truncate">{l.sku}</p>
         <p className="text-[10px] text-muted-foreground truncate">
           {typeLabel}{l.grade ? ` · ${l.grade}` : ''}

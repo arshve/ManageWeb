@@ -85,9 +85,9 @@ export function PricingForm({ pricing, trigger }: PricingFormProps) {
             {pricing ? "Edit Harga" : "Tambah Harga"}
           </DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label>Jenis Hewan</Label>
               <Select
                 value={animalType}
@@ -104,7 +104,7 @@ export function PricingForm({ pricing, trigger }: PricingFormProps) {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label>Grade</Label>
               <Select
                 value={grade}
@@ -126,7 +126,7 @@ export function PricingForm({ pricing, trigger }: PricingFormProps) {
             </div>
           </div>
 
-          <div className="space-y-2">
+          <div className="flex flex-col gap-2">
             <Label>Harga Beli (Modal)</Label>
             <RupiahInput
               value={hargaBeli}
@@ -136,7 +136,7 @@ export function PricingForm({ pricing, trigger }: PricingFormProps) {
             />
           </div>
 
-          <div className="space-y-2">
+          <div className="flex flex-col gap-2">
             <Label>Harga Jual</Label>
             <RupiahInput
               value={hargaJual}

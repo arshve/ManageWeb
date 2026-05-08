@@ -111,7 +111,7 @@ export function BuktiTransferUpload({
     <div className="flex flex-wrap items-center gap-3">
       {photos.map((photo, index) => (
         <div key={photo.url} className="relative">
-          <div className="w-14 h-14 rounded-md overflow-hidden border bg-muted">
+          <div className="size-14 rounded-md overflow-hidden border bg-muted">
             <button
               type="button"
               onClick={() => setPreviewUrl(photo.url)}
@@ -135,9 +135,9 @@ export function BuktiTransferUpload({
             title="Hapus"
           >
             {removingUrl === photo.url ? (
-              <Loader2 className="h-3 w-3 animate-spin" />
+              <Loader2 className="size-3 animate-spin" />
             ) : (
-              <X className="h-3 w-3" />
+              <X className="size-3" />
             )}
           </button>
         </div>
@@ -148,13 +148,13 @@ export function BuktiTransferUpload({
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
-          className="w-14 h-14 rounded-md border border-dashed border-muted-foreground/40 hover:border-muted-foreground hover:bg-muted/50 flex items-center justify-center text-muted-foreground transition-colors disabled:opacity-50"
+          className="size-14 rounded-md border border-dashed border-muted-foreground/40 hover:border-muted-foreground hover:bg-muted/50 flex items-center justify-center text-muted-foreground transition-colors disabled:opacity-50"
           title={uploading ? 'Mengunggah...' : 'Tambah bukti transfer'}
         >
           {uploading ? (
-            <Loader2 className="h-5 w-5 animate-spin" />
+            <Loader2 className="size-5 animate-spin" />
           ) : (
-            <Plus className="h-5 w-5" />
+            <Plus className="size-5" />
           )}
         </button>
       )}

@@ -24,7 +24,7 @@ import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { RupiahInput } from '@/components/ui/rupiah-input';
-import { Label } from '@/components/ui/label';
+import { Field, FieldLabel } from '@/components/ui/field';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
@@ -236,11 +236,11 @@ export function EntryTable({
 
   function SortIcon({ field }: { field: SortField }) {
     if (sortField !== field)
-      return <ArrowUpDown className="h-3 w-3 opacity-40" />;
+      return <ArrowUpDown className="size-3 opacity-40" />;
     return sortDir === 'asc' ? (
-      <ArrowUp className="h-3 w-3" />
+      <ArrowUp className="size-3" />
     ) : (
-      <ArrowDown className="h-3 w-3" />
+      <ArrowDown className="size-3" />
     );
   }
 
@@ -327,9 +327,9 @@ export function EntryTable({
   return (
     <div>
       {/* Toolbar: Search + Filters */}
-      <div className="p-3 border-b space-y-3">
+      <div className="p-3 border-b flex flex-col gap-3">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
             placeholder="Cari invoice, pembeli, SKU, sales..."
             value={search}
@@ -441,7 +441,7 @@ export function EntryTable({
                 setPengirimanFilter('ALL');
               }}
             >
-              <X className="h-3 w-3 mr-1" />
+              <X className="size-3 mr-1" />
               Reset
             </Button>
           )}
@@ -550,7 +550,7 @@ export function EntryTable({
       </div>
 
       {/* Mobile card list */}
-      <div className="md:hidden p-3 space-y-3">
+      <div className="md:hidden p-3 flex flex-col gap-3">
         {paginated.map((entry) => (
           <MobileEntryCard
             key={entry.id}
@@ -638,7 +638,7 @@ function HoverBuktiTransfer({
           className="fixed z-[9999] -translate-x-1/2 -translate-y-full"
           style={{ top: pos.top, left: pos.left }}
         >
-          <div className="bg-popover border rounded-lg shadow-xl p-2 space-y-1 w-52 mb-2">
+          <div className="bg-popover border rounded-lg shadow-xl p-2 flex flex-col gap-1 w-52 mb-2">
             <div className="flex items-center justify-between px-1 pb-1 border-b">
               <p className="text-xs font-medium text-muted-foreground">
                 Bukti Transfer ({buktiTransfer.length})
@@ -648,7 +648,7 @@ function HoverBuktiTransfer({
                 onClick={() => setShow(false)}
                 className="text-muted-foreground hover:text-foreground transition-colors"
               >
-                <X className="h-3 w-3" />
+                <X className="size-3" />
               </button>
             </div>
             {buktiTransfer.map((url, i) => (
@@ -659,7 +659,7 @@ function HoverBuktiTransfer({
               />
             ))}
           </div>
-          <div className="w-2 h-2 bg-popover border-b border-r rotate-45 mx-auto -mt-1" />
+          <div className="size-2 bg-popover border-b border-r rotate-45 mx-auto -mt-1" />
         </div>
       )}
     </>
@@ -938,16 +938,16 @@ function LivestockSwapDialog({
       {pendingLivestockSku ? (
         <span className="inline-flex items-center gap-1">
           <Button size="sm" variant="secondary" className="h-6 text-xs px-2 gap-1" onClick={() => setOpen(true)}>
-            <Beef className="h-3 w-3" />
+            <Beef className="size-3" />
             {pendingLivestockSku}
           </Button>
-          <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-muted-foreground" onClick={onReset} title="Batal ganti">
-            <X className="h-3 w-3" />
+          <Button size="sm" variant="ghost" className="size-6 p-0 text-muted-foreground" onClick={onReset} title="Batal ganti">
+            <X className="size-3" />
           </Button>
         </span>
       ) : (
         <Button size="sm" variant="outline" className="h-6 text-xs px-2 gap-1" onClick={() => setOpen(true)}>
-          <Beef className="h-3 w-3" />
+          <Beef className="size-3" />
           Ganti
         </Button>
       )}
@@ -999,13 +999,13 @@ function PendingEditBanner({
   loading: boolean;
 }) {
   return (
-    <div className="rounded-md border border-warning-ring/40 bg-warning-bg/30 p-3 space-y-2">
+    <div className="rounded-md border border-warning-ring/40 bg-warning-bg/30 p-3 flex flex-col gap-2">
       <div className="flex items-center gap-2 text-xs font-medium text-warning-fg">
         <Clock className="h-3.5 w-3.5" />
         <span>Perubahan diajukan oleh {pendingRequest.proposedByName}</span>
       </div>
       {isAdmin && (
-        <div className="space-y-1.5">
+        <div className="flex flex-col gap-1.5">
           {pendingRequest.itemChanges.map((ic) => {
             const originalItem = entry.items.find((i) => i.id === ic.entryItemId);
             return (
@@ -1033,17 +1033,17 @@ function PendingEditBanner({
         {isAdmin ? (
           <>
             <Button size="sm" className="h-7 text-xs" onClick={onApprove} disabled={loading}>
-              <Check className="h-3 w-3 mr-1" />
+              <Check className="size-3 mr-1" />
               Setujui
             </Button>
             <Button size="sm" variant="outline" className="h-7 text-xs text-destructive border-destructive/50" onClick={onReject} disabled={loading}>
-              <X className="h-3 w-3 mr-1" />
+              <X className="size-3 mr-1" />
               Tolak
             </Button>
           </>
         ) : (
           <Button size="sm" variant="outline" className="h-7 text-xs" onClick={onCancel} disabled={loading}>
-            <XCircle className="h-3 w-3 mr-1" />
+            <XCircle className="size-3 mr-1" />
             Batalkan Permintaan
           </Button>
         )}
@@ -1082,9 +1082,9 @@ function EntryEditFields({
   salesUsers: SalesUser[];
 }) {
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-4">
       {/* ── Per-item pricing ── */}
-      <div className="space-y-2">
+      <div className="flex flex-col gap-2">
         <p className="text-xs font-medium text-muted-foreground">
           Hewan ({itemPrices.length})
         </p>
@@ -1095,7 +1095,7 @@ function EntryEditFields({
           return (
             <div
               key={ip.id}
-              className={`rounded-md border p-2 space-y-1.5 ${isMatiItem ? 'border-destructive/40 bg-destructive/5' : 'bg-muted/20'}`}
+              className={`rounded-md border p-2 flex flex-col gap-1.5 ${isMatiItem ? 'border-destructive/40 bg-destructive/5' : 'bg-muted/20'}`}
             >
               <p className="text-xs font-medium flex flex-wrap items-center gap-1.5">
                 {typeLabel}{lv.grade ? ` · ${lv.grade}` : ''}
@@ -1111,41 +1111,41 @@ function EntryEditFields({
                 )}
               </p>
               <div className={`grid gap-1.5 ${canViewFinancials ? 'grid-cols-2 sm:grid-cols-4' : isAdmin ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-2'}`}>
-                <div className="space-y-0.5">
-                  <Label className="text-[10px]">Tag</Label>
+                <Field>
+                  <FieldLabel className="text-[10px]">Tag</FieldLabel>
                   <Input
                     value={ip.tag}
                     readOnly
                     className="h-7 text-xs bg-muted/50 cursor-default"
                   />
-                </div>
-                <div className="space-y-0.5">
-                  <Label className="text-[10px]">Harga Jual</Label>
+                </Field>
+                <Field>
+                  <FieldLabel className="text-[10px]">Harga Jual</FieldLabel>
                   <RupiahInput
                     value={ip.hargaJual}
                     onValueChange={(v) => updateItemPrice(ip.id, 'hargaJual', v)}
                     className="h-7 text-xs"
                   />
-                </div>
+                </Field>
                 {canViewFinancials && (
-                  <div className="space-y-0.5">
-                    <Label className="text-[10px]">Modal</Label>
+                  <Field>
+                    <FieldLabel className="text-[10px]">Modal</FieldLabel>
                     <RupiahInput
                       value={ip.hargaModal}
                       onValueChange={(v) => updateItemPrice(ip.id, 'hargaModal', v)}
                       className="h-7 text-xs"
                     />
-                  </div>
+                  </Field>
                 )}
                 {isAdmin && (
-                  <div className="space-y-0.5">
-                    <Label className="text-[10px]">Reseller Cut</Label>
+                  <Field>
+                    <FieldLabel className="text-[10px]">Reseller Cut</FieldLabel>
                     <RupiahInput
                       value={ip.resellerCut}
                       onValueChange={(v) => updateItemPrice(ip.id, 'resellerCut', v)}
                       className="h-7 text-xs"
                     />
-                  </div>
+                  </Field>
                 )}
               </div>
             </div>
@@ -1173,8 +1173,8 @@ function EntryEditFields({
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {/* Sales */}
         {isAdmin && salesUsers.length > 0 && (
-          <div className="space-y-1">
-            <Label className="text-xs">Sales</Label>
+          <Field>
+            <FieldLabel className="text-xs">Sales</FieldLabel>
             <Select
               value={form.salesId}
               onValueChange={(val) => update('salesId', val ?? form.salesId)}
@@ -1190,29 +1190,29 @@ function EntryEditFields({
                 ))}
               </SelectContent>
             </Select>
-          </div>
+          </Field>
         )}
         {/* Buyer */}
-        <div className="space-y-1">
-          <Label className="text-xs">Nama Pembeli</Label>
+        <Field>
+          <FieldLabel className="text-xs">Nama Pembeli</FieldLabel>
           <Input value={form.buyerName} onChange={(e) => update('buyerName', e.target.value)} className="h-8 text-sm" />
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs">Telepon</Label>
+        </Field>
+        <Field>
+          <FieldLabel className="text-xs">Telepon</FieldLabel>
           <Input value={form.buyerPhone} onChange={(e) => update('buyerPhone', e.target.value)} className="h-8 text-sm" />
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs">Alamat</Label>
+        </Field>
+        <Field>
+          <FieldLabel className="text-xs">Alamat</FieldLabel>
           <Input value={form.buyerAddress} onChange={(e) => update('buyerAddress', e.target.value)} className="h-8 text-sm" />
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs">Google Maps</Label>
+        </Field>
+        <Field>
+          <FieldLabel className="text-xs">Google Maps</FieldLabel>
           <Input value={form.buyerMaps} onChange={(e) => update('buyerMaps', e.target.value)} className="h-8 text-sm" />
-        </div>
+        </Field>
 
         {/* Pengiriman */}
-        <div className="space-y-1">
-          <Label className="text-xs">Pengiriman</Label>
+        <Field>
+          <FieldLabel className="text-xs">Pengiriman</FieldLabel>
           <Select
             value={form.pengiriman || '__none__'}
             onValueChange={(val) => update('pengiriman', !val || val === '__none__' ? '' : val)}
@@ -1231,29 +1231,29 @@ function EntryEditFields({
               <SelectItem value="TITIP_POTONG">Titip Potong</SelectItem>
             </SelectContent>
           </Select>
-        </div>
+        </Field>
 
         {/* DP field */}
         {form.paymentStatus === 'DP' && (
-          <div className="space-y-1">
-            <Label className="text-xs">Jumlah DP</Label>
+          <Field>
+            <FieldLabel className="text-xs">Jumlah DP</FieldLabel>
             <RupiahInput value={form.dp} onValueChange={(v) => update('dp', v)} className="h-8 text-sm" />
-          </div>
+          </Field>
         )}
         {isAdmin && (
-          <div className="space-y-1">
-            <Label className="text-xs">Sudah Dikirim</Label>
+          <Field>
+            <FieldLabel className="text-xs">Sudah Dikirim</FieldLabel>
             <div className="pt-1">
               <Switch checked={form.isSent} onCheckedChange={(val) => update('isSent', val)} />
             </div>
-          </div>
+          </Field>
         )}
 
         {/* Payment + Bukti */}
         <div className="col-span-2 md:col-span-4">
           <div className="flex flex-wrap items-end gap-4">
-            <div className="space-y-1 w-[180px]">
-              <Label className="text-xs">Pembayaran</Label>
+            <Field className="w-[180px]">
+              <FieldLabel className="text-xs">Pembayaran</FieldLabel>
               <Select
                 value={form.paymentStatus}
                 onValueChange={(val) => update('paymentStatus', val ?? form.paymentStatus)}
@@ -1267,23 +1267,23 @@ function EntryEditFields({
                   <SelectItem value="LUNAS">Lunas</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-            <div className="space-y-1 flex-1 min-w-[200px]">
-              <Label className="text-xs">Bukti Transfer</Label>
+            </Field>
+            <Field className="flex-1 min-w-[200px]">
+              <FieldLabel className="text-xs">Bukti Transfer</FieldLabel>
               <BuktiTransferUpload
                 key={entry.id + '-bukti'}
                 initialUrls={entry.buktiTransfer ?? []}
                 onChange={setBuktiTransferUrls}
               />
-            </div>
+            </Field>
           </div>
         </div>
 
         {/* Notes */}
-        <div className="col-span-2 md:col-span-4 space-y-1">
-          <Label className="text-xs">Catatan</Label>
+        <Field className="col-span-2 md:col-span-4">
+          <FieldLabel className="text-xs">Catatan</FieldLabel>
           <Textarea value={form.notes} onChange={(e) => update('notes', e.target.value)} rows={2} className="text-sm" />
-        </div>
+        </Field>
       </div>
     </div>
   );
@@ -1342,7 +1342,7 @@ function EntryRow({
       <tr className={`border-b last:border-0 transition-colors ${rowClass}`}>
         <td className="p-3 font-mono text-xs">{entry.invoiceNo}</td>
         <td className="p-3">
-          <div className="space-y-1">
+          <div className="flex flex-col gap-1">
             {entry.items.map((item) => {
               const lv = item.livestock;
               const wLabel = lv.type === 'SAPI' ? formatWeight(lv.weightMin, lv.weightMax) : null;
@@ -1442,7 +1442,7 @@ function EntryRow({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 text-primary"
+                  className="size-8 text-primary"
                   onClick={handleSave}
                   disabled={loading || (isAdmin && !!pendingRequest)}
                   title={isAdmin && pendingRequest ? 'Selesaikan permintaan perubahan dulu' : 'Simpan'}
@@ -1452,7 +1452,7 @@ function EntryRow({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8"
+                  className="size-8"
                   onClick={onCancel}
                   title="Batal"
                 >
@@ -1466,27 +1466,27 @@ function EntryRow({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 text-primary"
+                      className="size-8 text-primary"
                       onClick={handleApprove}
                       title="Setujui"
                     >
-                      <Check className="h-4 w-4" />
+                      <Check className="size-4" />
                     </Button>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 text-destructive"
+                      className="size-8 text-destructive"
                       onClick={handleReject}
                       title="Tolak"
                     >
-                      <X className="h-4 w-4" />
+                      <X className="size-4" />
                     </Button>
                   </>
                 )}
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8"
+                  className="size-8"
                   onClick={onEdit}
                   title="Edit"
                 >
@@ -1499,7 +1499,7 @@ function EntryRow({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 text-destructive"
+                  className="size-8 text-destructive"
                   onClick={handleDelete}
                   title="Hapus"
                 >
@@ -1514,7 +1514,7 @@ function EntryRow({
       {/* Inline edit row */}
       {isEditing && (
         <tr className="border-b bg-muted/20">
-          <td colSpan={isAdmin ? 12 : 8} className="p-4 space-y-3">
+          <td colSpan={isAdmin ? 12 : 8} className="p-4 flex flex-col gap-3">
             <EntryEditFields
               entry={entry}
               isAdmin={isAdmin}
@@ -1635,7 +1635,7 @@ function MobileEntryCard({
           <BuyerLocationIcons address={entry.buyerAddress} maps={entry.buyerMaps} />
         </div>
         <ChevronDown
-          className={`h-4 w-4 text-muted-foreground shrink-0 transition-transform ${
+          className={`size-4 text-muted-foreground shrink-0 transition-transform ${
             open ? 'rotate-180' : ''
           }`}
         />
@@ -1644,7 +1644,7 @@ function MobileEntryCard({
       {/* Expanded bands */}
       {open && (
         isEditing ? (
-          <div className="p-3 space-y-3 border-t">
+          <div className="p-3 flex flex-col gap-3 border-t">
             <EntryEditFields
               entry={entry}
               isAdmin={isAdmin}
@@ -1796,21 +1796,21 @@ function MobileEntryCard({
               <div className="flex items-center gap-1 shrink-0">
                 {isAdmin && entry.status === 'PENDING' && (
                   <>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={handleApprove} title="Setujui">
-                      <Check className="h-4 w-4" />
+                    <Button variant="ghost" size="icon" className="size-8 text-primary" onClick={handleApprove} title="Setujui">
+                      <Check className="size-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={handleReject} title="Tolak">
-                      <X className="h-4 w-4" />
+                    <Button variant="ghost" size="icon" className="size-8 text-destructive" onClick={handleReject} title="Tolak">
+                      <X className="size-4" />
                     </Button>
                   </>
                 )}
                 {entry.status === 'APPROVED' && entry.buktiTransfer.length > 0 && (
                   <PdfMenu entryId={entry.id} />
                 )}
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onEdit} title="Edit">
+                <Button variant="ghost" size="icon" className="size-8" onClick={onEdit} title="Edit">
                   <Pencil className="h-3.5 w-3.5" />
                 </Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={handleDelete} title="Hapus">
+                <Button variant="ghost" size="icon" className="size-8 text-destructive" onClick={handleDelete} title="Hapus">
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>
@@ -1874,7 +1874,7 @@ function KirimIcon({ isSent }: { isSent: boolean }) {
   return (
     <IconTooltip label={isSent ? 'Sudah dikirim' : 'Belum dikirim'}>
       <Truck
-        className={`h-4 w-4 ${
+        className={`size-4 ${
           isSent ? 'text-primary' : 'text-muted-foreground/40'
         }`}
       />
@@ -1893,7 +1893,7 @@ function DeliveryIcon({
     : delivery
       ? 'Belum di-assign driver'
       : 'Belum masuk rute';
-  const iconClass = `h-4 w-4 ${
+  const iconClass = `size-4 ${
     assigned ? 'text-warning-fg' : 'text-muted-foreground/40'
   }`;
   return (
@@ -1976,7 +1976,7 @@ function StatusIcon({ status }: { status: string }) {
         : { Icon: XCircle, label: 'Ditolak', className: 'text-destructive' };
   return (
     <IconTooltip label={label}>
-      <Icon className={`h-4 w-4 ${className}`} />
+      <Icon className={`size-4 ${className}`} />
     </IconTooltip>
   );
 }
@@ -2018,7 +2018,7 @@ function BuktiPreviewItem({ url, label }: { url: string; label: string }) {
                 onClick={() => setOpen(false)}
                 className="absolute top-2 right-2 bg-black/50 hover:bg-black/80 text-white rounded-full p-1 transition-colors"
               >
-                <X className="h-4 w-4" />
+                <X className="size-4" />
               </button>
             </div>
           </div>,
@@ -2033,7 +2033,7 @@ function BuktiPreviewItem({ url, label }: { url: string; label: string }) {
         onClick={() => setOpen(true)}
         className="flex items-center gap-2 w-full rounded hover:bg-muted px-1 py-1 transition-colors text-left"
       >
-        <div className="relative w-8 h-8 rounded overflow-hidden flex-shrink-0 bg-muted">
+        <div className="relative size-8 rounded overflow-hidden flex-shrink-0 bg-muted">
           <Image
             src={url}
             alt={label}

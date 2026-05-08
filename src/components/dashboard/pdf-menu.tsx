@@ -27,7 +27,7 @@ export function PdfMenu({ entryId }: { entryId: string }) {
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8"
+            className="size-8"
             title="Download PDF"
           />
         }

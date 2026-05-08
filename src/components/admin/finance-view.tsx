@@ -80,14 +80,6 @@ function getAvatarHex(name: string): string {
 
 /* ── Small helpers ───────────────────────────────────────────────────────── */
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground mb-3">
-      {children}
-    </p>
-  );
-}
-
 function StatusBadge({ status }: { status: string }) {
   const ds = PAYMENT_STATUS[status as keyof typeof PAYMENT_STATUS] ?? { intent: 'neutral' as const, label: status };
   return <StatusToken intent={ds.intent} size="sm">{ds.label}</StatusToken>;
@@ -205,141 +197,114 @@ export function FinanceView({ entries, salesUsers, cashflows }: FinanceViewProps
   const netCfLabel = cfTotals.pengeluaran - cfTotals.pemasukan;
 
   return (
-    <div className="space-y-5">
+    <div className="flex flex-col gap-6">
 
       {/* ── 1. Profit Hero ───────────────────────────────────────────────── */}
-      <div
-        className="rounded-2xl border overflow-hidden"
-        style={{
-          background: isProfit ? 'var(--success-bg)' : 'var(--danger-bg)',
-          borderColor: isProfit ? 'var(--success-ring)' : 'var(--danger-ring)',
-        }}
-      >
-        {/* Top: big profit number */}
-        <div className="px-6 pt-5 pb-4 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground mb-2">
+      <div className="rounded-2xl border bg-card overflow-hidden">
+        <div className="px-6 pt-5 pb-5">
+          <div className="flex items-start justify-between gap-4 mb-3">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               Profit Bersih
             </p>
-            <p
+            <span
+              className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2.5 py-1"
               style={{
-                fontFamily: SERIF,
-                fontSize: 42,
-                lineHeight: 1,
-                color: isProfit ? 'var(--success-ring)' : 'var(--danger-ring)',
+                background: isProfit ? 'var(--success-bg)' : 'var(--danger-bg)',
+                color: isProfit ? 'var(--success-fg)' : 'var(--danger-fg)',
               }}
             >
-              {formatRupiah(totals.profit)}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1.5">
-              Penjualan − Modal − Fee Sales &nbsp;·&nbsp; {totals.count} transaksi
-            </p>
-          </div>
-          <div
-            className="flex items-center gap-1.5 rounded-lg px-3 py-2 self-start sm:self-auto"
-            style={{
-              background: isProfit ? 'var(--success-bg)' : 'var(--danger-bg)',
-              color: isProfit ? 'var(--success-ring)' : 'var(--danger-ring)',
-            }}
-          >
-            {isProfit
-              ? <TrendingUp className="h-4 w-4" />
-              : <TrendingDown className="h-4 w-4" />
-            }
-            <span className="text-xs font-semibold">
+              {isProfit ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
               {isProfit ? 'Untung' : 'Rugi'}
             </span>
           </div>
+          <p
+            className="leading-none mb-2"
+            style={{
+              fontFamily: SERIF,
+              fontSize: 40,
+              color: isProfit ? 'var(--success-ring)' : 'var(--danger-ring)',
+            }}
+          >
+            {formatRupiah(totals.profit)}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Penjualan − Modal − Fee Sales &nbsp;·&nbsp; {totals.count} transaksi
+          </p>
         </div>
 
-        {/* Bottom row: 3 sub-metrics */}
-        <div
-          className="grid grid-cols-3 divide-x"
-          style={{ borderTop: `1px solid var(--${isProfit ? 'success' : 'danger'}-ring)` }}
-        >
+        <div className="grid grid-cols-3 divide-x border-t">
           {[
             { label: 'Total Penjualan', value: formatRupiah(totals.penjualan) },
-            { label: 'Total Modal', value: formatRupiah(totals.modal), muted: true },
-            { label: 'Fee Sales', value: formatRupiah(totals.fee), color: 'var(--warning-ring)' },
+            { label: 'Total Modal',     value: formatRupiah(totals.modal) },
+            { label: 'Fee Sales',       value: formatRupiah(totals.fee) },
           ].map((m) => (
-            <div key={m.label} className="px-5 py-3">
+            <div key={m.label} className="px-5 py-3.5">
               <p className="text-[9px] uppercase tracking-[0.08em] text-muted-foreground mb-1">{m.label}</p>
-              <p style={{ fontFamily: SERIF, fontSize: 14, color: m.color ?? (m.muted ? 'var(--muted-foreground)' : undefined) }}>
-                {m.value}
-              </p>
+              <p className="text-sm font-medium tabular-nums">{m.value}</p>
             </div>
           ))}
         </div>
       </div>
 
-      {/* ── 2. Secondary stats strip ─────────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <StatTile label="Rata-rata / transaksi" value={formatRupiah(totals.avg)} />
-        <StatTile label="Net setelah fee" value={formatRupiah(totals.netAfterFee)} color="var(--info-ring)" />
-        <StatTile label="Pengeluaran" value={formatRupiah(cfTotals.pengeluaran)} color="var(--danger-ring)" />
-        <StatTile label="Pemasukan" value={formatRupiah(cfTotals.pemasukan)} color="var(--success-ring)" />
-      </div>
+      {/* ── 2. Secondary stats + payment in one card ─────────────────────── */}
+      <div className="rounded-xl border bg-card overflow-hidden">
+        {/* Top: 4 stats */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 divide-x border-b">
+          {[
+            { label: 'Rata-rata / transaksi', value: formatRupiah(totals.avg) },
+            { label: 'Net setelah fee',       value: formatRupiah(totals.netAfterFee) },
+            { label: 'Pengeluaran',           value: formatRupiah(cfTotals.pengeluaran), color: cfTotals.pengeluaran > 0 ? 'var(--danger-ring)' : undefined },
+            { label: 'Pemasukan',             value: formatRupiah(cfTotals.pemasukan),   color: cfTotals.pemasukan > 0 ? 'var(--success-ring)' : undefined },
+          ].map((m) => (
+            <div key={m.label} className="px-4 py-3.5">
+              <p className="text-[9px] uppercase tracking-[0.07em] text-muted-foreground mb-1">{m.label}</p>
+              <p className="text-sm font-semibold tabular-nums" style={m.color ? { color: m.color } : undefined}>{m.value}</p>
+            </div>
+          ))}
+        </div>
 
-      {/* ── 3. Payment breakdown ─────────────────────────────────────────── */}
-      <div className="rounded-xl border bg-card px-5 py-4">
-        <SectionLabel>Status Pembayaran</SectionLabel>
-
-        {/* Proportion bar */}
-        {totals.penjualan > 0 && (
-          <div className="flex rounded-full overflow-hidden h-2 mb-4 gap-px bg-border">
-            {totals.diterimaLunas > 0 && (
-              <div style={{ flex: totals.diterimaLunas, background: 'var(--success-ring)', minWidth: 3 }} />
-            )}
-            {totals.diterimaDP > 0 && (
-              <div style={{ flex: totals.diterimaDP, background: 'var(--warning-ring)', minWidth: 3 }} />
-            )}
-            {totals.piutang > 0 && (
-              <div style={{ flex: totals.piutang, background: 'oklch(0.86 0.005 80)', minWidth: 3 }} />
-            )}
+        {/* Bottom: payment status */}
+        <div className="px-5 py-4">
+          <p className="text-[9px] uppercase tracking-[0.1em] text-muted-foreground mb-3">Status Pembayaran</p>
+          {totals.penjualan > 0 && (
+            <div className="flex rounded-full overflow-hidden h-1.5 mb-4 gap-px bg-border">
+              {totals.diterimaLunas > 0 && (
+                <div style={{ flex: totals.diterimaLunas, background: 'var(--success-ring)', minWidth: 3 }} />
+              )}
+              {totals.diterimaDP > 0 && (
+                <div style={{ flex: totals.diterimaDP, background: 'var(--warning-ring)', minWidth: 3 }} />
+              )}
+              {totals.piutang > 0 && (
+                <div style={{ flex: totals.piutang, background: 'var(--border)', minWidth: 3 }} />
+              )}
+            </div>
+          )}
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-y-3">
+            {[
+              { label: `Lunas · ${totals.countLunas}`,           value: formatRupiah(totals.diterimaLunas), color: 'var(--success-ring)' },
+              { label: `DP · ${totals.countDp}`,                 value: formatRupiah(totals.diterimaDP),    color: 'var(--warning-ring)' },
+              { label: `Belum Bayar · ${totals.countBelumBayar}`,value: `${totals.countBelumBayar} transaksi`, color: totals.countBelumBayar > 0 ? 'var(--danger-ring)' : undefined },
+              { label: 'Uang Diterima',                          value: formatRupiah(totals.diterima) },
+              { label: 'Piutang',                                value: formatRupiah(totals.piutang),        color: totals.piutang > 0 ? 'var(--danger-ring)' : undefined },
+            ].map((m) => (
+              <div key={m.label}>
+                <p className="text-[9px] uppercase tracking-[0.06em] text-muted-foreground mb-0.5">{m.label}</p>
+                <p className="text-sm font-semibold tabular-nums" style={m.color ? { color: m.color } : undefined}>{m.value}</p>
+              </div>
+            ))}
           </div>
-        )}
-
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-          <StatTile
-            label={`Lunas · ${totals.countLunas}`}
-            value={formatRupiah(totals.diterimaLunas)}
-            color="var(--success-ring)"
-          />
-          <StatTile
-            label={`DP · ${totals.countDp}`}
-            value={formatRupiah(totals.diterimaDP)}
-            color="var(--warning-ring)"
-          />
-          <StatTile
-            label={`Belum Bayar · ${totals.countBelumBayar}`}
-            value={`${totals.countBelumBayar} transaksi`}
-            color="var(--danger-ring)"
-          />
-          <StatTile
-            label="Uang Diterima"
-            value={formatRupiah(totals.diterima)}
-            color="var(--success-ring)"
-          />
-          <StatTile
-            label="Piutang"
-            value={formatRupiah(totals.piutang)}
-            color={totals.piutang > 0 ? 'var(--danger-ring)' : undefined}
-          />
         </div>
       </div>
 
-      {/* ── 4. Per-Sales ─────────────────────────────────────────────────── */}
+      {/* ── 3. Per-Sales ─────────────────────────────────────────────────── */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <SectionLabel>
-            Ringkasan Per Sales{' '}
-            <span
-              className="text-foreground bg-muted px-[7px] py-0.5 rounded-full ml-1.5 normal-case"
-              style={{ letterSpacing: 'normal', fontWeight: 600, fontSize: 10 }}
-            >
+          <div className="flex items-center gap-2">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">Ringkasan Per Sales</p>
+            <span className="text-[10px] font-semibold text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
               {perSales.length}
             </span>
-          </SectionLabel>
+          </div>
           {perSales.length > 0 && (
             <button
               onClick={toggleAll}
@@ -355,7 +320,7 @@ export function FinanceView({ entries, salesUsers, cashflows }: FinanceViewProps
             Belum ada data penjualan
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="flex flex-col gap-2">
             {perSales.map((record) => (
               <SalesCard
                 key={record.user.id}
@@ -368,16 +333,16 @@ export function FinanceView({ entries, salesUsers, cashflows }: FinanceViewProps
         )}
       </div>
 
-      {/* ── 5. Cashflow ──────────────────────────────────────────────────── */}
+      {/* ── 4. Cashflow ──────────────────────────────────────────────────── */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <SectionLabel>Pengeluaran / Pemasukan</SectionLabel>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">Pengeluaran / Pemasukan</p>
           <div className="flex items-center gap-2 text-[11px]">
-            <span className="font-semibold" style={{ color: 'var(--danger-ring)' }}>
+            <span className="font-medium tabular-nums" style={{ color: 'var(--danger-ring)' }}>
               − {formatRupiah(cfTotals.pengeluaran)}
             </span>
-            <span className="text-muted-foreground">·</span>
-            <span className="font-semibold" style={{ color: 'var(--success-ring)' }}>
+            <span className="text-border">·</span>
+            <span className="font-medium tabular-nums" style={{ color: 'var(--success-ring)' }}>
               + {formatRupiah(cfTotals.pemasukan)}
             </span>
           </div>
@@ -385,9 +350,8 @@ export function FinanceView({ entries, salesUsers, cashflows }: FinanceViewProps
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-start">
           {/* Input form */}
-          <div className="rounded-xl border bg-card p-4 space-y-3">
-            {/* Type toggle */}
-            <div className="flex gap-1.5">
+          <div className="rounded-xl border bg-card p-4 flex flex-col gap-3">
+            <div className="flex gap-1 p-0.5 rounded-lg bg-muted">
               {(['PENGELUARAN', 'PEMASUKAN'] as const).map((tipe) => {
                 const isPel = tipe === 'PENGELUARAN';
                 const active = cfType === tipe;
@@ -395,25 +359,20 @@ export function FinanceView({ entries, salesUsers, cashflows }: FinanceViewProps
                   <button
                     key={tipe}
                     onClick={() => setCfType(tipe)}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs cursor-pointer transition-all duration-100"
-                    style={{
-                      background: active ? (isPel ? 'var(--danger-bg)' : 'var(--success-bg)') : undefined,
-                      color: active ? (isPel ? 'var(--danger-ring)' : 'var(--success-ring)') : 'var(--muted-foreground)',
-                      borderColor: active ? (isPel ? 'var(--danger-ring)' : 'var(--success-ring)') : undefined,
-                      fontWeight: active ? 600 : 400,
-                    }}
+                    className={cn(
+                      'flex-1 inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs cursor-pointer transition-all duration-150',
+                      active
+                        ? 'bg-card shadow-sm font-medium text-foreground'
+                        : 'text-muted-foreground hover:text-foreground',
+                    )}
                   >
-                    {isPel
-                      ? <ArrowDown className="h-3 w-3" />
-                      : <ArrowUp className="h-3 w-3" />
-                    }
+                    {isPel ? <ArrowDown className="size-3" /> : <ArrowUp className="size-3" />}
                     {isPel ? 'Pengeluaran' : 'Pemasukan'}
                   </button>
                 );
               })}
             </div>
 
-            {/* Inputs */}
             <Input
               ref={nameRef}
               placeholder="Nama…"
@@ -437,12 +396,8 @@ export function FinanceView({ entries, salesUsers, cashflows }: FinanceViewProps
                 className="flex-1"
               />
             </div>
-            <Button
-              onClick={addCashflow}
-              disabled={cfPending}
-              className="w-full gap-1.5"
-            >
-              <Plus className="h-3.5 w-3.5" /> Tambah
+            <Button onClick={addCashflow} disabled={cfPending} className="w-full gap-1.5">
+              <Plus className="size-3.5" /> Tambah
             </Button>
           </div>
 
@@ -458,19 +413,11 @@ export function FinanceView({ entries, salesUsers, cashflows }: FinanceViewProps
                   {cashflow.map((item) => {
                     const isPemasukan = item.type === 'PEMASUKAN';
                     return (
-                      <div
-                        key={item.id}
-                        className="flex items-center gap-3 px-4 py-3"
-                      >
-                        <div
-                          className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-                          style={{
-                            background: isPemasukan ? 'var(--success-bg)' : 'var(--danger-bg)',
-                          }}
-                        >
+                      <div key={item.id} className="flex items-center gap-3 px-4 py-3">
+                        <div className="size-6 rounded-md flex items-center justify-center shrink-0 bg-muted">
                           {isPemasukan
-                            ? <ArrowUp className="h-3 w-3" style={{ color: 'var(--success-ring)' }} />
-                            : <ArrowDown className="h-3 w-3" style={{ color: 'var(--danger-ring)' }} />
+                            ? <ArrowUp className="size-3 text-muted-foreground" />
+                            : <ArrowDown className="size-3 text-muted-foreground" />
                           }
                         </div>
                         <div className="flex-1 min-w-0">
@@ -478,35 +425,31 @@ export function FinanceView({ entries, salesUsers, cashflows }: FinanceViewProps
                           <div className="flex items-center gap-1.5 mt-0.5">
                             <span className="text-[10px] text-muted-foreground">{item.date}</span>
                             {item.category && (
-                              <span className="text-[9px] font-bold uppercase bg-muted text-muted-foreground px-1.5 py-px rounded tracking-[0.04em]">
+                              <span className="text-[9px] uppercase bg-muted text-muted-foreground px-1.5 py-px rounded tracking-[0.04em]">
                                 {item.category}
                               </span>
                             )}
                           </div>
                         </div>
                         <span
-                          className="shrink-0 text-sm"
+                          className="shrink-0 text-sm tabular-nums"
                           style={{ fontFamily: SERIF, color: isPemasukan ? 'var(--success-ring)' : 'var(--danger-ring)' }}
                         >
                           {isPemasukan ? '+' : '−'} {formatRupiah(item.amount)}
                         </span>
                         <button
                           onClick={() => removeCashflow(item.id)}
-                          className="w-6 h-6 rounded border border-border flex items-center justify-center shrink-0 cursor-pointer text-muted-foreground transition-colors hover:text-destructive hover:bg-destructive/5"
+                          className="size-6 rounded border border-border flex items-center justify-center shrink-0 cursor-pointer text-muted-foreground transition-colors hover:text-destructive hover:bg-destructive/5"
                         >
-                          <Trash2 className="h-3 w-3" />
+                          <Trash2 className="size-3" />
                         </button>
                       </div>
                     );
                   })}
                 </div>
-                {/* Net row */}
-                <div
-                  className="flex items-center justify-between px-4 py-2.5 bg-muted/50"
-                  style={{ borderTop: '2px solid var(--border)' }}
-                >
-                  <span className="text-[10px] font-bold uppercase tracking-[0.06em] text-muted-foreground">Net</span>
-                  <span style={{ fontFamily: SERIF, fontSize: 15, color: netCfLabel > 0 ? 'var(--danger-ring)' : 'var(--success-ring)' }}>
+                <div className="flex items-center justify-between px-4 py-2.5 border-t bg-muted/30">
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">Net</span>
+                  <span className="tabular-nums" style={{ fontFamily: SERIF, fontSize: 14, color: netCfLabel > 0 ? 'var(--danger-ring)' : 'var(--success-ring)' }}>
                     {netCfLabel >= 0 ? '−' : '+'} {formatRupiah(Math.abs(netCfLabel))}
                   </span>
                 </div>
@@ -515,19 +458,6 @@ export function FinanceView({ entries, salesUsers, cashflows }: FinanceViewProps
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-/* ── Stat Tile ───────────────────────────────────────────────────────────── */
-
-function StatTile({ label, value, color }: { label: string; value: string; color?: string }) {
-  return (
-    <div className="rounded-xl border bg-card px-4 py-3">
-      <p className="text-[9px] uppercase tracking-[0.07em] text-muted-foreground mb-1">{label}</p>
-      <p className="text-sm font-semibold truncate" style={color ? { color } : undefined}>
-        {value}
-      </p>
     </div>
   );
 }
@@ -553,7 +483,7 @@ function SalesCard({
       >
         {/* Avatar */}
         <div
-          className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-[13px] font-bold"
+          className="size-9 rounded-full flex items-center justify-center shrink-0 text-[13px] font-bold"
           style={{ background: hex + '20', color: hex, border: `1.5px solid ${hex}50` }}
         >
           {record.user.name.charAt(0).toUpperCase()}
@@ -589,7 +519,7 @@ function SalesCard({
         <button
           onClick={(e) => { e.stopPropagation(); window.open(`/api/payslip/${record.user.id}`, '_blank'); }}
           title="Generate payslip"
-          className="w-8 h-8 rounded-lg border border-border bg-muted flex items-center justify-center shrink-0 cursor-pointer transition-colors hover:bg-accent text-muted-foreground"
+          className="size-8 rounded-lg border border-border bg-muted flex items-center justify-center shrink-0 cursor-pointer transition-colors hover:bg-accent text-muted-foreground"
         >
           <FileText className="h-3.5 w-3.5" />
         </button>

@@ -3,7 +3,7 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { RupiahInput } from '@/components/ui/rupiah-input';
-import { Label } from '@/components/ui/label';
+import { Field, FieldLabel } from '@/components/ui/field';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
@@ -80,9 +80,9 @@ export function AntrianRequestRows({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="flex flex-col gap-3">
       {rows.map((row, idx) => (
-        <div key={row._id} className="border rounded-lg p-3 space-y-3 bg-muted/20">
+        <div key={row._id} className="border rounded-lg p-3 flex flex-col gap-3 bg-muted/20">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-muted-foreground">Permintaan {idx + 1}</span>
             {rows.length > 1 && (
@@ -91,15 +91,15 @@ export function AntrianRequestRows({
                 onClick={() => remove(row._id)}
                 className="text-muted-foreground hover:text-destructive"
               >
-                <X className="h-4 w-4" />
+                <X className="size-4" />
               </button>
             )}
           </div>
 
           {/* Type + Grade/Weight */}
           <div className="grid grid-cols-2 gap-2">
-            <div className="space-y-1">
-              <Label className="text-[11px]">Jenis</Label>
+            <Field>
+              <FieldLabel className="text-[11px]">Jenis</FieldLabel>
               <Select
                 value={row.type}
                 onValueChange={(v) => {
@@ -117,10 +117,10 @@ export function AntrianRequestRows({
                   <SelectItem value="DOMBA">Domba</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
+            </Field>
 
-            <div className="space-y-1">
-              <Label className="text-[11px]">Grade</Label>
+            <Field>
+              <FieldLabel className="text-[11px]">Grade</FieldLabel>
               <Select
                 value={row.grade || 'A'}
                 onValueChange={(v) => v && update(row._id, 'grade', v)}
@@ -134,46 +134,46 @@ export function AntrianRequestRows({
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </Field>
           </div>
 
           {/* Pricing */}
           <div className={`grid gap-2 ${showHargaModal ? 'grid-cols-3' : 'grid-cols-1'}`}>
-            <div className="space-y-1">
-              <Label className="text-[11px]">Harga Jual *</Label>
+            <Field>
+              <FieldLabel className="text-[11px]">Harga Jual *</FieldLabel>
               <RupiahInput
                 value={row.hargaJual}
                 onValueChange={(v) => update(row._id, 'hargaJual', v)}
                 className="h-8 text-xs"
                 placeholder="3500000"
               />
-            </div>
+            </Field>
             {showHargaModal && (
-              <div className="space-y-1">
-                <Label className="text-[11px]">Harga Modal</Label>
+              <Field>
+                <FieldLabel className="text-[11px]">Harga Modal</FieldLabel>
                 <RupiahInput
                   value={row.hargaModal}
                   onValueChange={(v) => update(row._id, 'hargaModal', v)}
                   className="h-8 text-xs"
                   placeholder="2800000"
                 />
-              </div>
+              </Field>
             )}
             {showHargaModal && (
-              <div className="space-y-1">
-                <Label className="text-[11px]">Komisi Sales</Label>
+              <Field>
+                <FieldLabel className="text-[11px]">Komisi Sales</FieldLabel>
                 <RupiahInput
                   value={row.resellerCut}
                   onValueChange={(v) => update(row._id, 'resellerCut', v)}
                   className="h-8 text-xs"
                   placeholder="0"
                 />
-              </div>
+              </Field>
             )}
           </div>
 
-          <div className="space-y-1">
-            <Label className="text-[11px]">Catatan Permintaan</Label>
+          <Field>
+            <FieldLabel className="text-[11px]">Catatan Permintaan</FieldLabel>
             <Textarea
               value={row.notes}
               onChange={(e) => update(row._id, 'notes', e.target.value)}
@@ -181,12 +181,12 @@ export function AntrianRequestRows({
               className="text-xs resize-none"
               placeholder="Misal: preferensi warna, ukuran tanduk, dll"
             />
-          </div>
+          </Field>
         </div>
       ))}
 
       <Button type="button" variant="outline" size="sm" onClick={add} className="w-full gap-2">
-        <Plus className="h-4 w-4" />
+        <Plus className="size-4" />
         Tambah Permintaan
       </Button>
     </div>

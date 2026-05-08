@@ -91,6 +91,7 @@ type UnscheduledEntry = {
   buyerLat: number | null;
   buyerLng: number | null;
   pengiriman: string | null;
+  salesName: string | null;
   hasCoords: boolean;
 };
 
@@ -208,8 +209,15 @@ export function DeliveriesAdminView({
     if (unscheduledPengirimanFilter !== 'ALL') list = list.filter((e) => e.pengiriman === unscheduledPengirimanFilter);
     if (unscheduledJenisFilter.size > 0) list = list.filter((e) => e.items.some((i) => i.type != null && unscheduledJenisFilter.has(i.type)));
     if (unscheduledSearch.trim()) {
-      const q = unscheduledSearch.trim().toLowerCase();
-      list = list.filter((e) => e.buyerName.toLowerCase().includes(q) || (e.sku?.toLowerCase().includes(q)) || (e.buyerAddress?.toLowerCase().includes(q)));
+      const tokens = unscheduledSearch.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean);
+      list = list.filter((e) =>
+        tokens.some((t) =>
+          e.buyerName.toLowerCase().includes(t) ||
+          e.sku?.toLowerCase().includes(t) ||
+          e.buyerAddress?.toLowerCase().includes(t) ||
+          e.salesName?.toLowerCase().includes(t),
+        ),
+      );
     }
     return list;
   }, [unscheduled, unscheduledSearch, unscheduledCoordFilter, unscheduledPengirimanFilter, unscheduledJenisFilter]);
@@ -319,14 +327,14 @@ export function DeliveriesAdminView({
   const td = 'px-3 py-3 text-sm';
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-4">
       {lightboxUrl && <PhotoLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />}
 
       {/* ── Date nav ── */}
       <div className="rounded-xl border bg-card px-4 py-3 flex flex-wrap items-center gap-2">
         <button
           onClick={() => gotoDate(dateOffset(-1))}
-          className="w-8 h-8 rounded-lg border flex items-center justify-center text-sm text-muted-foreground hover:bg-muted/40 transition-colors"
+          className="size-8 rounded-lg border flex items-center justify-center text-sm text-muted-foreground hover:bg-muted/40 transition-colors"
         >←</button>
         <input
           type="date"
@@ -337,7 +345,7 @@ export function DeliveriesAdminView({
         />
         <button
           onClick={() => gotoDate(dateOffset(1))}
-          className="w-8 h-8 rounded-lg border flex items-center justify-center text-sm text-muted-foreground hover:bg-muted/40 transition-colors"
+          className="size-8 rounded-lg border flex items-center justify-center text-sm text-muted-foreground hover:bg-muted/40 transition-colors"
         >→</button>
         <span className="text-[11px] text-muted-foreground hidden sm:block">
           {scheduled.length} dijadwalkan · {unscheduled.length} belum dijadwal
@@ -394,7 +402,7 @@ export function DeliveriesAdminView({
                       <tr key={d.id} className={cn('transition-colors', d.isAssigned ? 'bg-warning-bg/30' : 'hover:bg-muted/20')}>
                         <td className={cn(td, 'pl-5')}>
                           <div className="flex items-center gap-2.5">
-                            <div className={cn('w-7 h-7 shrink-0 rounded-full flex items-center justify-center text-[11px] font-bold select-none', d.isAssigned ? 'bg-warning-bg text-warning-fg' : 'bg-primary/10 text-primary')}>
+                            <div className={cn('size-7 shrink-0 rounded-full flex items-center justify-center text-[11px] font-bold select-none', d.isAssigned ? 'bg-warning-bg text-warning-fg' : 'bg-primary/10 text-primary')}>
                               {initials(d.name)}
                             </div>
                             <span className="font-medium text-foreground text-sm">{d.name}</span>
@@ -429,7 +437,7 @@ export function DeliveriesAdminView({
                 const loc = driverLocs.get(d.id);
                 return (
                   <div key={d.id} className={cn('px-4 py-3 flex items-center gap-3', d.isAssigned && 'bg-warning-bg/30')}>
-                    <div className={cn('w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-xs font-bold select-none', d.isAssigned ? 'bg-warning-bg text-warning-fg' : 'bg-primary/10 text-primary')}>
+                    <div className={cn('size-9 shrink-0 rounded-full flex items-center justify-center text-xs font-bold select-none', d.isAssigned ? 'bg-warning-bg text-warning-fg' : 'bg-primary/10 text-primary')}>
                       {initials(d.name)}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -481,7 +489,7 @@ export function DeliveriesAdminView({
             <Input
               value={unscheduledSearch}
               onChange={(ev) => { setUnscheduledSearch(ev.target.value); setUnscheduledPage(0); }}
-              placeholder="Cari nama / SKU / alamat"
+              placeholder="Cari nama, SKU, alamat, sales… (pisah koma)"
               className="h-8 text-xs pl-8"
             />
           </div>
@@ -585,13 +593,14 @@ export function DeliveriesAdminView({
                         checked={allSelected}
                         ref={(el) => { if (el) el.indeterminate = someSelected; }}
                         onChange={(e) => toggleAll(e.target.checked)}
-                        className="h-4 w-4 rounded border-border cursor-pointer"
+                        className="size-4 rounded border-border cursor-pointer"
                       />
                     </th>
                     <th className={cn(th, 'w-32')}>Tag</th>
                     <th className={cn(th, 'w-36')}>Hewan</th>
                     <th className={th}>Pembeli</th>
                     <th className={th}>Alamat</th>
+                    <th className={cn(th, 'w-28')}>Sales</th>
                     <th className={cn(th, 'w-28')}>Pengiriman</th>
                     <th className={cn(th, 'w-52 pr-5')}>Koordinat</th>
                   </tr>
@@ -612,7 +621,7 @@ export function DeliveriesAdminView({
                   checked={allSelected}
                   ref={(el) => { if (el) el.indeterminate = someSelected; }}
                   onChange={(e) => toggleAll(e.target.checked)}
-                  className="h-4 w-4 rounded border-border cursor-pointer"
+                  className="size-4 rounded border-border cursor-pointer"
                 />
                 <span className="text-xs text-muted-foreground">Pilih semua</span>
               </div>
@@ -642,7 +651,7 @@ export function DeliveriesAdminView({
 
       {/* ── Route management ── */}
       <div className="rounded-xl border bg-card overflow-hidden">
-        <div className="border-b bg-muted/30 px-5 py-3.5 space-y-3">
+        <div className="border-b bg-muted/30 px-5 py-3.5 flex flex-col gap-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-sm font-semibold" style={{ fontFamily: SERIF }}>
               Rute — {dateStr}
@@ -696,10 +705,10 @@ export function DeliveriesAdminView({
           </div>
         </div>
 
-        <div className="p-4 space-y-4">
+        <div className="p-4 flex flex-col gap-4">
           {/* Bucket driver assignment */}
           {buckets && (
-            <div className="space-y-3 rounded-xl border border-info-ring/40 bg-info-bg/30 overflow-hidden">
+            <div className="flex flex-col gap-3 rounded-xl border border-info-ring/40 bg-info-bg/30 overflow-hidden">
               <div className="flex flex-wrap items-center justify-between gap-2 px-4 pt-3">
                 <p className="text-sm font-semibold" style={{ fontFamily: SERIF }}>Pilih driver tiap rute</p>
                 <div className="flex gap-2">
@@ -710,7 +719,7 @@ export function DeliveriesAdminView({
                   </Button>
                 </div>
               </div>
-              <div className="px-4 pb-4 space-y-2">
+              <div className="px-4 pb-4 flex flex-col gap-2">
                 {buckets.map((entryIds, i) => (
                   <div key={i} className="flex flex-wrap items-center gap-2 rounded-lg border bg-card px-3 py-2">
                     <span className="text-sm font-medium text-foreground">🚚 Rute {i + 1}</span>
@@ -741,7 +750,7 @@ export function DeliveriesAdminView({
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/30 px-4 py-2.5">
                   <div className="flex items-center gap-2.5">
                     <div
-                      className={cn('w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 select-none', isUnassigned ? 'bg-warning-bg text-warning-fg' : 'bg-primary')}
+                      className={cn('size-8 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 select-none', isUnassigned ? 'bg-warning-bg text-warning-fg' : 'bg-primary')}
                       style={!isUnassigned ? { color: 'var(--sidebar-primary)' } : undefined}
                     >
                       {isUnassigned ? '?' : initials(driverName)}
@@ -783,14 +792,14 @@ export function DeliveriesAdminView({
                           <tr key={s.id} className="hover:bg-muted/20 transition-colors">
                             <td className={cn(td, 'pl-4')}>
                               <span
-                                className="inline-flex w-5 h-5 items-center justify-center rounded-full text-[10px] font-bold text-white"
+                                className="inline-flex size-5 items-center justify-center rounded-full text-[10px] font-bold text-white"
                                 style={{ background: `var(--${ds.intent}-ring)` }}
                               >
                                 {(s.delivery?.sequence ?? 0) + 1}
                               </span>
                             </td>
                             <td className={td}>
-                              <div className="space-y-1">
+                              <div className="flex flex-col gap-1">
                                 {s.items.map((item) => (
                                   <div key={item.sku ?? item.tag}>
                                     <div className="font-medium text-foreground text-xs">
@@ -821,7 +830,7 @@ export function DeliveriesAdminView({
                                 <button
                                   type="button"
                                   onClick={() => setLightboxUrl(s.delivery!.proofPhotoUrl!)}
-                                  className="group relative block w-14 h-14 rounded-lg overflow-hidden border hover:ring-2 ring-info-ring transition-all"
+                                  className="group relative block size-14 rounded-lg overflow-hidden border hover:ring-2 ring-info-ring transition-all"
                                 >
                                   {/* eslint-disable-next-line @next/next/no-img-element */}
                                   <img src={s.delivery.proofPhotoUrl} alt="bukti kirim" className="w-full h-full object-cover" />
@@ -840,7 +849,7 @@ export function DeliveriesAdminView({
                             <td className={cn(td, 'pr-4 text-right')}>
                               {href && (
                                 <a href={href} target="_blank" rel="noreferrer" title="Buka di Maps"
-                                  className="inline-flex items-center justify-center w-7 h-7 rounded-lg border text-muted-foreground hover:bg-muted/40 hover:text-foreground transition-colors text-sm">
+                                  className="inline-flex items-center justify-center size-7 rounded-lg border text-muted-foreground hover:bg-muted/40 hover:text-foreground transition-colors text-sm">
                                   ↗
                                 </a>
                               )}
@@ -858,11 +867,11 @@ export function DeliveriesAdminView({
                     const href = navigationUrl({ buyerMaps: s.buyerMaps, buyerLat: s.buyerLat, buyerLng: s.buyerLng, buyerAddress: s.buyerAddress });
                     const dsMob = DELIVERY_STATUS[s.delivery?.status ?? 'PENDING'] ?? DELIVERY_STATUS.PENDING;
                     return (
-                      <div key={s.id} className="px-4 py-3 space-y-1.5">
+                      <div key={s.id} className="px-4 py-3 flex flex-col gap-1.5">
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-2 min-w-0">
                             <span
-                              className="w-5 h-5 shrink-0 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
+                              className="size-5 shrink-0 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
                               style={{ background: `var(--${dsMob.intent}-ring)` }}
                             >
                               {(s.delivery?.sequence ?? 0) + 1}
@@ -873,7 +882,7 @@ export function DeliveriesAdminView({
                                 <button
                                   type="button"
                                   onClick={() => setLightboxUrl(s.delivery!.proofPhotoUrl!)}
-                                  className="group relative mt-1 block w-12 h-12 rounded-lg overflow-hidden border hover:ring-2 ring-info-ring transition-all"
+                                  className="group relative mt-1 block size-12 rounded-lg overflow-hidden border hover:ring-2 ring-info-ring transition-all"
                                 >
                                   {/* eslint-disable-next-line @next/next/no-img-element */}
                                   <img src={s.delivery.proofPhotoUrl} alt="bukti kirim" className="w-full h-full object-cover" />
@@ -891,7 +900,7 @@ export function DeliveriesAdminView({
                             <StatusToken intent={dsMob.intent}>{dsMob.label}</StatusToken>
                             {href && (
                               <a href={href} target="_blank" rel="noreferrer"
-                                className="inline-flex items-center justify-center w-7 h-7 rounded-lg border text-muted-foreground hover:bg-muted/40 transition-colors text-sm shrink-0">
+                                className="inline-flex items-center justify-center size-7 rounded-lg border text-muted-foreground hover:bg-muted/40 transition-colors text-sm shrink-0">
                                 ↗
                               </a>
                             )}
@@ -967,10 +976,10 @@ function UnscheduledRow({
       className={cn('cursor-pointer transition-colors hover:bg-muted/20', selected && 'bg-muted/30')}
     >
       <td className="pl-5 py-3" onClick={(ev) => ev.stopPropagation()}>
-        <input type="checkbox" checked={selected} onChange={onToggle} className="h-4 w-4 rounded border-border cursor-pointer" />
+        <input type="checkbox" checked={selected} onChange={onToggle} className="size-4 rounded border-border cursor-pointer" />
       </td>
       <td className={td}>
-        <div className="space-y-0.5">
+        <div className="flex flex-col gap-0.5">
           {e.items.map((item) => (
             <span key={item.sku ?? item.tag} className="block font-mono text-[11px] bg-muted/50 px-2 py-0.5 rounded text-muted-foreground">
               {item.tag ?? item.sku ?? '—'}
@@ -979,7 +988,7 @@ function UnscheduledRow({
         </div>
       </td>
       <td className={td}>
-        <div className="space-y-0.5">
+        <div className="flex flex-col gap-0.5">
           {e.items.map((item) => {
             const typeLabel = item.type ? item.type.charAt(0) + item.type.slice(1).toLowerCase() : '—';
             const detail = item.type === 'SAPI'
@@ -993,6 +1002,7 @@ function UnscheduledRow({
       </td>
       <td className={cn(td, 'font-medium text-foreground')}>{e.buyerName}</td>
       <td className={cn(td, 'text-xs text-muted-foreground max-w-[180px] truncate')} title={e.buyerAddress ?? undefined}>{e.buyerAddress ?? '—'}</td>
+      <td className={cn(td, 'text-xs text-muted-foreground whitespace-nowrap')}>{e.salesName ?? '—'}</td>
       <td className={cn(td, 'text-xs text-muted-foreground')}>{formatPengiriman(e.pengiriman)}</td>
       <td className={cn(td, 'pr-5')} onClick={(ev) => ev.stopPropagation()}>
         {editing ? (
@@ -1053,20 +1063,20 @@ function UnscheduledCard({
   }
 
   return (
-    <div className={cn('px-4 py-3 space-y-2', selected && 'bg-muted/30')}>
+    <div className={cn('px-4 py-3 flex flex-col gap-2', selected && 'bg-muted/30')}>
       <div className="flex items-start gap-3">
         <input
           type="checkbox"
           checked={selected}
           onChange={onToggle}
-          className="h-4 w-4 mt-0.5 rounded border-border cursor-pointer shrink-0"
+          className="size-4 mt-0.5 rounded border-border cursor-pointer shrink-0"
         />
         <div className="flex-1 min-w-0" onClick={onToggle}>
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-medium text-sm text-foreground truncate">{e.buyerName}</span>
             {e.pengiriman && <StatusToken intent="info" outlined size="sm">{formatPengiriman(e.pengiriman)}</StatusToken>}
           </div>
-          <div className="mt-1 space-y-0.5">
+          <div className="mt-1 flex flex-col gap-0.5">
             {e.items.map((item) => {
               const typeLabel = item.type ? item.type.charAt(0) + item.type.slice(1).toLowerCase() : '—';
               const detail = item.type === 'SAPI'

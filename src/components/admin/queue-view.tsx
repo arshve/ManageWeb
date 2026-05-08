@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { RupiahInput } from '@/components/ui/rupiah-input';
-import { Label } from '@/components/ui/label';
+import { Field, FieldLabel } from '@/components/ui/field';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   Dialog,
@@ -179,8 +179,8 @@ export function QueueView({
   if (requests.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center p-16 text-center border rounded-xl bg-muted/20 border-dashed">
-        <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
-          <Package className="h-8 w-8 text-muted-foreground/50" />
+        <div className="size-16 bg-muted rounded-full flex items-center justify-center mb-4">
+          <Package className="size-8 text-muted-foreground/50" />
         </div>
         <h3 className="font-semibold text-lg">Tidak Ada Antrian</h3>
         <p className="text-sm text-muted-foreground mt-1">Semua permintaan sudah terpenuhi.</p>
@@ -193,7 +193,7 @@ export function QueueView({
       {/* Filter bar */}
       <div className="flex flex-col sm:flex-row gap-2 mb-4">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
             placeholder="Cari pembeli atau invoice..."
             value={search}
@@ -258,7 +258,7 @@ export function QueueView({
                     <td className="px-4 py-3 font-medium">{formatRupiah(req.hargaJual)}</td>
                     <td className="px-4 py-3">
                       <span className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
+                        <Clock className="size-3" />
                         {relativeTime(req.createdAt)}
                       </span>
                     </td>
@@ -268,7 +268,7 @@ export function QueueView({
                     <td className="px-4 py-3 text-right">
                       {req.isFulfilled ? (
                         <span className="inline-flex items-center gap-1 text-xs text-success-fg font-medium">
-                          <CheckCircle2 className="h-4 w-4" />
+                          <CheckCircle2 className="size-4" />
                           Selesai
                         </span>
                       ) : (
@@ -284,12 +284,12 @@ export function QueueView({
           </div>
 
           {/* Mobile cards */}
-          <div className="md:hidden space-y-3">
+          <div className="md:hidden flex flex-col gap-3">
             {filtered.map((req) => (
               <Card key={req.id} className={req.isFulfilled ? 'bg-success-bg/40' : ''}>
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0 space-y-1">
+                    <div className="flex-1 min-w-0 flex flex-col gap-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-medium text-sm">{req.entry.buyerName}</span>
                         <StatusBadge status={req.entry.status} />
@@ -305,7 +305,7 @@ export function QueueView({
                           <span className="text-muted-foreground">{req.entry.salesName}</span>
                         )}
                         <span className="text-muted-foreground flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
+                          <Clock className="size-3" />
                           {relativeTime(req.createdAt)}
                         </span>
                       </div>
@@ -315,7 +315,7 @@ export function QueueView({
                     </div>
                     {req.isFulfilled ? (
                       <span className="inline-flex items-center gap-1 text-xs text-success-fg font-medium shrink-0">
-                        <CheckCircle2 className="h-4 w-4" />
+                        <CheckCircle2 className="size-4" />
                         Selesai
                       </span>
                     ) : (
@@ -344,8 +344,8 @@ export function QueueView({
           </DialogHeader>
 
           {fulfillTarget && (
-            <div className="space-y-4">
-              <div className="rounded-lg border bg-muted/30 p-3 text-sm space-y-1">
+            <div className="flex flex-col gap-4">
+              <div className="rounded-lg border bg-muted/30 p-3 text-sm flex flex-col gap-1">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Pembeli</span>
                   <span className="font-medium">{fulfillTarget.entry.buyerName}</span>
@@ -388,8 +388,8 @@ export function QueueView({
 
               <div className={`grid gap-3 pt-2 border-t ${canViewFinancials ? 'grid-cols-2' : 'grid-cols-1'}`}>
                 {canViewFinancials && (
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Harga Modal</Label>
+                  <Field>
+                    <FieldLabel className="text-xs">Harga Modal</FieldLabel>
                     <RupiahInput
                       value={hargaModal}
                       onValueChange={setHargaModal}
@@ -399,17 +399,17 @@ export function QueueView({
                       }
                       className="h-9 text-sm"
                     />
-                  </div>
+                  </Field>
                 )}
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Komisi Sales</Label>
+                <Field>
+                  <FieldLabel className="text-xs">Komisi Sales</FieldLabel>
                   <RupiahInput
                     value={resellerCut}
                     onValueChange={setResellerCut}
                     placeholder={fulfillTarget.resellerCut?.toString() ?? '0'}
                     className="h-9 text-sm"
                   />
-                </div>
+                </Field>
                 {canViewFinancials && pickedId && hargaModal && (
                   <div className="col-span-2 flex justify-between text-sm border-t pt-2">
                     <span className="text-muted-foreground">Estimasi Profit</span>

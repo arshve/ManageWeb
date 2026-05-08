@@ -14,7 +14,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { FieldGroup, Field, FieldLabel } from '@/components/ui/field';
 import {
   Select,
   SelectContent,
@@ -104,84 +104,86 @@ export function UserForm({ user, trigger, isSuperAdmin = false }: UserFormProps)
               {isEdit ? 'Edit User' : 'Tambah User Baru'}
             </DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Nama</Label>
-              <Input
-                id="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-              />
-            </div>
-
-            {!isEdit && (
-              <div className="space-y-2">
-                <Label htmlFor="username">Username</Label>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <FieldGroup>
+              <Field>
+                <FieldLabel htmlFor="name">Nama</FieldLabel>
                 <Input
-                  id="username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  id="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
                   required
                 />
-              </div>
-            )}
+              </Field>
 
-            <div className="space-y-2">
-              <Label htmlFor="password">
-                {isEdit
-                  ? 'Password Baru (kosongkan jika tidak diubah)'
-                  : 'Password'}
-              </Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                minLength={isEdit ? 0 : 4}
-                required={!isEdit}
-              />
-            </div>
+              {!isEdit && (
+                <Field>
+                  <FieldLabel htmlFor="username">Username</FieldLabel>
+                  <Input
+                    id="username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    required
+                  />
+                </Field>
+              )}
 
-            <div className="space-y-2">
-              <Label htmlFor="phone">No. Telepon</Label>
-              <Input
-                id="phone"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-              />
-            </div>
+              <Field>
+                <FieldLabel htmlFor="password">
+                  {isEdit
+                    ? 'Password Baru (kosongkan jika tidak diubah)'
+                    : 'Password'}
+                </FieldLabel>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  minLength={isEdit ? 0 : 4}
+                  required={!isEdit}
+                />
+              </Field>
 
-            <div className="space-y-2">
-              <Label htmlFor="rekBank">Rek. Bank</Label>
-              <Input
-                id="rekBank"
-                value={rekBank}
-                onChange={(e) => setRekBank(e.target.value)}
-                placeholder="BCA 1234567890 a/n Nama"
-              />
-            </div>
+              <Field>
+                <FieldLabel htmlFor="phone">No. Telepon</FieldLabel>
+                <Input
+                  id="phone"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                />
+              </Field>
 
-            <div className="space-y-2">
-              <Label htmlFor="role">Role</Label>
-              <Select
-                value={role}
-                onValueChange={(val) => setRole(val ?? role)}
-              >
-                <SelectTrigger>
-                  <SelectValue>
-                    {{ SUPER_ADMIN: 'Super Admin', ADMIN: 'Admin', SALES: 'Sales', MANAGE: 'Manage', DRIVER: 'Driver' }[role] ?? role}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {isSuperAdmin && <SelectItem value="SUPER_ADMIN">Super Admin</SelectItem>}
-                  <SelectItem value="ADMIN">Admin</SelectItem>
-                  <SelectItem value="SALES">Sales</SelectItem>
-                  <SelectItem value="MANAGE">Manage</SelectItem>
-                  <SelectItem value="DRIVER">Driver</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+              <Field>
+                <FieldLabel htmlFor="rekBank">Rek. Bank</FieldLabel>
+                <Input
+                  id="rekBank"
+                  value={rekBank}
+                  onChange={(e) => setRekBank(e.target.value)}
+                  placeholder="BCA 1234567890 a/n Nama"
+                />
+              </Field>
+
+              <Field>
+                <FieldLabel htmlFor="role">Role</FieldLabel>
+                <Select
+                  value={role}
+                  onValueChange={(val) => setRole(val ?? role)}
+                >
+                  <SelectTrigger>
+                    <SelectValue>
+                      {{ SUPER_ADMIN: 'Super Admin', ADMIN: 'Admin', SALES: 'Sales', MANAGE: 'Manage', DRIVER: 'Driver' }[role] ?? role}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {isSuperAdmin && <SelectItem value="SUPER_ADMIN">Super Admin</SelectItem>}
+                    <SelectItem value="ADMIN">Admin</SelectItem>
+                    <SelectItem value="SALES">Sales</SelectItem>
+                    <SelectItem value="MANAGE">Manage</SelectItem>
+                    <SelectItem value="DRIVER">Driver</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+            </FieldGroup>
 
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Menyimpan...' : isEdit ? 'Simpan' : 'Tambah User'}

@@ -57,7 +57,7 @@ export default function HomePage() {
               className="inline-flex items-center gap-2 bg-[#4a7c59] text-white px-8 py-3.5 rounded-full text-[14px] font-semibold transition-all duration-200 hover:bg-[#3a6347] hover:-translate-y-0.5 hover:shadow-[0_8px_32px_rgba(74,124,89,0.4)]"
             >
               Lihat Katalog
-              <ArrowRight className="w-4 h-4" />
+              <ArrowRight className="size-4" />
             </Link>
             <Link
               href="#about"
@@ -164,7 +164,7 @@ export default function HomePage() {
                     {animal.desc}
                   </p>
                 </div>
-                <div className="space-y-1 text-sm opacity-50">
+                <div className="flex flex-col gap-1 text-sm opacity-50">
                   <p>Berat: {animal.weight}</p>
                   <p>Grade: {animal.grades}</p>
                 </div>
@@ -211,7 +211,7 @@ export default function HomePage() {
             )}
           >
             Buka Katalog
-            <ArrowRight className="h-4 w-4" />
+            <ArrowRight className="size-4" />
           </Link>
         </div>
       </section>

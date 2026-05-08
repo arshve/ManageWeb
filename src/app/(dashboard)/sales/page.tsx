@@ -146,7 +146,7 @@ export default async function SalesPage() {
       description="Ringkasan entry dan penghasilan kamu"
       actions={
         <Link href="/sales/new" className={buttonVariants()}>
-          <Plus className="h-4 w-4 mr-2" />
+          <Plus className="size-4 mr-2" />
           Tambah Entry
         </Link>
       }

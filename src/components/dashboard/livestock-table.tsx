@@ -105,7 +105,7 @@ export async function LivestockTable({
             pricingTemplate={pricingTemplate}
             trigger={
               <Button>
-                <Plus className="h-4 w-4 mr-2" />
+                <Plus className="size-4 mr-2" />
                 Tambah Hewan
               </Button>
             }

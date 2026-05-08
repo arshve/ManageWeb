@@ -22,7 +22,7 @@ export function StatsBar({ livestock }: StatsBarProps) {
       emoji: '✨',
       label: 'Total Tersedia',
       count: livestock.length,
-      bg: 'bg-neutral-100 dark:bg-neutral-800',
+      bg: 'bg-muted',
     },
     {
       emoji: '🐄',
@@ -60,10 +60,10 @@ export function StatsBar({ livestock }: StatsBarProps) {
               {stat.emoji}
             </span>
             <div>
-              <p className="text-2xl font-bold text-neutral-900 dark:text-neutral-100 tabular-nums">
+              <p className="text-2xl font-bold text-foreground tabular-nums">
                 {stat.count}
               </p>
-              <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+              <p className="text-xs text-muted-foreground mt-0.5">
                 {stat.label}
               </p>
             </div>

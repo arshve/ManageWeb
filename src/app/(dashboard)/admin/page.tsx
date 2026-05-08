@@ -160,7 +160,7 @@ export default async function AdminDashboardPage() {
       description="Ringkasan data Millenials Farm"
       actions={
         <Link href="/admin/new" className={cn(buttonVariants({ size: 'sm' }), 'gap-1')}>
-          <Plus className="h-4 w-4" />
+          <Plus className="size-4" />
           Tambah Entry
         </Link>
       }

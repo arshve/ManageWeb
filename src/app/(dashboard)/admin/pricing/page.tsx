@@ -21,7 +21,7 @@ export default async function PricingPage() {
         <PricingForm
           trigger={
             <Button>
-              <Plus className="h-4 w-4 mr-2" />
+              <Plus className="size-4 mr-2" />
               Tambah Harga
             </Button>
           }

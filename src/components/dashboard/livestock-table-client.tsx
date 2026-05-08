@@ -15,7 +15,6 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { LivestockPhoto } from '@/components/dashboard/livestock-photo';
 import { LivestockActions } from '@/components/dashboard/livestock-actions';
 import type { PricingMap } from '@/components/dashboard/livestock-form';
@@ -77,21 +76,21 @@ export interface LivestockItem {
 function ConditionIcon({ condition }: { condition: string }) {
   if (condition === 'SEHAT') {
     return (
-      <span title="Sehat" className="inline-flex text-success-fg">
-        <HeartPulse className="h-4 w-4" />
+      <span title="Sehat" className="inline-flex items-center justify-center size-6 rounded-full bg-success-bg text-success-fg">
+        <HeartPulse className="size-3.5" />
       </span>
     );
   }
   if (condition === 'SAKIT') {
     return (
-      <span title="Sakit" className="inline-flex">
-        <Thermometer className="h-4 w-4" />
+      <span title="Sakit" className="inline-flex items-center justify-center size-6 rounded-full bg-warning-bg text-warning-fg">
+        <Thermometer className="size-3.5" />
       </span>
     );
   }
   return (
-    <span title="Mati" className="inline-flex">
-      <Skull className="h-4 w-4" />
+    <span title="Mati" className="inline-flex items-center justify-center size-6 rounded-full bg-danger-bg text-danger-fg">
+      <Skull className="size-3.5" />
     </span>
   );
 }
@@ -99,14 +98,14 @@ function ConditionIcon({ condition }: { condition: string }) {
 function StatusIcon({ isSold }: { isSold: boolean }) {
   if (isSold) {
     return (
-      <span title="Terjual" className="inline-flex text-warning-fg">
-        <ShoppingBag className="h-4 w-4" />
+      <span title="Terjual" className="inline-flex items-center justify-center size-6 rounded-full bg-muted text-muted-foreground">
+        <ShoppingBag className="size-3.5" />
       </span>
     );
   }
   return (
-    <span title="Tersedia" className="inline-flex text-success-fg">
-      <CircleCheck className="h-4 w-4" />
+    <span title="Tersedia" className="inline-flex items-center justify-center size-6 rounded-full bg-info-bg text-info-fg">
+      <CircleCheck className="size-3.5" />
     </span>
   );
 }
@@ -194,194 +193,121 @@ export function LivestockTableClient({
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
-    <div className="space-y-4">
-      {/* Filter bar with labels */}
-      <div className="flex items-end gap-3 flex-wrap bg-muted/20 p-3 rounded-lg border border-border/50">
-        {/* Search */}
-        <div className="space-y-1.5 w-full sm:w-auto">
-          <Label className="text-xs text-muted-foreground">Cari</Label>
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="SKU, tag, catatan..."
-              className="h-8 pl-8 pr-8 text-xs w-full sm:w-[200px]"
-            />
-            {search && (
-              <button type="button" onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                <X className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
+    <div className="flex flex-col gap-4">
+      {/* Compact filter toolbar */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="SKU, tag, catatan..."
+            className="h-8 pl-8 pr-8 text-xs w-[200px]"
+          />
+          {search && (
+            <button type="button" onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+              <X className="size-3.5" />
+            </button>
+          )}
         </div>
 
-        <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">Jenis Hewan</Label>
-          <Select
-            value={typeFilter}
-            onValueChange={(val) => { setTypeFilter(val ?? typeFilter); setGradeFilter('ALL'); setWeightFilter('ALL'); }}
-          >
-            <SelectTrigger className="h-8 w-[130px] text-xs">
-              <SelectValue>
-                {{ ALL: 'Semua Jenis', KAMBING: 'Kambing', DOMBA: 'Domba', SAPI: 'Sapi' }[typeFilter] ?? typeFilter}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">Semua Jenis</SelectItem>
-              <SelectItem value="KAMBING">Kambing</SelectItem>
-              <SelectItem value="DOMBA">Domba</SelectItem>
-              <SelectItem value="SAPI">Sapi</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <Select value={typeFilter} onValueChange={(val) => { setTypeFilter(val ?? typeFilter); setGradeFilter('ALL'); setWeightFilter('ALL'); }}>
+          <SelectTrigger className="h-8 w-[120px] text-xs">
+            <SelectValue>{{ ALL: 'Semua Jenis', KAMBING: 'Kambing', DOMBA: 'Domba', SAPI: 'Sapi' }[typeFilter] ?? typeFilter}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">Semua Jenis</SelectItem>
+            <SelectItem value="KAMBING">Kambing</SelectItem>
+            <SelectItem value="DOMBA">Domba</SelectItem>
+            <SelectItem value="SAPI">Sapi</SelectItem>
+          </SelectContent>
+        </Select>
 
         {(typeFilter === 'KAMBING' || typeFilter === 'DOMBA') && gradeOptions.length > 0 && (
-          <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">Grade</Label>
-            <Select
-              value={gradeFilter}
-              onValueChange={(val) => setGradeFilter(val ?? gradeFilter)}
-            >
-              <SelectTrigger className="h-8 w-[130px] text-xs">
-                <SelectValue>
-                  {gradeFilter === 'ALL' ? 'Semua Grade' : gradeFilter}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">Semua Grade</SelectItem>
-                {gradeOptions.map((g) => (
-                  <SelectItem key={g} value={g}>{g}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <Select value={gradeFilter} onValueChange={(val) => setGradeFilter(val ?? gradeFilter)}>
+            <SelectTrigger className="h-8 w-[110px] text-xs">
+              <SelectValue>{gradeFilter === 'ALL' ? 'Semua Grade' : gradeFilter}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">Semua Grade</SelectItem>
+              {gradeOptions.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+            </SelectContent>
+          </Select>
         )}
 
-        <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">Status</Label>
-          <Select
-            value={statusFilter}
-            onValueChange={(val) => setStatusFilter(val ?? statusFilter)}
-          >
-            <SelectTrigger className="h-8 w-[130px] text-xs">
-              <SelectValue>
-                {{ ALL: 'Semua Status', AVAILABLE: 'Tersedia', SOLD: 'Terjual' }[statusFilter] ?? statusFilter}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">Semua Status</SelectItem>
-              <SelectItem value="AVAILABLE">Tersedia</SelectItem>
-              <SelectItem value="SOLD">Terjual</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val ?? statusFilter)}>
+          <SelectTrigger className="h-8 w-[110px] text-xs">
+            <SelectValue>{{ ALL: 'Semua Status', AVAILABLE: 'Tersedia', SOLD: 'Terjual' }[statusFilter] ?? statusFilter}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">Semua Status</SelectItem>
+            <SelectItem value="AVAILABLE">Tersedia</SelectItem>
+            <SelectItem value="SOLD">Terjual</SelectItem>
+          </SelectContent>
+        </Select>
 
-        <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">Kondisi</Label>
-          <Select
-            value={conditionFilter}
-            onValueChange={(val) => setConditionFilter(val ?? conditionFilter)}
-          >
-            <SelectTrigger className="h-8 w-[130px] text-xs">
-              <SelectValue>
-                {{ ALL: 'Semua Kondisi', SEHAT: 'Sehat', SAKIT: 'Sakit', MATI: 'Mati' }[conditionFilter] ?? conditionFilter}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">Semua Kondisi</SelectItem>
-              <SelectItem value="SEHAT">Sehat</SelectItem>
-              <SelectItem value="SAKIT">Sakit</SelectItem>
-              <SelectItem value="MATI">Mati</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <Select value={conditionFilter} onValueChange={(val) => setConditionFilter(val ?? conditionFilter)}>
+          <SelectTrigger className="h-8 w-[110px] text-xs">
+            <SelectValue>{{ ALL: 'Semua Kondisi', SEHAT: 'Sehat', SAKIT: 'Sakit', MATI: 'Mati' }[conditionFilter] ?? conditionFilter}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">Semua Kondisi</SelectItem>
+            <SelectItem value="SEHAT">Sehat</SelectItem>
+            <SelectItem value="SAKIT">Sakit</SelectItem>
+            <SelectItem value="MATI">Mati</SelectItem>
+          </SelectContent>
+        </Select>
 
         {weightBuckets.length > 0 && typeFilter !== 'KAMBING' && typeFilter !== 'DOMBA' && (
-          <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">Berat (kg)</Label>
-            <Select
-              value={weightFilter}
-              onValueChange={(val) => setWeightFilter(val ?? weightFilter)}
-            >
-              <SelectTrigger className="h-8 w-[140px] text-xs">
-                <SelectValue>
-                  {weightFilter === 'ALL'
-                    ? 'Semua Berat'
-                    : `${weightFilter}–${Number(weightFilter) + WEIGHT_BUCKET} kg`}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">Semua Berat</SelectItem>
-                {weightBuckets.map((lo) => (
-                  <SelectItem key={lo} value={String(lo)}>
-                    {lo}–{lo + WEIGHT_BUCKET} kg
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-
-        <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">Tag</Label>
-          <Select
-            value={tagFilter}
-            onValueChange={(val) => setTagFilter(val ?? tagFilter)}
-          >
+          <Select value={weightFilter} onValueChange={(val) => setWeightFilter(val ?? weightFilter)}>
             <SelectTrigger className="h-8 w-[130px] text-xs">
               <SelectValue>
-                {{ ALL: 'Semua Tag', WITH_TAG: 'Ada Tag', NO_TAG: 'Tanpa Tag' }[tagFilter] ?? tagFilter}
+                {weightFilter === 'ALL' ? 'Semua Berat' : `${weightFilter}–${Number(weightFilter) + WEIGHT_BUCKET} kg`}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="ALL">Semua Tag</SelectItem>
-              <SelectItem value="WITH_TAG">Ada Tag</SelectItem>
-              <SelectItem value="NO_TAG">Tanpa Tag</SelectItem>
+              <SelectItem value="ALL">Semua Berat</SelectItem>
+              {weightBuckets.map((lo) => (
+                <SelectItem key={lo} value={String(lo)}>{lo}–{lo + WEIGHT_BUCKET} kg</SelectItem>
+              ))}
             </SelectContent>
           </Select>
-        </div>
+        )}
 
-        <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">Urutkan</Label>
-          <Select
-            value={sortOrder}
-            onValueChange={(val) => setSortOrder(val as typeof sortOrder)}
-          >
-            <SelectTrigger className="h-8 w-[160px] text-xs">
-              <SelectValue>
-                {{ newest: 'Terbaru', sku_asc: 'SKU A-Z', sku_desc: 'SKU Z-A', harga_asc: 'Harga ↑', harga_desc: 'Harga ↓' }[sortOrder]}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="newest">Terbaru</SelectItem>
-              <SelectItem value="sku_asc">SKU A-Z</SelectItem>
-              <SelectItem value="sku_desc">SKU Z-A</SelectItem>
-              <SelectItem value="harga_asc">Harga ↑</SelectItem>
-              <SelectItem value="harga_desc">Harga ↓</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <Select value={tagFilter} onValueChange={(val) => setTagFilter(val ?? tagFilter)}>
+          <SelectTrigger className="h-8 w-[110px] text-xs">
+            <SelectValue>{{ ALL: 'Semua Tag', WITH_TAG: 'Ada Tag', NO_TAG: 'Tanpa Tag' }[tagFilter] ?? tagFilter}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">Semua Tag</SelectItem>
+            <SelectItem value="WITH_TAG">Ada Tag</SelectItem>
+            <SelectItem value="NO_TAG">Tanpa Tag</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={sortOrder} onValueChange={(val) => setSortOrder(val as typeof sortOrder)}>
+          <SelectTrigger className="h-8 w-[120px] text-xs">
+            <SelectValue>{{ newest: 'Terbaru', sku_asc: 'SKU A-Z', sku_desc: 'SKU Z-A', harga_asc: 'Harga ↑', harga_desc: 'Harga ↓' }[sortOrder]}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="newest">Terbaru</SelectItem>
+            <SelectItem value="sku_asc">SKU A-Z</SelectItem>
+            <SelectItem value="sku_desc">SKU Z-A</SelectItem>
+            <SelectItem value="harga_asc">Harga ↑</SelectItem>
+            <SelectItem value="harga_desc">Harga ↓</SelectItem>
+          </SelectContent>
+        </Select>
 
         {hasFilters && (
           <button
             type="button"
-            onClick={() => {
-              setSearch('');
-              setTypeFilter('ALL');
-              setStatusFilter('ALL');
-              setConditionFilter('ALL');
-              setGradeFilter('ALL');
-              setWeightFilter('ALL');
-              setTagFilter('ALL');
-              setSortOrder('newest');
-            }}
-            className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors mb-2 ml-1"
+            onClick={() => { setSearch(''); setTypeFilter('ALL'); setStatusFilter('ALL'); setConditionFilter('ALL'); setGradeFilter('ALL'); setWeightFilter('ALL'); setTagFilter('ALL'); setSortOrder('newest'); }}
+            className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors"
           >
             Reset
           </button>
         )}
-        <span className="ml-auto text-xs text-muted-foreground mb-2">
+        <span className="ml-auto text-xs text-muted-foreground">
           {filtered.length} dari {livestock.length} hewan
         </span>
       </div>
@@ -402,8 +328,7 @@ export function LivestockTableClient({
                     <th className="p-3 font-medium text-right">Modal</th>
                   )}
                   <th className="p-3 font-medium text-right">Harga</th>
-                  <th className="p-3 font-medium text-center w-12">Kondisi</th>
-                  <th className="p-3 font-medium text-center w-12">Status</th>
+                  <th className="p-3 font-medium text-center w-16">Info</th>
                   <th className="p-3 font-medium text-left">Pembeli</th>
                   <th className="p-3 font-medium text-left">Sales</th>
                   <th className="p-3 font-medium text-left">Pengiriman</th>
@@ -469,10 +394,10 @@ export function LivestockTableClient({
                         {item.hargaJual ? formatRupiah(item.hargaJual) : '—'}
                       </td>
                       <td className="p-3 text-center">
-                        <ConditionIcon condition={item.condition} />
-                      </td>
-                      <td className="p-3 text-center">
-                        <StatusIcon isSold={item.isSold} />
+                        <div className="inline-flex items-center gap-1">
+                          <ConditionIcon condition={item.condition} />
+                          <StatusIcon isSold={item.isSold} />
+                        </div>
                       </td>
                       <td className="p-3 text-xs whitespace-nowrap">
                         {item.buyerName || (
@@ -527,7 +452,7 @@ export function LivestockTableClient({
           </div>
 
           {/* Mobile card list */}
-          <div className="md:hidden p-3 space-y-3">
+          <div className="md:hidden p-3 flex flex-col gap-3">
             {paginated.map((item) => (
               <MobileLivestockCard
                 key={item.id}
@@ -602,7 +527,7 @@ function MobileLivestockCard({
           <ConditionIcon condition={item.condition} />
           <StatusIcon isSold={item.isSold} />
           <ChevronDown
-            className={`h-4 w-4 text-muted-foreground shrink-0 transition-transform ${
+            className={`size-4 text-muted-foreground shrink-0 transition-transform ${
               expanded ? 'rotate-180' : ''
             }`}
           />

@@ -63,7 +63,7 @@ function UserCard({ user, isSuperAdmin }: { user: UserRow; isSuperAdmin: boolean
             user={user}
             isSuperAdmin={isSuperAdmin}
             trigger={
-              <Button variant="ghost" size="icon" className="h-8 w-8">
+              <Button variant="ghost" size="icon" className="size-8">
                 <Pencil className="h-3.5 w-3.5" />
               </Button>
             }
@@ -140,25 +140,25 @@ export function UsersAdminView({
             type="button"
             onClick={() => setRoleDropdownOpen((o) => !o)}
             className={cn(
-              'h-8 rounded-md border bg-white px-2 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400 flex items-center gap-1.5 whitespace-nowrap dark:bg-input/30',
-              roleFilter.size > 0 ? 'border-gray-500 font-medium' : 'border-gray-300',
+              'h-8 rounded-md border bg-card px-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring flex items-center gap-1.5 whitespace-nowrap dark:bg-input/30',
+              roleFilter.size > 0 ? 'border-border font-medium' : 'border-border',
             )}
           >
             {roleFilter.size === 0
               ? 'Semua Role'
               : Array.from(roleFilter).map((r) => ROLE_LABELS[r] ?? r).join(', ')}
-            <svg className="h-3.5 w-3.5 text-gray-400 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+            <svg className="h-3.5 w-3.5 text-muted-foreground shrink-0" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
             </svg>
           </button>
           {roleDropdownOpen && (
-            <div className="absolute left-0 top-full mt-1 z-50 min-w-[130px] rounded-md border border-gray-200 bg-white shadow-md py-1 dark:bg-popover dark:border-border">
+            <div className="absolute left-0 top-full mt-1 z-50 min-w-[130px] rounded-md border border-border bg-card shadow-md py-1 dark:bg-popover dark:border-border">
               {visibleRoles.map((role) => {
                 const checked = roleFilter.has(role);
                 return (
                   <label
                     key={role}
-                    className="flex items-center gap-2 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 cursor-pointer select-none dark:text-foreground dark:hover:bg-accent"
+                    className="flex items-center gap-2 px-3 py-1.5 text-xs text-foreground hover:bg-accent cursor-pointer select-none"
                   >
                     <input
                       type="checkbox"
@@ -171,7 +171,7 @@ export function UsersAdminView({
                           return next;
                         });
                       }}
-                      className="h-3.5 w-3.5 rounded border-gray-300 accent-gray-700"
+                      className="h-3.5 w-3.5 rounded border-border accent-foreground"
                     />
                     {ROLE_LABELS[role]}
                   </label>
@@ -187,7 +187,7 @@ export function UsersAdminView({
             type="checkbox"
             checked={showInactive}
             onChange={(e) => setShowInactive(e.target.checked)}
-            className="h-3.5 w-3.5 rounded border-gray-300 accent-gray-700"
+            className="h-3.5 w-3.5 rounded border-border accent-foreground"
           />
           Tampilkan nonaktif
         </label>
@@ -196,7 +196,7 @@ export function UsersAdminView({
           <button
             type="button"
             onClick={resetAll}
-            className="text-xs text-gray-400 hover:text-gray-700 underline underline-offset-2"
+            className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
           >
             Reset
           </button>
@@ -243,7 +243,7 @@ export function UsersAdminView({
                     user={user}
                     isSuperAdmin={isSuperAdmin}
                     trigger={
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <Button variant="ghost" size="icon" className="size-8">
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
                     }
@@ -263,7 +263,7 @@ export function UsersAdminView({
       </div>
 
       {/* Mobile cards */}
-      <div className="md:hidden p-3 space-y-2">
+      <div className="md:hidden p-3 flex flex-col gap-2">
         {filtered.map((user) => (
           <UserCard key={user.id} user={user} isSuperAdmin={isSuperAdmin} />
         ))}

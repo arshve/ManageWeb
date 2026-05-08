@@ -63,7 +63,7 @@ export function LivestockActions({ livestock, pricingTemplate }: LivestockAction
         livestock={livestock}
         pricingTemplate={pricingTemplate}
         trigger={
-          <Button variant="ghost" size="icon" className="h-8 w-8">
+          <Button variant="ghost" size="icon" className="size-8">
             <Pencil className="h-3.5 w-3.5" />
           </Button>
         }
@@ -72,7 +72,7 @@ export function LivestockActions({ livestock, pricingTemplate }: LivestockAction
       <Button
         variant="ghost"
         size="icon"
-        className="h-8 w-8 text-destructive"
+        className="size-8 text-destructive"
         onClick={handleDelete}
       >
         <Trash2 className="h-3.5 w-3.5" />

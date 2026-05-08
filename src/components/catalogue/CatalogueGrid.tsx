@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { Beef, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { AnimalCard } from './AnimalCard';
 import { FilterBar, type FilterType, type GradeFilter, type SortOrder } from './FilterBar';
 import { StatsBar } from './StatsBar';
@@ -153,7 +154,7 @@ export function CatalogueGrid({ livestock }: CatalogueGridProps) {
           <EmptyState filter={activeFilter} />
         ) : (
           <>
-            <p className="text-xs text-neutral-400 dark:text-neutral-500 mb-6 font-mono">
+            <p className="text-xs text-muted-foreground mb-6 font-mono">
               {filtered.length} hewan ditemukan
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
@@ -170,17 +171,17 @@ export function CatalogueGrid({ livestock }: CatalogueGridProps) {
                   disabled={safePage === 0}
                   onClick={() => setPage(safePage - 1)}
                   className={[
-                    'inline-flex items-center justify-center w-10 h-10 rounded-full',
-                    'border border-neutral-200 dark:border-neutral-800',
-                    'text-neutral-600 dark:text-neutral-400',
-                    'hover:bg-neutral-100 dark:hover:bg-neutral-800',
+                    'inline-flex items-center justify-center size-10 rounded-full',
+                    'border border-border',
+                    'text-muted-foreground',
+                    'hover:bg-accent',
                     'disabled:opacity-30 disabled:cursor-not-allowed',
                     'transition-all duration-200',
                   ].join(' ')}
                 >
-                  <ChevronLeft className="w-4 h-4" />
+                  <ChevronLeft className="size-4" />
                 </button>
-                <span className="text-sm text-neutral-500 dark:text-neutral-400 tabular-nums">
+                <span className="text-sm text-muted-foreground tabular-nums">
                   {safePage + 1} / {totalPages}
                 </span>
                 <button
@@ -188,15 +189,15 @@ export function CatalogueGrid({ livestock }: CatalogueGridProps) {
                   disabled={safePage >= totalPages - 1}
                   onClick={() => setPage(safePage + 1)}
                   className={[
-                    'inline-flex items-center justify-center w-10 h-10 rounded-full',
-                    'border border-neutral-200 dark:border-neutral-800',
-                    'text-neutral-600 dark:text-neutral-400',
-                    'hover:bg-neutral-100 dark:hover:bg-neutral-800',
+                    'inline-flex items-center justify-center size-10 rounded-full',
+                    'border border-border',
+                    'text-muted-foreground',
+                    'hover:bg-accent',
                     'disabled:opacity-30 disabled:cursor-not-allowed',
                     'transition-all duration-200',
                   ].join(' ')}
                 >
-                  <ChevronRight className="w-4 h-4" />
+                  <ChevronRight className="size-4" />
                 </button>
               </div>
             )}
@@ -211,34 +212,26 @@ export function CatalogueGrid({ livestock }: CatalogueGridProps) {
 export function CatalogueGridSkeleton() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-      {/* Stats skeleton */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div
-            key={i}
-            className="h-24 rounded-2xl bg-neutral-200 dark:bg-neutral-800 animate-pulse"
-          />
+          <Skeleton key={i} className="h-24 rounded-2xl" />
         ))}
       </div>
-
-      {/* Grid skeleton */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
         {Array.from({ length: 6 }).map((_, i) => (
           <div
             key={i}
-            className="rounded-2xl lg:rounded-3xl overflow-hidden border border-neutral-200/80 dark:border-neutral-800 animate-pulse"
+            className="rounded-2xl lg:rounded-3xl overflow-hidden border"
             style={{ animationDelay: `${i * 80}ms` }}
           >
-            {/* Image placeholder */}
-            <div className="aspect-[4/3] bg-neutral-200 dark:bg-neutral-800" />
-            {/* Content placeholder */}
-            <div className="p-4 space-y-3">
-              <div className="h-4 bg-neutral-200 dark:bg-neutral-800 rounded-lg w-3/4" />
-              <div className="h-3 bg-neutral-100 dark:bg-neutral-800/60 rounded-lg w-1/2" />
-              <div className="h-3 bg-neutral-100 dark:bg-neutral-800/60 rounded-lg w-2/5" />
-              <div className="pt-2 border-t border-neutral-100 dark:border-neutral-800 space-y-3">
-                <div className="h-6 bg-neutral-200 dark:bg-neutral-800 rounded-lg w-1/2" />
-                <div className="h-11 bg-neutral-200 dark:bg-neutral-800 rounded-xl" />
+            <Skeleton className="aspect-[4/3] rounded-none" />
+            <div className="p-4 flex flex-col gap-3">
+              <Skeleton className="h-4 w-3/4 rounded-lg" />
+              <Skeleton className="h-3 w-1/2 rounded-lg" />
+              <Skeleton className="h-3 w-2/5 rounded-lg" />
+              <div className="pt-2 border-t flex flex-col gap-3">
+                <Skeleton className="h-6 w-1/2 rounded-lg" />
+                <Skeleton className="h-11 rounded-xl" />
               </div>
             </div>
           </div>
@@ -259,14 +252,14 @@ function EmptyState({ filter }: { filter: FilterType }) {
 
   return (
     <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
-      <div className="w-20 h-20 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center">
-        <Beef className="w-10 h-10 text-neutral-300 dark:text-neutral-600" />
+      <div className="size-20 rounded-full bg-muted flex items-center justify-center">
+        <Beef className="size-10 text-muted-foreground" />
       </div>
       <div>
-        <p className="text-lg font-semibold text-neutral-700 dark:text-neutral-300">
+        <p className="text-lg font-semibold text-foreground">
           Tidak ada {typeMap[filter]} tersedia
         </p>
-        <p className="text-sm text-neutral-400 dark:text-neutral-500 mt-1">
+        <p className="text-sm text-muted-foreground mt-1">
           Silakan cek kembali nanti atau pilih kategori lain.
         </p>
       </div>

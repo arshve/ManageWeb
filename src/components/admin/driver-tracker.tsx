@@ -47,7 +47,7 @@ export function DriverTracker({ initial }: { initial: DriverLoc[] }) {
     };
   }, []);
   return (
-    <ul className="text-sm space-y-1 border rounded-lg p-3">
+    <ul className="text-sm flex flex-col gap-1 border rounded-lg p-3">
       {drivers.length === 0 && (
         <li className="text-muted-foreground text-xs">
           Belum ada driver terdaftar.

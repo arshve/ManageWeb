@@ -51,3 +51,7 @@ next-env.d.ts
 # Ignore AI instructions
 CLAUDE.md
 AGENT.md
+
+# Ignore AI tool directories
+.claude/
+.agents/

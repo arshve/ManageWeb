@@ -69,7 +69,7 @@ export default async function PublicLayout({
               <h4 className="text-sm font-semibold tracking-wide uppercase opacity-40 mb-4">
                 Kontak
               </h4>
-              <div className="space-y-2 text-sm opacity-60">
+              <div className="flex flex-col gap-2 text-sm opacity-60">
                 <p>Instagram: @millenialsfarm_</p>
                 <p>PT. Millenials Farm Abadi</p>
               </div>

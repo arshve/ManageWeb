@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { RupiahInput } from '@/components/ui/rupiah-input';
-import { Label } from '@/components/ui/label';
+import { Field, FieldLabel } from '@/components/ui/field';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
@@ -78,7 +78,7 @@ function SectionCard({
           {title}
         </h3>
       </div>
-      <div className="p-5 space-y-4">{children}</div>
+      <div className="p-5 flex flex-col gap-4">{children}</div>
     </section>
   );
 }
@@ -212,7 +212,7 @@ export function AdminNewEntryForm({ canViewFinancials }: { canViewFinancials: bo
       title="Tambah Entry Baru"
       description="Pilih sales, hewan, dan isi data pembeli (Otomatis Disetujui)"
     >
-      <form action={handleSubmit} className="space-y-4 max-w-2xl">
+      <form action={handleSubmit} className="flex flex-col gap-4 max-w-2xl">
         <input type="hidden" name="pengiriman" value={pengiriman} />
 
         {/* ── Mode Toggle ── */}
@@ -308,7 +308,7 @@ export function AdminNewEntryForm({ canViewFinancials }: { canViewFinancials: bo
             />
 
             {selectedItems.length > 0 && (
-              <div className="border-t pt-4 space-y-2">
+              <div className="border-t pt-4 flex flex-col gap-2">
                 <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
                   {selectedItems.length} hewan dipilih
                 </p>
@@ -335,42 +335,42 @@ export function AdminNewEntryForm({ canViewFinancials }: { canViewFinancials: bo
                             canViewFinancials ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2'
                           }`}
                         >
-                          <div className="space-y-1">
-                            <Label className="text-[10px]">Tag</Label>
+                          <Field>
+                            <FieldLabel className="text-[10px]">Tag</FieldLabel>
                             <Input
                               value={item.tag}
                               readOnly
                               className="h-7 text-xs bg-muted/50 cursor-default"
                             />
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-[10px]">Harga Jual *</Label>
+                          </Field>
+                          <Field>
+                            <FieldLabel className="text-[10px]">Harga Jual *</FieldLabel>
                             <RupiahInput
                               value={item.hargaJual}
                               onValueChange={(v) => updateItem(lv.id, 'hargaJual', v)}
                               className="h-7 text-xs"
                               placeholder="3500000"
                             />
-                          </div>
+                          </Field>
                           {canViewFinancials && (
                             <>
-                              <div className="space-y-1">
-                                <Label className="text-[10px]">Modal</Label>
+                              <Field>
+                                <FieldLabel className="text-[10px]">Modal</FieldLabel>
                                 <RupiahInput
                                   value={item.hargaModal}
                                   onValueChange={(v) => updateItem(lv.id, 'hargaModal', v)}
                                   className="h-7 text-xs"
                                   placeholder="2500000"
                                 />
-                              </div>
-                              <div className="space-y-1">
-                                <Label className="text-[10px]">Profit</Label>
+                              </Field>
+                              <Field>
+                                <FieldLabel className="text-[10px]">Profit</FieldLabel>
                                 <div className="h-7 flex items-center text-xs px-2 text-muted-foreground">
                                   {item.hargaJual && item.hargaModal
                                     ? formatRupiah(Number(item.hargaJual) - Number(item.hargaModal))
                                     : '—'}
                                 </div>
-                              </div>
+                              </Field>
                             </>
                           )}
                         </div>
@@ -380,7 +380,7 @@ export function AdminNewEntryForm({ canViewFinancials }: { canViewFinancials: bo
                         onClick={() => handleToggle(lv.id)}
                         className="text-muted-foreground hover:text-destructive mt-0.5 shrink-0 transition-colors"
                       >
-                        <X className="h-4 w-4" />
+                        <X className="size-4" />
                       </button>
                     </div>
                   );
@@ -432,26 +432,26 @@ export function AdminNewEntryForm({ canViewFinancials }: { canViewFinancials: bo
 
         {/* ── Data Pembeli ── */}
         <SectionCard title="Data Pembeli">
-          <div className="space-y-1.5">
-            <Label htmlFor="buyerName">Nama Pembeli *</Label>
+          <Field>
+            <FieldLabel htmlFor="buyerName">Nama Pembeli *</FieldLabel>
             <Input id="buyerName" name="buyerName" required />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="buyerPhone">No. Telepon</Label>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="buyerPhone">No. Telepon</FieldLabel>
             <Input id="buyerPhone" name="buyerPhone" type="tel" />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="buyerAddress">Alamat Lengkap</Label>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="buyerAddress">Alamat Lengkap</FieldLabel>
             <Textarea id="buyerAddress" name="buyerAddress" rows={2} />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="buyerMaps">Link Google Maps</Label>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="buyerMaps">Link Google Maps</FieldLabel>
             <Input
               id="buyerMaps"
               name="buyerMaps"
               placeholder="https://maps.google.com/..."
             />
-          </div>
+          </Field>
         </SectionCard>
 
         {/* ── Pengiriman (Langsung only) ── */}
@@ -490,8 +490,8 @@ export function AdminNewEntryForm({ canViewFinancials }: { canViewFinancials: bo
               </span>
             </div>
           )}
-          <div className="space-y-1.5">
-            <Label>Status Pembayaran</Label>
+          <Field>
+            <FieldLabel>Status Pembayaran</FieldLabel>
             <Select
               value={paymentStatus}
               onValueChange={(val) => setPaymentStatus(val ?? 'BELUM_BAYAR')}
@@ -505,17 +505,17 @@ export function AdminNewEntryForm({ canViewFinancials }: { canViewFinancials: bo
                 <SelectItem value="LUNAS" label="Lunas">Lunas</SelectItem>
               </SelectContent>
             </Select>
-          </div>
+          </Field>
           {paymentStatus === 'DP' && (
-            <div className="space-y-1.5">
-              <Label htmlFor="dp">Jumlah DP</Label>
+            <Field>
+              <FieldLabel htmlFor="dp">Jumlah DP</FieldLabel>
               <RupiahInput id="dp" name="dp" placeholder="1000000" />
-            </div>
+            </Field>
           )}
-          <div className="space-y-1.5">
-            <Label>Bukti Transfer</Label>
+          <Field>
+            <FieldLabel>Bukti Transfer</FieldLabel>
             <BuktiTransferUpload onChange={setBuktiTransferUrls} />
-          </div>
+          </Field>
         </SectionCard>
 
         {/* ── Catatan ── */}

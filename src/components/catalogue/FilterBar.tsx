@@ -65,12 +65,12 @@ export function FilterBar({
     <div
       className={[
         'sticky top-0 z-20',
-        'bg-neutral-50/90 dark:bg-neutral-950/90 backdrop-blur-md',
-        'border-b border-neutral-200/60 dark:border-neutral-800/60',
+        'bg-card/90 backdrop-blur-md',
+        'border-b border-border/60',
         'py-3',
       ].join(' ')}
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-2.5">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col gap-2.5">
         {/* Row 1: Type pills + Sort */}
         <div className="flex items-center gap-2 overflow-x-auto scrollbar-none scroll-smooth snap-x snap-mandatory">
           {/* Filter pills */}
@@ -92,12 +92,12 @@ export function FilterBar({
                     'text-sm font-medium whitespace-nowrap',
                     'transition-all duration-200',
                     isActive
-                      ? 'bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900 shadow-sm'
+                      ? 'bg-primary text-primary-foreground shadow-sm'
                       : [
-                          'bg-white dark:bg-neutral-900',
-                          'text-neutral-600 dark:text-neutral-400',
-                          'border border-neutral-200 dark:border-neutral-800',
-                          'hover:border-neutral-400 dark:hover:border-neutral-600',
+                          'bg-card',
+                          'text-muted-foreground',
+                          'border border-border',
+                          'hover:border-border',
                           'active:scale-95',
                         ].join(' '),
                   ].join(' ')}
@@ -115,8 +115,8 @@ export function FilterBar({
                       className={[
                         'text-[10px] font-bold tabular-nums px-1.5 py-0.5 rounded-full',
                         isActive
-                          ? 'bg-white/20 text-white dark:bg-neutral-900/20 dark:text-neutral-900'
-                          : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400',
+                          ? 'bg-primary-foreground/20 text-primary-foreground'
+                          : 'bg-muted text-muted-foreground',
                       ].join(' ')}
                     >
                       {count}
@@ -128,11 +128,11 @@ export function FilterBar({
           </div>
 
           {/* Divider */}
-          <div className="w-px h-6 bg-neutral-200 dark:bg-neutral-700 shrink-0 mx-1" />
+          <div className="w-px h-6 bg-border shrink-0 mx-1" />
 
           {/* Sort */}
           <div className="flex items-center gap-1.5 shrink-0">
-            <SlidersHorizontal className="w-3.5 h-3.5 text-neutral-400 dark:text-neutral-500 shrink-0" />
+            <SlidersHorizontal className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
             {SORT_OPTIONS.map((opt) => {
               const isActive = activeSort === opt.key;
               return (
@@ -146,8 +146,8 @@ export function FilterBar({
                     'text-sm whitespace-nowrap',
                     'transition-all duration-200',
                     isActive
-                      ? 'font-semibold text-neutral-900 dark:text-neutral-100 underline underline-offset-4 decoration-2 decoration-[var(--success-ring)]'
-                      : 'font-normal text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300 active:scale-95',
+                      ? 'font-semibold text-foreground underline underline-offset-4 decoration-2 decoration-[var(--success-ring)]'
+                      : 'font-normal text-muted-foreground hover:text-foreground active:scale-95',
                   ].join(' ')}
                 >
                   {opt.label}
@@ -160,7 +160,7 @@ export function FilterBar({
         {/* Row 2: Grade pills (hidden for Sapi) */}
         {showGrades && (
           <div className="flex items-center gap-2 overflow-x-auto scrollbar-none">
-            <span className="text-xs text-neutral-400 dark:text-neutral-500 shrink-0">Grade:</span>
+            <span className="text-xs text-muted-foreground shrink-0">Grade:</span>
             {GRADE_OPTIONS.map((g) => {
               const isActive = activeGrade === g.key;
               return (
@@ -172,12 +172,12 @@ export function FilterBar({
                     'inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap',
                     'transition-all duration-200',
                     isActive
-                      ? 'bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900'
+                      ? 'bg-primary text-primary-foreground'
                       : [
-                          'bg-white dark:bg-neutral-900',
-                          'text-neutral-500 dark:text-neutral-400',
-                          'border border-neutral-200 dark:border-neutral-800',
-                          'hover:border-neutral-400 dark:hover:border-neutral-600',
+                          'bg-card',
+                          'text-muted-foreground',
+                          'border border-border',
+                          'hover:border-border',
                           'active:scale-95',
                         ].join(' '),
                   ].join(' ')}
@@ -192,7 +192,7 @@ export function FilterBar({
         {/* Row 3: Weight pills */}
         {weightOptions.length > 0 && (
           <div className="flex items-center gap-2 overflow-x-auto scrollbar-none">
-            <span className="text-xs text-neutral-400 dark:text-neutral-500 shrink-0">Berat:</span>
+            <span className="text-xs text-muted-foreground shrink-0">Berat:</span>
             <button
               type="button"
               onClick={() => onWeightChange('ALL')}
@@ -200,12 +200,12 @@ export function FilterBar({
                 'inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap',
                 'transition-all duration-200',
                 activeWeight === 'ALL'
-                  ? 'bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900'
+                  ? 'bg-primary text-primary-foreground'
                   : [
-                      'bg-white dark:bg-neutral-900',
-                      'text-neutral-500 dark:text-neutral-400',
-                      'border border-neutral-200 dark:border-neutral-800',
-                      'hover:border-neutral-400 dark:hover:border-neutral-600',
+                      'bg-card',
+                      'text-muted-foreground',
+                      'border border-border',
+                      'hover:border-border',
                       'active:scale-95',
                     ].join(' '),
               ].join(' ')}
@@ -223,12 +223,12 @@ export function FilterBar({
                     'inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap',
                     'transition-all duration-200',
                     isActive
-                      ? 'bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900'
+                      ? 'bg-primary text-primary-foreground'
                       : [
-                          'bg-white dark:bg-neutral-900',
-                          'text-neutral-500 dark:text-neutral-400',
-                          'border border-neutral-200 dark:border-neutral-800',
-                          'hover:border-neutral-400 dark:hover:border-neutral-600',
+                          'bg-card',
+                          'text-muted-foreground',
+                          'border border-border',
+                          'hover:border-border',
                           'active:scale-95',
                         ].join(' '),
                   ].join(' ')}
@@ -246,7 +246,7 @@ export function FilterBar({
             <button
               type="button"
               onClick={onReset}
-              className="text-xs text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300 underline underline-offset-2"
+              className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
             >
               Reset filter
             </button>

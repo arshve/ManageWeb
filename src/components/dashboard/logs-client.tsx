@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
+import { StatusToken } from '@/components/ui/status-token';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -340,19 +341,18 @@ function FallbackPayload({ payload }: { payload: unknown }) {
   );
 }
 
+const ACTION_STATUS = {
+  CREATE: { intent: 'info',    label: 'CREATE' },
+  UPDATE: { intent: 'warning', label: 'UPDATE' },
+  DELETE: { intent: 'danger',  label: 'DELETE' },
+} as const;
+
 function ActionBadge({ action }: { action: LogItem['action'] }) {
-  const map = {
-    CREATE: 'bg-primary/10 text-primary',
-    UPDATE: 'bg-yellow-500/10 text-yellow-700',
-    DELETE: 'bg-destructive/10 text-destructive',
-  } as const;
+  const ds = ACTION_STATUS[action] ?? ACTION_STATUS.UPDATE;
   return (
-    <Badge
-      variant="outline"
-      className={`${map[action] ?? ''} text-[10px] shrink-0 mt-0.5`}
-    >
-      {action}
-    </Badge>
+    <StatusToken intent={ds.intent} size="sm" className="shrink-0 mt-0.5 font-mono">
+      {ds.label}
+    </StatusToken>
   );
 }
 

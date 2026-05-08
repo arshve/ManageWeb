@@ -27,6 +27,32 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { formatRupiah, formatWeight } from '@/lib/format';
+import { StatusToken, DELIVERY_STATUS } from '@/components/ui/status-token';
+
+const GRADE_COLORS: Record<string, { bg: string; color: string }> = {
+  Super: { bg: 'var(--warning-bg)', color: 'var(--warning-fg)' },
+  A:     { bg: 'var(--success-bg)', color: 'var(--success-fg)' },
+  B:     { bg: 'var(--info-bg)',    color: 'var(--info-fg)'    },
+  C:     { bg: 'var(--neutral-bg)', color: 'var(--neutral-fg)' },
+  D:     { bg: 'var(--danger-bg)',  color: 'var(--danger-fg)'  },
+};
+
+function GradeChip({ grade }: { grade: string }) {
+  const colors = GRADE_COLORS[grade];
+  return (
+    <span
+      className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold"
+      style={colors ? { background: colors.bg, color: colors.color } : undefined}
+    >
+      {grade}
+    </span>
+  );
+}
+
+function DeliveryBadge({ status }: { status: string }) {
+  const ds = DELIVERY_STATUS[status as keyof typeof DELIVERY_STATUS] ?? { intent: 'neutral' as const, label: status };
+  return <StatusToken intent={ds.intent} size="sm">{ds.label}</StatusToken>;
+}
 
 export interface LivestockItem {
   id: string;
@@ -51,7 +77,7 @@ export interface LivestockItem {
 function ConditionIcon({ condition }: { condition: string }) {
   if (condition === 'SEHAT') {
     return (
-      <span title="Sehat" className="inline-flex text-green-600">
+      <span title="Sehat" className="inline-flex text-success-fg">
         <HeartPulse className="h-4 w-4" />
       </span>
     );
@@ -73,13 +99,13 @@ function ConditionIcon({ condition }: { condition: string }) {
 function StatusIcon({ isSold }: { isSold: boolean }) {
   if (isSold) {
     return (
-      <span title="Terjual" className="inline-flex text-yellow-600">
+      <span title="Terjual" className="inline-flex text-warning-fg">
         <ShoppingBag className="h-4 w-4" />
       </span>
     );
   }
   return (
-    <span title="Tersedia" className="inline-flex text-green-600">
+    <span title="Tersedia" className="inline-flex text-success-fg">
       <CircleCheck className="h-4 w-4" />
     </span>
   );
@@ -271,7 +297,7 @@ export function LivestockTableClient({
           </Select>
         </div>
 
-        {weightBuckets.length > 0 && (
+        {weightBuckets.length > 0 && typeFilter !== 'KAMBING' && typeFilter !== 'DOMBA' && (
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">Berat (kg)</Label>
             <Select
@@ -419,16 +445,17 @@ export function LivestockTableClient({
                       </td>
                       <td className="p-3 text-center whitespace-nowrap">
                         {item.type === 'SAPI' ? (
-                          <span className="tabular-nums">
+                          <span className="tabular-nums text-xs">
                             {formatWeight(item.weightMin, item.weightMax) ?? '—'}
                           </span>
                         ) : item.grade ? (
-                          <Badge
-                            variant="outline"
-                            className={isMati ? 'border-white/40 text-white' : ''}
-                          >
-                            {item.grade}
-                          </Badge>
+                          isMati ? (
+                            <Badge variant="outline" className="border-white/40 text-white text-[11px]">
+                              {item.grade}
+                            </Badge>
+                          ) : (
+                            <GradeChip grade={item.grade} />
+                          )
                         ) : (
                           <span className={mutedClass}>—</span>
                         )}
@@ -461,16 +488,13 @@ export function LivestockTableClient({
                         {item.deliveryStatus ? (
                           <div className="flex items-center gap-1.5">
                             <span>{item.driverName ?? '—'}</span>
-                            <Badge
-                              variant="outline"
-                              className={
-                                isMati
-                                  ? 'border-white/40 text-white text-[10px]'
-                                  : 'text-[10px]'
-                              }
-                            >
-                              {item.deliveryStatus}
-                            </Badge>
+                            {isMati ? (
+                              <Badge variant="outline" className="border-white/40 text-white text-[10px]">
+                                {item.deliveryStatus}
+                              </Badge>
+                            ) : (
+                              <DeliveryBadge status={item.deliveryStatus} />
+                            )}
                           </div>
                         ) : (
                           <span className={mutedClass}>—</span>
@@ -603,9 +627,7 @@ function MobileLivestockCard({
             ) : (
               <LivestockCardRow
                 label="Grade"
-                value={
-                  item.grade ? <Badge variant="outline">{item.grade}</Badge> : '—'
-                }
+                value={item.grade ? <GradeChip grade={item.grade} /> : '—'}
               />
             )}
             {canViewFinancials && (
@@ -652,9 +674,7 @@ function MobileLivestockCard({
                 item.deliveryStatus ? (
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span>{item.driverName ?? '—'}</span>
-                    <Badge variant="outline" className="text-[10px]">
-                      {item.deliveryStatus}
-                    </Badge>
+                    <DeliveryBadge status={item.deliveryStatus} />
                   </div>
                 ) : (
                   <span className="text-muted-foreground">—</span>

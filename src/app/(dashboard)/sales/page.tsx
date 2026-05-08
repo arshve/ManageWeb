@@ -1,12 +1,14 @@
 import { prisma } from '@/lib/prisma';
 import { requireAuth } from '@/lib/auth';
-import { formatRupiah, formatDateTime } from '@/lib/format';
+import { formatRupiah } from '@/lib/format';
 import { DashboardShell } from '@/components/dashboard/dashboard-shell';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { buttonVariants } from '@/components/ui/button';
-import { Plus, DollarSign, ClipboardList, Clock } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import Link from 'next/link';
 import { EntryTable } from '@/components/dashboard/entry-table';
+import { StatCard } from '@/components/ui/stat-card';
+
+const SERIF = "var(--font-dm-serif), 'DM Serif Display', serif";
 
 export default async function SalesPage() {
   const profile = await requireAuth();
@@ -32,7 +34,6 @@ export default async function SalesPage() {
     }),
   ]);
 
-  // Batch-fetch new livestock info for diff display
   const pendingEditLivestockIds = entries
     .flatMap((e) => e.editRequests)
     .flatMap((req) => (req.itemChanges as Array<{ entryItemId: string; livestockId: string; hargaJual: number }>).map((ic) => ic.livestockId));
@@ -150,50 +151,20 @@ export default async function SalesPage() {
         </Link>
       }
     >
-      <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 mb-6 [&>*:last-child:nth-child(odd)]:col-span-2 [&>*:last-child:nth-child(odd)]:sm:col-span-1">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Komisi</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-primary">{formatRupiah(totalEarnings)}</div>
-            <p className="text-xs text-muted-foreground mt-1">Dari {approved.length} penjualan disetujui</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Penjualan</CardTitle>
-            <ClipboardList className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatRupiah(totalSalesAmount)}</div>
-            <p className="text-xs text-muted-foreground mt-1">{entries.length} entry total</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Menunggu Approval</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">{pending.length}</div>
-            <p className="text-xs text-muted-foreground mt-1">Entry belum disetujui</p>
-          </CardContent>
-        </Card>
+      <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 mb-6 [&>*:last-child:nth-child(odd)]:col-span-2 [&>*:last-child:nth-child(odd)]:sm:col-span-1">
+        <StatCard accent="success" label="Total Komisi"        value={formatRupiah(totalEarnings)}   sub={`Dari ${approved.length} penjualan disetujui`} />
+        <StatCard accent="info"    label="Total Penjualan"     value={formatRupiah(totalSalesAmount)} sub={`${entries.length} entry total`} />
+        <StatCard accent={pending.length > 0 ? 'warning' : 'neutral'} label="Menunggu Approval" value={pending.length} sub="Entry belum disetujui" />
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Entry Saya</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <EntryTable
-            entries={serialized}
-            isAdmin={false}
-          />
-        </CardContent>
-      </Card>
+      <div className="rounded-xl border bg-card overflow-hidden">
+        <div className="px-6 py-4 border-b">
+          <h2 className="text-base font-semibold" style={{ fontFamily: SERIF }}>
+            Entry Saya
+          </h2>
+        </div>
+        <EntryTable entries={serialized} isAdmin={false} />
+      </div>
     </DashboardShell>
   );
 }

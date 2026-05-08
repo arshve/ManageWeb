@@ -2,13 +2,16 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import { compressImage } from '@/lib/image';
+
 import { cn } from '@/lib/utils';
+import { StatusToken, intentVars, DELIVERY_STATUS } from '@/components/ui/status-token';
+
+const SERIF = "var(--font-dm-serif), 'DM Serif Display', serif";
 import {
   startDeliveryRun,
   markDelivered,
@@ -25,6 +28,8 @@ import {
   Navigation,
   Clock,
   CalendarDays,
+  Camera,
+  X,
 } from 'lucide-react';
 
 type Stop = {
@@ -33,6 +38,7 @@ type Stop = {
   status: string;
   deliveredAt: string | null;
   notes: string | null;
+  proofPhotoUrl: string | null;
   entry: {
     buyerName: string;
     buyerPhone: string | null;
@@ -151,16 +157,16 @@ export function DriverRunView({
         {/* Progress Bar */}
         {stops.length > 0 && (
           <div className="mt-3">
-            <div className="flex justify-between text-xs font-medium mb-1">
-              <span className="text-muted-foreground">Progress Pengiriman</span>
-              <span className="text-primary">
-                {deliveredCount} / {stops.length} Selesai
+            <div className="flex justify-between text-xs font-medium mb-1.5">
+              <span className="text-muted-foreground uppercase tracking-[0.08em] text-[10px] font-bold">Progress</span>
+              <span className="text-sm font-bold text-success-fg" style={{ fontFamily: SERIF }}>
+                {deliveredCount} / {stops.length}
               </span>
             </div>
-            <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+            <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
               <div
-                className="h-full bg-primary transition-all duration-500 ease-in-out"
-                style={{ width: `${progress}%` }}
+                className="h-full rounded-full transition-all duration-500 ease-in-out"
+                style={{ width: `${progress}%`, background: 'var(--success-ring)' }}
               />
             </div>
           </div>
@@ -169,20 +175,26 @@ export function DriverRunView({
 
       {/* ── Start Route Button ── */}
       {isToday && notStarted && (
-        <Button
-          size="lg"
-          className="w-full text-base font-semibold shadow-lg shadow-primary/20 h-14"
+        <button
+          className="w-full h-14 rounded-xl text-base font-bold flex items-center justify-center gap-2.5 transition-all disabled:opacity-60"
+          style={{ background: 'var(--primary)', color: 'var(--sidebar-primary)', fontFamily: SERIF, boxShadow: '0 4px 24px oklch(0.22 0.065 145 / 0.25)' }}
           onClick={handleStart}
           disabled={pending}
         >
-          <Navigation className="mr-2 h-5 w-5" />
+          <Navigation className="h-5 w-5" />
           Mulai Perjalanan Rute
-        </Button>
+        </button>
       )}
 
-      {/* ── Stop Cards ── */}
+      {/* ── Stop Cards ── active first, done/failed last */}
       <div className="space-y-4">
-        {stops.map((s) => (
+        {[...stops]
+          .sort((a, b) => {
+            const done = (s: Stop) => s.status === 'DELIVERED' || s.status === 'FAILED';
+            if (done(a) !== done(b)) return done(a) ? 1 : -1;
+            return (a.sequence ?? 0) - (b.sequence ?? 0);
+          })
+          .map((s) => (
           <StopCard
             key={s.id}
             stop={s}
@@ -193,12 +205,12 @@ export function DriverRunView({
 
         {stops.length === 0 && (
           <div className="flex flex-col items-center justify-center p-12 text-center border rounded-xl bg-muted/20 border-dashed mt-8">
-            <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
-              <Clock className="h-8 w-8 text-muted-foreground/50" />
+            <div className="w-14 h-14 rounded-full flex items-center justify-center mb-4 bg-primary/10">
+              <Clock className="h-7 w-7 text-success-fg" />
             </div>
-            <h3 className="font-semibold text-lg">Tidak Ada Jadwal</h3>
+            <h3 className="font-bold text-lg" style={{ fontFamily: SERIF }}>Tidak Ada Jadwal</h3>
             <p className="text-sm text-muted-foreground mt-1 max-w-xs">
-              Anda tidak memiliki jadwal pengiriman untuk tanggal ini.
+              Tidak ada pengiriman untuk tanggal ini.
             </p>
           </div>
         )}
@@ -217,8 +229,24 @@ function StopCard({
   readOnly: boolean;
 }) {
   const [notes, setNotes] = useState('');
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const done = stop.status === 'DELIVERED' || stop.status === 'FAILED';
+
+  async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const compressed = await compressImage(file);
+    setPhotoFile(compressed);
+    setPhotoPreview(URL.createObjectURL(compressed));
+  }
+
+  function clearPhoto() {
+    setPhotoFile(null);
+    if (photoPreview) URL.revokeObjectURL(photoPreview);
+    setPhotoPreview(null);
+  }
 
   const mapsHref = navigationUrl({
     buyerMaps: stop.entry.buyerMaps,
@@ -233,7 +261,21 @@ function StopCard({
 
   async function handleDelivered() {
     setBusy(true);
-    const r = await markDelivered(stop.id, notes || undefined);
+    let proofUrl: string | undefined;
+    if (photoFile) {
+      const fd = new FormData();
+      fd.append('file', photoFile);
+      const res = await fetch('/api/upload?folder=delivery-proof', { method: 'POST', body: fd });
+      if (res.ok) {
+        const { url } = await res.json() as { url: string };
+        proofUrl = url;
+      } else {
+        toast.error('Gagal upload foto bukti — coba lagi');
+        setBusy(false);
+        return;
+      }
+    }
+    const r = await markDelivered(stop.id, notes || undefined, proofUrl);
     if ('error' in r) toast.error(r.error);
     else toast.success('Berhasil ditandai terkirim!');
     setBusy(false);
@@ -253,57 +295,44 @@ function StopCard({
   }
 
 
+  const ds = DELIVERY_STATUS[stop.status] ?? DELIVERY_STATUS.ASSIGNED;
+
   return (
-    <Card
+    <div
       className={cn(
-        'overflow-hidden transition-all duration-300',
-        isCurrent
-          ? 'border-primary shadow-md ring-1 ring-primary/20 scale-[1.01]'
-          : '',
-        done ? 'opacity-75 bg-muted/30' : '',
+        'rounded-xl border bg-card overflow-hidden transition-all duration-300',
+        isCurrent ? 'shadow-md' : '',
+        done ? 'opacity-70' : '',
       )}
+      style={isCurrent ? { borderColor: 'var(--primary)', boxShadow: '0 0 0 1px oklch(0.22 0.065 145 / 0.15), 0 4px 16px oklch(0.22 0.065 145 / 0.12)' } : {}}
     >
       {/* ── Card Header ── */}
       <div
-        className={cn(
-          'px-4 py-2.5 border-b flex justify-between items-center',
-          isCurrent ? 'bg-primary/10' : 'bg-muted/50',
-          done && stop.status === 'DELIVERED'
-            ? 'bg-green-500/10 border-green-500/20'
-            : '',
-          done && stop.status === 'FAILED'
-            ? 'bg-destructive/10 border-destructive/20'
-            : '',
-        )}
+        className="px-4 py-2.5 border-b flex justify-between items-center"
+        style={{ ...intentVars(ds.intent), background: 'var(--token-bg)', borderColor: 'var(--token-ring)' }}
       >
-        <div className="font-bold flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5">
           <span
-            className={cn(
-              'w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white',
-              done && stop.status === 'DELIVERED'
-                ? 'bg-green-600'
-                : done && stop.status === 'FAILED'
-                  ? 'bg-destructive'
-                  : 'bg-primary',
-            )}
+            className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
+            style={{ background: 'var(--token-ring)', fontFamily: SERIF }}
           >
             {stop.sequence + 1}
           </span>
           <div className="flex flex-wrap gap-1">
             {stop.entry.items.map((lv) => (
-              <span key={lv.sku} className="text-xs font-mono tracking-tight text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+              <span key={lv.sku} className="text-xs font-mono tracking-tight text-muted-foreground bg-muted/70 px-1.5 py-0.5 rounded">
                 {lv.tag ?? lv.sku}
               </span>
             ))}
           </div>
         </div>
-        <StatusBadge status={stop.status} />
+        <StatusToken intent={ds.intent}>{ds.label}</StatusToken>
       </div>
 
-      <CardContent className="p-4 space-y-4">
+      <div className="p-4 space-y-4">
         {/* ── Buyer Info ── */}
         <div>
-          <h3 className="text-lg font-bold leading-tight">
+          <h3 className="text-xl font-bold leading-tight" style={{ fontFamily: SERIF }}>
             {stop.entry.buyerName}
           </h3>
           <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">
@@ -320,7 +349,7 @@ function StopCard({
               rel="noreferrer"
               className={cn(
                 buttonVariants({ variant: 'outline' }),
-                'flex-1 gap-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200',
+                'flex-1 gap-2 bg-info-bg hover:bg-info-bg/80 text-info-fg border-info-ring/40',
               )}
             >
               <MapPin className="w-4 h-4" />
@@ -340,7 +369,7 @@ function StopCard({
               rel="noreferrer"
               className={cn(
                 buttonVariants({ variant: 'outline' }),
-                'flex-1 gap-2 bg-green-50 hover:bg-green-100 text-green-700 border-green-200',
+                'flex-1 gap-2 bg-success-bg hover:bg-success-bg/80 text-success-fg border-success-ring/40',
               )}
             >
               <MessageCircle className="w-4 h-4" />
@@ -349,10 +378,7 @@ function StopCard({
           ) : stop.entry.buyerPhone ? (
             <a
               href={`tel:${stop.entry.buyerPhone}`}
-              className={cn(
-                buttonVariants({ variant: 'outline' }),
-                'flex-1 gap-2',
-              )}
+              className={cn(buttonVariants({ variant: 'outline' }), 'flex-1 gap-2')}
             >
               <Phone className="w-4 h-4" />
               Telepon
@@ -366,114 +392,119 @@ function StopCard({
         </div>
 
         {/* ── Animal Details ── */}
-        <div className="bg-muted/40 rounded-lg p-3 space-y-2 border">
-          {stop.entry.items.map((lv) => {
-            const typeLabel =
-              lv.type.charAt(0) + lv.type.slice(1).toLowerCase() +
-              (lv.grade ? ' Grade ' + lv.grade : '');
-            return (
-              <div key={lv.sku} className="flex gap-3 items-center">
-                <LivestockPhoto
-                  photoUrl={lv.photoUrl}
-                  alt={lv.sku}
-                  thumbnailClassName="w-12 h-12"
-                />
-                <div className="text-sm flex-1 min-w-0">
-                  <p className="font-semibold text-foreground truncate">{typeLabel}</p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    <span className="font-medium">Tag:</span> {lv.tag || '—'}
-                  </p>
+        <div className="rounded-lg border bg-muted/30 overflow-hidden">
+          <div className="px-3 py-2 border-b bg-muted/30">
+            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
+              Detail Hewan · Sales: {stop.entry.salesName}
+            </p>
+          </div>
+          <div className="p-3 space-y-2">
+            {stop.entry.items.map((lv) => {
+              const typeLabel =
+                lv.type.charAt(0) + lv.type.slice(1).toLowerCase() +
+                (lv.grade ? ' Grade ' + lv.grade : '');
+              return (
+                <div key={lv.sku} className="flex gap-3 items-center">
+                  <LivestockPhoto
+                    photoUrl={lv.photoUrl}
+                    alt={lv.sku}
+                    thumbnailClassName="w-12 h-12"
+                  />
+                  <div className="text-sm flex-1 min-w-0">
+                    <p className="font-semibold text-foreground truncate">{typeLabel}</p>
+                    <p className="text-xs text-muted-foreground truncate">Tag: {lv.tag || '—'}</p>
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-          <p className="text-xs text-muted-foreground">
-            <span className="font-medium">Sales:</span> {stop.entry.salesName}
-          </p>
+              );
+            })}
+          </div>
         </div>
 
         {/* ── Driver Action Forms ── */}
         {!done && isCurrent && !readOnly && (
           <div className="pt-3 border-t space-y-3">
             <Textarea
-              placeholder="Catatan pengiriman (opsional, misal: Diterima oleh Pak RT)"
+              placeholder="Catatan pengiriman (opsional)"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
               className="text-sm resize-none bg-background"
             />
+            {/* Bukti kirim photo capture */}
+            {photoPreview ? (
+              <div className="relative rounded-lg overflow-hidden border">
+                <img src={photoPreview} alt="Bukti kirim" className="w-full max-h-48 object-cover" />
+                <button
+                  onClick={clearPhoto}
+                  className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 flex items-center justify-center"
+                >
+                  <X className="w-4 h-4 text-white" />
+                </button>
+                <div className="absolute bottom-0 left-0 right-0 px-3 py-1.5 bg-black/50">
+                  <p className="text-[11px] text-white/80">Foto bukti pengiriman</p>
+                </div>
+              </div>
+            ) : (
+              <label className="flex items-center gap-2.5 px-4 py-2.5 rounded-lg border border-dashed cursor-pointer transition-colors hover:bg-muted/40">
+                <Camera className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Foto bukti kirim (opsional)</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="sr-only"
+                  onChange={handlePhotoChange}
+                />
+              </label>
+            )}
             <div className="flex gap-2">
-              <Button
-                className="flex-1 gap-2 bg-green-600 hover:bg-green-700 text-white h-11"
+              <button
+                className="flex-1 h-11 rounded-lg flex items-center justify-center gap-2 font-semibold text-sm transition-all disabled:opacity-60"
+                style={{ background: 'var(--success-ring)', color: 'white' }}
                 disabled={busy}
                 onClick={handleDelivered}
               >
-                <CheckCircle2 className="w-5 h-5" />
-                Terkirim
-              </Button>
+                <CheckCircle2 className="w-4 h-4" />
+                {busy ? 'Menyimpan…' : 'Terkirim'}
+              </button>
               <Button
                 variant="destructive"
-                className="gap-2 h-11 px-6"
+                className="gap-2 h-11 px-5"
                 disabled={busy}
                 onClick={handleFailed}
               >
-                <AlertCircle className="w-5 h-5" />
+                <AlertCircle className="w-4 h-4" />
                 Gagal
               </Button>
             </div>
           </div>
         )}
 
-        {/* ── Completed Status / Notes ── */}
-        {done && stop.notes && (
-          <div className="mt-2 text-sm bg-background p-3 rounded-md border border-dashed">
-            <span className="font-semibold text-xs text-muted-foreground block mb-1 uppercase tracking-wider">
-              Catatan Pengiriman:
-            </span>
-            <span className="text-foreground">{stop.notes}</span>
+        {/* ── Completed Notes + Proof ── */}
+        {done && (stop.notes || stop.proofPhotoUrl) && (
+          <div className="space-y-2">
+            {stop.proofPhotoUrl && (
+              <a href={stop.proofPhotoUrl} target="_blank" rel="noreferrer" className="block rounded-lg overflow-hidden border relative group">
+                <img src={stop.proofPhotoUrl} alt="Bukti kirim" className="w-full max-h-48 object-cover" />
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+                <div className="absolute bottom-0 left-0 right-0 px-3 py-1.5 bg-black/40">
+                  <p className="text-[11px] text-white/90 flex items-center gap-1.5">
+                    <Camera className="w-3 h-3" />
+                    Bukti pengiriman — ketuk untuk buka
+                  </p>
+                </div>
+              </a>
+            )}
+            {stop.notes && (
+              <div className="text-sm bg-muted/30 p-3 rounded-lg border border-dashed">
+                <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground block mb-1">Catatan:</span>
+                <span className="text-foreground">{stop.notes}</span>
+              </div>
+            )}
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const map: Record<
-    string,
-    {
-      label: string;
-      variant: 'default' | 'secondary' | 'outline' | 'destructive';
-      className?: string;
-    }
-  > = {
-    ASSIGNED: {
-      label: 'Menunggu',
-      variant: 'outline',
-      className: 'text-amber-600 bg-amber-50 border-amber-200',
-    },
-    ON_DELIVERY: {
-      label: 'Sedang Jalan',
-      variant: 'default',
-      className: 'bg-blue-500',
-    },
-    DELIVERED: {
-      label: 'Terkirim',
-      variant: 'secondary',
-      className: 'bg-green-100 text-green-800 hover:bg-green-200',
-    },
-    FAILED: { label: 'Gagal', variant: 'destructive' },
-    PENDING: {
-      label: 'Pending',
-      variant: 'outline',
-      className: 'text-gray-500',
-    },
-  };
-  const m = map[status] ?? { label: status, variant: 'outline' };
-
-  return (
-    <Badge variant={m.variant} className={cn('px-2.5 py-0.5', m.className)}>
-      {m.label}
-    </Badge>
-  );
-}

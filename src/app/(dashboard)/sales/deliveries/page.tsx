@@ -5,6 +5,7 @@ import { DashboardShell } from '@/components/dashboard/dashboard-shell';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
+import { StatusToken, DELIVERY_STATUS } from '@/components/ui/status-token';
 import { cn } from '@/lib/utils';
 import { navigationUrl } from '@/lib/delivery/maps';
 import {
@@ -33,42 +34,8 @@ function dateOffset(dateStr: string, days: number): string {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const map: Record<
-    string,
-    {
-      label: string;
-      variant: 'default' | 'secondary' | 'outline' | 'destructive';
-      className?: string;
-    }
-  > = {
-    ASSIGNED: {
-      label: 'Siap',
-      variant: 'outline',
-      className: 'text-amber-600 bg-amber-50 border-amber-200',
-    },
-    ON_DELIVERY: {
-      label: 'Jalan',
-      variant: 'default',
-      className: 'bg-blue-500 hover:bg-blue-600',
-    },
-    DELIVERED: {
-      label: 'Terkirim',
-      variant: 'secondary',
-      className: 'bg-green-100 text-green-800 hover:bg-green-200',
-    },
-    FAILED: { label: 'Gagal', variant: 'destructive' },
-    PENDING: {
-      label: 'Pending',
-      variant: 'outline',
-      className: 'text-gray-500',
-    },
-  };
-  const m = map[status] ?? { label: status, variant: 'outline' };
-  return (
-    <Badge variant={m.variant} className={m.className}>
-      {m.label}
-    </Badge>
-  );
+  const ds = DELIVERY_STATUS[status] ?? { intent: 'neutral' as const, label: status };
+  return <StatusToken intent={ds.intent}>{ds.label}</StatusToken>;
 }
 
 export default async function SalesDeliveriesPage({

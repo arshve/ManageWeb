@@ -3,11 +3,13 @@ import { requireAuth, isSuperAdmin } from '@/lib/auth';
 import { formatRupiah } from '@/lib/format';
 import { DashboardShell } from '@/components/dashboard/dashboard-shell';
 import { EntryTable } from '@/components/dashboard/entry-table';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Beef, ClipboardList, DollarSign, Users, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import Link from 'next/link';
 import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { StatCard } from '@/components/ui/stat-card';
+
+const SERIF = "var(--font-dm-serif), 'DM Serif Display', serif";
 
 export default async function AdminDashboardPage() {
   const profile = await requireAuth();
@@ -152,15 +154,6 @@ export default async function AdminDashboardPage() {
     };
   });
 
-  const stats = [
-    { title: 'Total Hewan', value: totalLivestock, sub: `${soldLivestock} terjual`, icon: Beef },
-    { title: 'Entry Penjualan', value: totalEntries, sub: `${pendingEntries} menunggu approval`, icon: ClipboardList },
-    ...(superAdmin
-      ? [{ title: 'Total Revenue', value: formatRupiah(totalRevenue), sub: `Modal: ${formatRupiah(totalModal)}`, icon: DollarSign }]
-      : []),
-    { title: 'Sales Aktif', value: totalSales, sub: superAdmin ? 'Keuangan di menu terpisah' : '', icon: Users },
-  ];
-
   return (
     <DashboardShell
       title="Dashboard"
@@ -172,34 +165,26 @@ export default async function AdminDashboardPage() {
         </Link>
       }
     >
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4 mb-6">
-        {stats.map((stat) => (
-          <Card key={stat.title}>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">{stat.title}</CardTitle>
-              <stat.icon className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
-              <p className="text-xs text-muted-foreground mt-1">{stat.sub}</p>
-            </CardContent>
-          </Card>
-        ))}
+      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4 mb-6">
+        <StatCard accent="warning" label="Total Hewan"      value={totalLivestock}           sub={`${soldLivestock} terjual`} />
+        <StatCard accent="info"    label="Entry Penjualan"  value={totalEntries}              sub={`${pendingEntries} menunggu approval`} />
+        {superAdmin && <StatCard accent="success" label="Total Revenue" value={formatRupiah(totalRevenue)} sub={`Modal: ${formatRupiah(totalModal)}`} />}
+        <StatCard accent="primary" label="Sales Aktif"      value={totalSales}                sub={superAdmin ? 'Keuangan di menu terpisah' : ''} />
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Entry Penjualan</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <EntryTable
-            entries={serialized}
-            isAdmin={true}
-            canViewFinancials={superAdmin}
-            salesUsers={salesUsers}
-          />
-        </CardContent>
-      </Card>
+      <div className="rounded-xl border bg-card overflow-hidden">
+        <div className="px-6 py-4 border-b">
+          <h2 className="text-base font-semibold" style={{ fontFamily: SERIF }}>
+            Entry Penjualan
+          </h2>
+        </div>
+        <EntryTable
+          entries={serialized}
+          isAdmin={true}
+          canViewFinancials={superAdmin}
+          salesUsers={salesUsers}
+        />
+      </div>
     </DashboardShell>
   );
 }

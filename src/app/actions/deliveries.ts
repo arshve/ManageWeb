@@ -367,7 +367,7 @@ export async function startDeliveryRun(deliveryDate: string) {
   return { success: true };
 }
 
-export async function markDelivered(deliveryId: string, notes?: string) {
+export async function markDelivered(deliveryId: string, notes?: string, proofPhotoUrl?: string) {
   const result = await requireDriverOwnership(deliveryId);
   if ('error' in result) return result;
   const { profile, delivery } = result;
@@ -379,6 +379,7 @@ export async function markDelivered(deliveryId: string, notes?: string) {
         status: 'DELIVERED',
         deliveredAt: new Date(),
         notes: notes ?? delivery.notes,
+        ...(proofPhotoUrl ? { proofPhotoUrl } : {}),
       },
     }),
     prisma.entry.update({

@@ -223,9 +223,10 @@ model Delivery {
   driver      Profile?       @relation(fields: [driverId], references: [id])
   sequence    Int?
   status      DeliveryStatus @default(PENDING)
-  deliveredAt DateTime?
-  notes       String?
-  createdAt   DateTime       @default(now())
+  deliveredAt   DateTime?
+  notes         String?
+  proofPhotoUrl String?
+  createdAt     DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
   @@index([driverId, sequence])

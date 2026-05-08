@@ -3,6 +3,7 @@
 import { useState, useMemo, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
+import { StatusToken, QUEUE_STATUS } from '@/components/ui/status-token';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -91,17 +92,8 @@ function relativeTime(iso: string) {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, { label: string; className: string }> = {
-    PENDING: { label: 'Menunggu', className: 'text-amber-600 bg-amber-50 border-amber-200' },
-    APPROVED: { label: 'Disetujui', className: 'bg-green-100 text-green-800' },
-    REJECTED: { label: 'Ditolak', className: 'bg-red-100 text-red-800' },
-  };
-  const m = map[status] ?? { label: status, className: '' };
-  return (
-    <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${m.className}`}>
-      {m.label}
-    </Badge>
-  );
+  const ds = QUEUE_STATUS[status] ?? { intent: 'neutral' as const, label: status };
+  return <StatusToken intent={ds.intent} size="sm">{ds.label}</StatusToken>;
 }
 
 export function QueueView({
@@ -257,7 +249,7 @@ export function QueueView({
               </thead>
               <tbody className="divide-y">
                 {filtered.map((req) => (
-                  <tr key={req.id} className={`transition-colors ${req.isFulfilled ? 'bg-green-50/60 text-muted-foreground' : 'hover:bg-muted/30'}`}>
+                  <tr key={req.id} className={`transition-colors ${req.isFulfilled ? 'bg-success-bg/40 text-muted-foreground' : 'hover:bg-muted/30'}`}>
                     <td className="px-4 py-3 font-mono text-xs">{req.entry.invoiceNo}</td>
                     <td className="px-4 py-3 font-medium">{req.entry.buyerName}</td>
                     <td className="px-4 py-3 text-muted-foreground">{req.entry.salesName ?? '-'}</td>
@@ -275,7 +267,7 @@ export function QueueView({
                     </td>
                     <td className="px-4 py-3 text-right">
                       {req.isFulfilled ? (
-                        <span className="inline-flex items-center gap-1 text-xs text-green-600 font-medium">
+                        <span className="inline-flex items-center gap-1 text-xs text-success-fg font-medium">
                           <CheckCircle2 className="h-4 w-4" />
                           Selesai
                         </span>
@@ -294,7 +286,7 @@ export function QueueView({
           {/* Mobile cards */}
           <div className="md:hidden space-y-3">
             {filtered.map((req) => (
-              <Card key={req.id} className={req.isFulfilled ? 'bg-green-50/60' : ''}>
+              <Card key={req.id} className={req.isFulfilled ? 'bg-success-bg/40' : ''}>
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0 space-y-1">
@@ -322,7 +314,7 @@ export function QueueView({
                       )}
                     </div>
                     {req.isFulfilled ? (
-                      <span className="inline-flex items-center gap-1 text-xs text-green-600 font-medium shrink-0">
+                      <span className="inline-flex items-center gap-1 text-xs text-success-fg font-medium shrink-0">
                         <CheckCircle2 className="h-4 w-4" />
                         Selesai
                       </span>

@@ -10,8 +10,9 @@ import { requireAuth, isSuperAdmin } from '@/lib/auth';
 import { DashboardShell } from '@/components/dashboard/dashboard-shell';
 import { LivestockForm, type PricingMap } from '@/components/dashboard/livestock-form';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus } from 'lucide-react';
+
+const SERIF = "var(--font-dm-serif), 'DM Serif Display', serif";
 import { LivestockTableClient } from '@/components/dashboard/livestock-table-client';
 
 export async function LivestockTable({
@@ -113,25 +114,37 @@ export async function LivestockTable({
       }
     >
       {/* Stat cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6 [&>*:last-child:nth-child(odd)]:col-span-2 [&>*:last-child:nth-child(odd)]:sm:col-span-1">
-        {stats.map((s) => (
-          <Card key={s.type}>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {typeLabels[s.type]}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{s.total}</div>
-              <div className="flex gap-3 mt-1 text-xs text-muted-foreground">
-                <span className="text-primary font-medium">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6 [&>*:last-child:nth-child(odd)]:col-span-2 [&>*:last-child:nth-child(odd)]:sm:col-span-1">
+        {stats.map((s) => {
+          const pct = s.total > 0 ? Math.round((s.available / s.total) * 100) : 0;
+          return (
+            <div key={s.type} className="rounded-xl border bg-card px-5 py-4">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
+                  {typeLabels[s.type]}
+                </span>
+                {s.total > 0 && (
+                  <span className="text-[10px] text-muted-foreground">{pct}% tersedia</span>
+                )}
+              </div>
+              <p className="text-3xl font-bold mb-2.5" style={{ fontFamily: SERIF }}>
+                {s.total}
+              </p>
+              <div className="h-1.5 rounded-full overflow-hidden bg-muted mb-2">
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{ width: `${pct}%`, background: 'var(--success-ring)' }}
+                />
+              </div>
+              <div className="flex gap-3 text-[11px]">
+                <span style={{ color: 'var(--success-ring)', fontWeight: 500 }}>
                   {s.available} tersedia
                 </span>
-                <span>{s.sold} terjual</span>
+                <span className="text-muted-foreground">{s.sold} terjual</span>
               </div>
-            </CardContent>
-          </Card>
-        ))}
+            </div>
+          );
+        })}
       </div>
 
       {/* Filterable table */}

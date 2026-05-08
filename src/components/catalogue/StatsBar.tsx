@@ -28,19 +28,19 @@ export function StatsBar({ livestock }: StatsBarProps) {
       emoji: '🐄',
       label: 'Sapi',
       count: counts['SAPI'] ?? 0,
-      bg: 'bg-amber-50 dark:bg-amber-950/40',
+      bg: 'bg-muted',
     },
     {
       emoji: '🐑',
       label: 'Domba',
       count: counts['DOMBA'] ?? 0,
-      bg: 'bg-emerald-50 dark:bg-emerald-950/40',
+      bg: 'bg-muted',
     },
     {
       emoji: '🐐',
       label: 'Kambing',
       count: counts['KAMBING'] ?? 0,
-      bg: 'bg-sky-50 dark:bg-sky-950/40',
+      bg: 'bg-muted',
     },
   ];
 

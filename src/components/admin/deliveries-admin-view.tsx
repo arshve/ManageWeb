@@ -24,33 +24,35 @@ import { formatPengiriman } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { StatusToken, intentVars, DELIVERY_STATUS } from '@/components/ui/status-token';
+import { StatCard } from '@/components/ui/stat-card';
 
-const badgeColors = {
-  gray: 'bg-gray-100 text-gray-600 border-gray-200',
-  green: 'bg-green-50 text-green-700 border-green-200',
-  amber: 'bg-amber-50 text-amber-700 border-amber-200',
-  red: 'bg-red-50 text-red-600 border-red-200',
-  blue: 'bg-blue-50 text-blue-700 border-blue-200',
-} as const;
-
-function ColorBadge({
-  children,
-  color = 'gray',
-}: {
-  children: React.ReactNode;
-  color?: keyof typeof badgeColors;
-}) {
+function PhotoLightbox({ url, onClose }: { url: string; onClose: () => void }) {
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose(); }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
   return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium',
-        badgeColors[color],
-      )}
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+      onClick={onClose}
     >
-      {children}
-    </span>
+      <div className="relative max-w-3xl w-full mx-4" onClick={(e) => e.stopPropagation()}>
+        <button
+          onClick={onClose}
+          className="absolute -top-9 right-0 text-white/80 hover:text-white text-sm font-medium"
+        >
+          Tutup ✕
+        </button>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={url} alt="Bukti kirim" className="w-full rounded-xl object-contain max-h-[80vh]" />
+      </div>
+    </div>
   );
 }
+
+const SERIF = "var(--font-dm-serif), 'DM Serif Display', serif";
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
@@ -74,6 +76,8 @@ type ScheduledEntry = {
     status: string;
     driverId: string | null;
     deliveredAt: Date | null;
+    notes: string | null;
+    proofPhotoUrl: string | null;
     driver: { id: string; name: string } | null;
   } | null;
 };
@@ -107,31 +111,15 @@ type Driver = {
 function parseLatLng(input: string): { lat: number; lng: number } | null {
   const m = input.trim().match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/);
   if (!m) return null;
-  const lat = Number(m[1]),
-    lng = Number(m[2]);
+  const lat = Number(m[1]), lng = Number(m[2]);
   if (!isFinite(lat) || !isFinite(lng)) return null;
   if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
   return { lat, lng };
 }
 
 function initials(name: string) {
-  return name
-    .split(' ')
-    .map((n) => n[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 1);
+  return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
 }
-
-const STATUS_COLOR: Record<
-  string,
-  'green' | 'blue' | 'amber' | 'red' | 'gray'
-> = {
-  DELIVERED: 'green',
-  IN_PROGRESS: 'blue',
-  PENDING: 'amber',
-  FAILED: 'red',
-};
 
 // ─── main component ───────────────────────────────────────────────────────────
 
@@ -156,18 +144,13 @@ export function DeliveriesAdminView({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [selectedUnscheduled, setSelectedUnscheduled] = useState<Set<string>>(
-    new Set(),
-  );
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [selectedUnscheduled, setSelectedUnscheduled] = useState<Set<string>>(new Set());
   const [buckets, setBuckets] = useState<string[][] | null>(null);
-  const [bucketDrivers, setBucketDrivers] = useState<Record<number, string>>(
-    {},
-  );
+  const [bucketDrivers, setBucketDrivers] = useState<Record<number, string>>({});
   const [startInput, setStartInput] = useState(defaultStart);
   const [maxPerDriver, setMaxPerDriver] = useState(30);
-  const [mapDepot, setMapDepot] = useState(
-    () => parseLatLng(defaultStart) ?? initialDepot,
-  );
+  const [mapDepot, setMapDepot] = useState(() => parseLatLng(defaultStart) ?? initialDepot);
 
   function updateStartInput(next: string) {
     setStartInput(next);
@@ -175,60 +158,24 @@ export function DeliveriesAdminView({
     if (p) setMapDepot(p);
   }
 
-  // ── Live driver locations via Supabase realtime ──
-  const [driverLocs, setDriverLocs] = useState<
-    Map<
-      string,
-      {
-        lastLat: number | null;
-        lastLng: number | null;
-        lastLocationAt: string | null;
-      }
-    >
-  >(
-    () =>
-      new Map(
-        drivers.map((d) => [
-          d.id,
-          {
-            lastLat: d.lastLat,
-            lastLng: d.lastLng,
-            lastLocationAt: d.lastLocationAt,
-          },
-        ]),
-      ),
+  const [driverLocs, setDriverLocs] = useState<Map<string, { lastLat: number | null; lastLng: number | null; lastLocationAt: string | null }>>(
+    () => new Map(drivers.map((d) => [d.id, { lastLat: d.lastLat, lastLng: d.lastLng, lastLocationAt: d.lastLocationAt }])),
   );
 
   useEffect(() => {
     const channel = supabase
       .channel('driver-locations-admin')
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'Profile' },
-        (payload) => {
-          const next = payload.new as {
-            id: string;
-            role: string;
-            lastLat: number | null;
-            lastLng: number | null;
-            lastLocationAt: string | null;
-          };
-          if (next.role !== 'DRIVER') return;
-          setDriverLocs((prev) => {
-            const map = new Map(prev);
-            map.set(next.id, {
-              lastLat: next.lastLat,
-              lastLng: next.lastLng,
-              lastLocationAt: next.lastLocationAt,
-            });
-            return map;
-          });
-        },
-      )
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'Profile' }, (payload) => {
+        const next = payload.new as { id: string; role: string; lastLat: number | null; lastLng: number | null; lastLocationAt: string | null };
+        if (next.role !== 'DRIVER') return;
+        setDriverLocs((prev) => {
+          const map = new Map(prev);
+          map.set(next.id, { lastLat: next.lastLat, lastLng: next.lastLng, lastLocationAt: next.lastLocationAt });
+          return map;
+        });
+      })
       .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   useEffect(() => {
@@ -243,11 +190,8 @@ export function DeliveriesAdminView({
 
   const assignableDrivers = drivers.filter((d) => !d.isAssigned);
   const driverCount = assignableDrivers.length;
-
   const [customRouteCount, setCustomRouteCount] = useState<number | ''>('');
-  const activeRouteCount =
-    customRouteCount === '' ? Math.max(driverCount, 1) : customRouteCount;
-
+  const activeRouteCount = customRouteCount === '' ? Math.max(driverCount, 1) : customRouteCount;
   const [unscheduledSearch, setUnscheduledSearch] = useState('');
   const [unscheduledCoordFilter, setUnscheduledCoordFilter] = useState<'ALL' | 'HAS_COORDS' | 'NO_COORDS'>('ALL');
   const [unscheduledPengirimanFilter, setUnscheduledPengirimanFilter] = useState('ALL');
@@ -265,26 +209,17 @@ export function DeliveriesAdminView({
     if (unscheduledJenisFilter.size > 0) list = list.filter((e) => e.items.some((i) => i.type != null && unscheduledJenisFilter.has(i.type)));
     if (unscheduledSearch.trim()) {
       const q = unscheduledSearch.trim().toLowerCase();
-      list = list.filter(
-        (e) =>
-          e.buyerName.toLowerCase().includes(q) ||
-          (e.sku?.toLowerCase().includes(q)) ||
-          (e.buyerAddress?.toLowerCase().includes(q)),
-      );
+      list = list.filter((e) => e.buyerName.toLowerCase().includes(q) || (e.sku?.toLowerCase().includes(q)) || (e.buyerAddress?.toLowerCase().includes(q)));
     }
     return list;
   }, [unscheduled, unscheduledSearch, unscheduledCoordFilter, unscheduledPengirimanFilter, unscheduledJenisFilter]);
 
   const unscheduledTotalPages = Math.max(1, Math.ceil(filteredUnscheduled.length / UNSCHEDULED_PAGE_SIZE));
   const unscheduledSafePage = Math.min(unscheduledPage, unscheduledTotalPages - 1);
-  const pagedUnscheduled = filteredUnscheduled.slice(
-    unscheduledSafePage * UNSCHEDULED_PAGE_SIZE,
-    (unscheduledSafePage + 1) * UNSCHEDULED_PAGE_SIZE,
-  );
+  const pagedUnscheduled = filteredUnscheduled.slice(unscheduledSafePage * UNSCHEDULED_PAGE_SIZE, (unscheduledSafePage + 1) * UNSCHEDULED_PAGE_SIZE);
 
-  const deliveredCount = scheduled.filter(
-    (e) => e.delivery?.status === 'DELIVERED',
-  ).length;
+  const deliveredCount = scheduled.filter((e) => e.delivery?.status === 'DELIVERED').length;
+  const failedCount = scheduled.filter((e) => e.delivery?.status === 'FAILED').length;
 
   const groupedByDriver = useMemo(() => {
     const map = new Map<string, ScheduledEntry[]>();
@@ -294,18 +229,12 @@ export function DeliveriesAdminView({
       map.get(id)!.push(e);
     }
     for (const list of map.values())
-      list.sort(
-        (a, b) => (a.delivery?.sequence ?? 0) - (b.delivery?.sequence ?? 0),
-      );
+      list.sort((a, b) => (a.delivery?.sequence ?? 0) - (b.delivery?.sequence ?? 0));
     return map;
   }, [scheduled]);
 
-  function refresh() {
-    router.refresh();
-  }
-  function gotoDate(d: string) {
-    router.push(`/admin/deliveries?date=${d}`);
-  }
+  function refresh() { router.refresh(); }
+  function gotoDate(d: string) { router.push(`/admin/deliveries?date=${d}`); }
   function dateOffset(days: number) {
     const d = new Date(dateStr + 'T00:00:00Z');
     d.setUTCDate(d.getUTCDate() + days);
@@ -313,34 +242,20 @@ export function DeliveriesAdminView({
   }
 
   function toggleOne(id: string) {
-    setSelectedUnscheduled((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
+    setSelectedUnscheduled((prev) => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
   }
   function toggleAll(checked: boolean) {
-    setSelectedUnscheduled(
-      checked ? new Set(filteredUnscheduled.map((e) => e.id)) : new Set(),
-    );
+    setSelectedUnscheduled(checked ? new Set(filteredUnscheduled.map((e) => e.id)) : new Set());
   }
 
   function handleAssignDate() {
     if (!selectedUnscheduled.size) return;
     startTransition(async () => {
-      const r = await assignDeliveryDate(
-        Array.from(selectedUnscheduled),
-        dateStr,
-      );
+      const r = await assignDeliveryDate(Array.from(selectedUnscheduled), dateStr);
       if ('error' in r) toast.error(r.error);
-      else {
-        toast.success(`${r.count} entry dijadwalkan`);
-        setSelectedUnscheduled(new Set());
-        refresh();
-      }
+      else { toast.success(`${r.count} entry dijadwalkan`); setSelectedUnscheduled(new Set()); refresh(); }
     });
   }
-
   function handleBackfill() {
     startTransition(async () => {
       const r = await backfillCoordinates();
@@ -348,223 +263,159 @@ export function DeliveriesAdminView({
       refresh();
     });
   }
-
   function handleGenerate() {
-    if (activeRouteCount < 1) {
-      toast.error('Jumlah rute minimal 1');
-      return;
-    }
+    if (activeRouteCount < 1) { toast.error('Jumlah rute minimal 1'); return; }
     startTransition(async () => {
       const r = await generateRoutes(dateStr, activeRouteCount, startInput, maxPerDriver);
-      if ('error' in r) {
-        toast.error(r.error);
-        return;
-      }
-      setBuckets(r.buckets);
-      setBucketDrivers({});
+      if ('error' in r) { toast.error(r.error); return; }
+      setBuckets(r.buckets); setBucketDrivers({});
       if (r.depot) setMapDepot(r.depot);
       toast.success(`${r.buckets.length} rute dibuat`);
       refresh();
     });
   }
-
   function handleCommitDrivers() {
     if (!buckets) return;
     const nonEmpty = buckets.filter((b) => b.length > 0);
-    const payload = buckets
-      .map((entryIds, i) => ({ driverId: bucketDrivers[i], entryIds }))
+    const payload = buckets.map((entryIds, i) => ({ driverId: bucketDrivers[i], entryIds }))
       .filter((b) => b.driverId && b.entryIds.length > 0)
       .map((b) => ({ driverId: b.driverId!, entryIds: b.entryIds }));
-    if (payload.length !== nonEmpty.length) {
-      toast.error('Pilih driver untuk semua rute');
-      return;
-    }
+    if (payload.length !== nonEmpty.length) { toast.error('Pilih driver untuk semua rute'); return; }
     startTransition(async () => {
       const r = await assignDriversToBuckets(dateStr, payload);
       if ('error' in r) toast.error(r.error);
-      else {
-        toast.success('Driver di-assign');
-        setBuckets(null);
-        setBucketDrivers({});
-        refresh();
-      }
+      else { toast.success('Driver di-assign'); setBuckets(null); setBucketDrivers({}); refresh(); }
     });
   }
-
   function handleUnassign(ids: string[]) {
     startTransition(async () => {
       const r = await unassignDeliveryDate(ids);
       if ('error' in r) toast.error(r.error);
-      else {
-        toast.success(`${r.count} entry dilepas`);
-        refresh();
-      }
+      else { toast.success(`${r.count} entry dilepas`); refresh(); }
     });
   }
-
   function handleResetRoutes() {
     if (!confirm(`Reset semua rute untuk ${dateStr}?`)) return;
     startTransition(async () => {
       const r = await resetRoutes(dateStr);
       if ('error' in r) toast.error(r.error);
-      else {
-        toast.success(`${r.count} delivery di-reset`);
-        setBuckets(null);
-        setBucketDrivers({});
-        refresh();
-      }
+      else { toast.success(`${r.count} delivery di-reset`); setBuckets(null); setBucketDrivers({}); refresh(); }
     });
   }
-
   function handleClearSchedule() {
     if (!confirm(`Kosongkan jadwal ${dateStr}?`)) return;
     startTransition(async () => {
       const r = await clearSchedule(dateStr);
       if ('error' in r) toast.error(r.error);
-      else {
-        toast.success(`${r.count} entry dilepas`);
-        setBuckets(null);
-        setBucketDrivers({});
-        refresh();
-      }
+      else { toast.success(`${r.count} entry dilepas`); setBuckets(null); setBucketDrivers({}); refresh(); }
     });
   }
 
-  const allSelected =
-    selectedUnscheduled.size === filteredUnscheduled.length && filteredUnscheduled.length > 0;
+  const allSelected = selectedUnscheduled.size === filteredUnscheduled.length && filteredUnscheduled.length > 0;
   const someSelected = selectedUnscheduled.size > 0 && !allSelected;
 
-  // ─── shared table styles ──────────────────────────────────────────────────
-  const th = 'px-3 py-2.5 text-left font-medium text-xs text-gray-500';
+  // ─── shared table cell styles ────────────────────────────────────────────────
+  const th = 'px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground';
   const td = 'px-3 py-3 text-sm';
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
+      {lightboxUrl && <PhotoLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />}
+
+      {/* ── Date nav ── */}
+      <div className="rounded-xl border bg-card px-4 py-3 flex flex-wrap items-center gap-2">
+        <button
+          onClick={() => gotoDate(dateOffset(-1))}
+          className="w-8 h-8 rounded-lg border flex items-center justify-center text-sm text-muted-foreground hover:bg-muted/40 transition-colors"
+        >←</button>
+        <input
+          type="date"
+          value={dateStr}
+          onChange={(e) => e.target.value && gotoDate(e.target.value)}
+          className="h-8 flex-1 min-w-0 rounded-lg border bg-background px-3 text-sm focus:outline-none focus:ring-1"
+          style={{ '--tw-ring-color': 'oklch(0.22 0.065 145)' } as React.CSSProperties}
+        />
+        <button
+          onClick={() => gotoDate(dateOffset(1))}
+          className="w-8 h-8 rounded-lg border flex items-center justify-center text-sm text-muted-foreground hover:bg-muted/40 transition-colors"
+        >→</button>
+        <span className="text-[11px] text-muted-foreground hidden sm:block">
+          {scheduled.length} dijadwalkan · {unscheduled.length} belum dijadwal
+        </span>
+      </div>
+
+      {/* ── Stat cards ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <StatCard accent="info"    label="Dijadwalkan"    value={scheduled.length}  sub="hari ini" />
+        <StatCard accent="success" label="Terkirim"       value={deliveredCount}     sub={`dari ${scheduled.length}`} />
+        <StatCard accent="warning" label="Belum Dijadwal" value={unscheduled.length} sub="menunggu" />
+        <StatCard accent="primary" label="Driver Aktif"   value={driverCount}        sub="tersedia" />
+      </div>
+
       {/* ── Map ── */}
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-        <div className="border-b border-gray-100 px-5 py-4">
-          <h2 className="text-sm font-semibold text-gray-900">
-            Peta Rute &amp; Driver (live)
+      <div className="rounded-xl border bg-card overflow-hidden">
+        <div className="px-5 py-3.5 border-b bg-muted/30">
+          <h2 className="text-sm font-semibold" style={{ fontFamily: SERIF }}>
+            Peta Rute &amp; Driver <span className="text-[10px] font-normal text-muted-foreground ml-1">(live)</span>
           </h2>
         </div>
         <DeliveryMap depot={mapDepot} stops={mapStops} drivers={mapDrivers} />
       </div>
 
-      {/* ── Summary cards ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {(
-          [
-            {
-              label: 'Dijadwalkan',
-              value: scheduled.length,
-              sub: 'pengiriman hari ini',
-              color: 'text-gray-900',
-            },
-            {
-              label: 'Terkirim',
-              value: deliveredCount,
-              sub: `dari ${scheduled.length}`,
-              color: 'text-green-700',
-            },
-            {
-              label: 'Belum dijadwal',
-              value: unscheduled.length,
-              sub: 'menunggu penugasan',
-              color: 'text-amber-600',
-            },
-            {
-              label: 'Driver aktif',
-              value: driverCount,
-              sub: 'tersedia hari ini',
-              color: 'text-blue-700',
-            },
-          ] as const
-        ).map((s) => (
-          <div
-            key={s.label}
-            className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm"
-          >
-            <p className="text-xs text-gray-500 mb-1">{s.label}</p>
-            <p className={cn('text-2xl font-semibold', s.color)}>{s.value}</p>
-            <p className="text-xs text-gray-400 mt-1">{s.sub}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* ── Date nav ── */}
-      <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
-        <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" onClick={() => gotoDate(dateOffset(-1))}>←</Button>
-          <input
-            type="date"
-            value={dateStr}
-            onChange={(e) => e.target.value && gotoDate(e.target.value)}
-            className="h-8 flex-1 min-w-0 rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400"
-          />
-          <Button size="sm" variant="outline" onClick={() => gotoDate(dateOffset(1))}>→</Button>
-        </div>
-        <p className="text-xs text-gray-400 mt-2 text-center sm:text-left">
-          {scheduled.length} dijadwalkan · {unscheduled.length} belum dijadwal
-        </p>
-      </div>
-
       {/* ── Driver availability ── */}
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-        <div className="flex items-center justify-between border-b border-gray-100 px-4 sm:px-5 py-4">
-          <h2 className="text-sm font-semibold text-gray-900">
-            Driver — {dateStr}
+      <div className="rounded-xl border bg-card overflow-hidden">
+        <div className="px-5 py-3.5 border-b bg-muted/30 flex items-center justify-between">
+          <h2 className="text-sm font-semibold" style={{ fontFamily: SERIF }}>
+            Driver
           </h2>
-          <span className="text-xs text-gray-400">
+          <span className="text-[11px] text-muted-foreground">
             {driverCount}/{drivers.length} tersedia
           </span>
         </div>
         {drivers.length === 0 ? (
-          <p className="px-5 py-6 text-sm text-gray-400">
-            Belum ada user dengan role DRIVER.
-          </p>
+          <p className="px-5 py-8 text-sm text-muted-foreground text-center">Belum ada user dengan role DRIVER.</p>
         ) : (
           <>
             {/* Desktop */}
             <div className="hidden sm:block overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-gray-100 bg-gray-50">
+                  <tr className="border-b bg-muted/20">
                     <th className={cn(th, 'pl-5')}>Driver</th>
                     <th className={th}>Telepon</th>
                     <th className={th}>Lokasi (live)</th>
                     <th className={cn(th, 'pr-5')}>Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50">
+                <tbody className="divide-y">
                   {drivers.map((d) => {
                     const loc = driverLocs.get(d.id);
                     return (
-                      <tr key={d.id} className={cn('transition-colors', d.isAssigned ? 'bg-amber-50/40' : 'hover:bg-gray-50')}>
+                      <tr key={d.id} className={cn('transition-colors', d.isAssigned ? 'bg-warning-bg/30' : 'hover:bg-muted/20')}>
                         <td className={cn(td, 'pl-5')}>
-                          <div className="flex items-center gap-2">
-                            <div className={cn('w-7 h-7 shrink-0 rounded-full flex items-center justify-center text-xs font-semibold select-none', d.isAssigned ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700')}>
+                          <div className="flex items-center gap-2.5">
+                            <div className={cn('w-7 h-7 shrink-0 rounded-full flex items-center justify-center text-[11px] font-bold select-none', d.isAssigned ? 'bg-warning-bg text-warning-fg' : 'bg-primary/10 text-primary')}>
                               {initials(d.name)}
                             </div>
-                            <span className="font-medium text-gray-900">{d.name}</span>
+                            <span className="font-medium text-foreground text-sm">{d.name}</span>
                           </div>
                         </td>
-                        <td className={cn(td, 'text-gray-500')}>{d.phone ?? '—'}</td>
+                        <td className={cn(td, 'text-muted-foreground text-xs')}>{d.phone ?? '—'}</td>
                         <td className={td}>
                           {loc?.lastLat != null && loc?.lastLng != null ? (
                             <div className="flex flex-col gap-0.5">
-                              <span className="font-mono text-xs text-gray-700">{loc.lastLat.toFixed(5)}, {loc.lastLng.toFixed(5)}</span>
-                              {loc.lastLocationAt && <span className="text-xs text-gray-400">{new Date(loc.lastLocationAt).toLocaleTimeString()}</span>}
+                              <span className="font-mono text-xs text-foreground">{loc.lastLat.toFixed(5)}, {loc.lastLng.toFixed(5)}</span>
+                              {loc.lastLocationAt && <span className="text-[10px] text-muted-foreground">{new Date(loc.lastLocationAt).toLocaleTimeString()}</span>}
                             </div>
                           ) : (
-                            <span className="text-xs text-gray-400">no signal</span>
+                            <span className="text-[11px] text-muted-foreground/60">no signal</span>
                           )}
                         </td>
                         <td className={cn(td, 'pr-5')}>
-                          {d.isAssigned ? (
-                            <ColorBadge color="amber"><span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block" /> On Delivery</ColorBadge>
-                          ) : (
-                            <ColorBadge color="green"><span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" /> Available</ColorBadge>
-                          )}
+                          {d.isAssigned
+                            ? <StatusToken intent="warning" dot>On Delivery</StatusToken>
+                            : <StatusToken intent="success" dot>Available</StatusToken>
+                          }
                         </td>
                       </tr>
                     );
@@ -572,25 +423,21 @@ export function DeliveriesAdminView({
                 </tbody>
               </table>
             </div>
-            {/* Mobile cards */}
-            <div className="sm:hidden divide-y divide-gray-100">
+            {/* Mobile */}
+            <div className="sm:hidden divide-y">
               {drivers.map((d) => {
                 const loc = driverLocs.get(d.id);
                 return (
-                  <div key={d.id} className={cn('px-4 py-3 flex items-center gap-3', d.isAssigned && 'bg-amber-50/40')}>
-                    <div className={cn('w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-sm font-semibold select-none', d.isAssigned ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700')}>
+                  <div key={d.id} className={cn('px-4 py-3 flex items-center gap-3', d.isAssigned && 'bg-warning-bg/30')}>
+                    <div className={cn('w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-xs font-bold select-none', d.isAssigned ? 'bg-warning-bg text-warning-fg' : 'bg-primary/10 text-primary')}>
                       {initials(d.name)}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-sm text-gray-900 truncate">{d.name}</span>
-                        {d.isAssigned ? (
-                          <ColorBadge color="amber">On Delivery</ColorBadge>
-                        ) : (
-                          <ColorBadge color="green">Available</ColorBadge>
-                        )}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-sm text-foreground truncate">{d.name}</span>
+                        {d.isAssigned ? <StatusToken intent="warning" dot>On Delivery</StatusToken> : <StatusToken intent="success" dot>Available</StatusToken>}
                       </div>
-                      <div className="text-xs text-gray-500 mt-0.5">
+                      <div className="text-xs text-muted-foreground mt-0.5">
                         {d.phone ?? 'No phone'}
                         {loc?.lastLat != null && loc?.lastLng != null && (
                           <span className="ml-2 font-mono">{loc.lastLat.toFixed(4)},{loc.lastLng.toFixed(4)}</span>
@@ -606,31 +453,31 @@ export function DeliveriesAdminView({
       </div>
 
       {/* ── Unscheduled ── */}
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-4 sm:px-5 py-4">
-          <h2 className="text-sm font-semibold text-gray-900">
-            Belum Dijadwalkan{' '}
-            <span className="font-normal text-gray-400">
-              ({unscheduled.length})
-            </span>
+      <div className="rounded-xl border bg-card overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-muted/30 px-5 py-3.5">
+          <h2 className="text-sm font-semibold" style={{ fontFamily: SERIF }}>
+            Belum Dijadwalkan
+            <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">({unscheduled.length})</span>
           </h2>
           <div className="flex flex-wrap gap-2">
             <Button size="sm" variant="outline" onClick={handleBackfill} disabled={pending}>
               Backfill Coords
             </Button>
-            <Button size="sm"
-              onClick={handleAssignDate}
+            <Button
+              size="sm"
               disabled={pending || !selectedUnscheduled.size}
+              onClick={handleAssignDate}
+              style={selectedUnscheduled.size > 0 ? { background: 'var(--primary)', color: 'var(--sidebar-primary)' } : {}}
             >
               Jadwalkan {selectedUnscheduled.size > 0 && `(${selectedUnscheduled.size})`}
             </Button>
           </div>
         </div>
 
-        {/* Search & filter bar */}
-        <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 px-4 sm:px-5 py-2.5">
+        {/* Filter bar */}
+        <div className="flex flex-wrap items-center gap-2 border-b bg-muted/10 px-5 py-2.5">
           <div className="relative flex-1 min-w-[160px]">
-            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
             <Input
               value={unscheduledSearch}
               onChange={(ev) => { setUnscheduledSearch(ev.target.value); setUnscheduledPage(0); }}
@@ -641,7 +488,7 @@ export function DeliveriesAdminView({
           <select
             value={unscheduledPengirimanFilter}
             onChange={(ev) => { setUnscheduledPengirimanFilter(ev.target.value); setUnscheduledPage(0); }}
-            className="h-8 rounded-md border border-gray-300 bg-white px-2 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400"
+            className="h-8 rounded-md border bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1"
           >
             <option value="ALL">Semua Pengiriman</option>
             <option value="HARI_H">{formatPengiriman('HARI_H')}</option>
@@ -655,35 +502,34 @@ export function DeliveriesAdminView({
               type="button"
               onClick={() => setJenisDropdownOpen((o) => !o)}
               className={cn(
-                'h-8 rounded-md border bg-white px-2 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400 flex items-center gap-1.5 whitespace-nowrap',
-                unscheduledJenisFilter.size > 0 ? 'border-gray-500 font-medium' : 'border-gray-300',
+                'h-8 rounded-md border bg-background px-2 text-xs text-foreground focus:outline-none flex items-center gap-1.5 whitespace-nowrap transition-colors',
+                unscheduledJenisFilter.size > 0 ? 'border-foreground/40 font-medium' : 'border-border',
               )}
             >
               {unscheduledJenisFilter.size === 0
                 ? 'Semua Jenis'
                 : Array.from(unscheduledJenisFilter).map((t) => t === 'KAMBING' ? 'Kambing' : t === 'DOMBA' ? 'Domba' : 'Sapi').join(', ')}
-              <svg className="h-3.5 w-3.5 text-gray-400 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" /></svg>
+              <svg className="h-3.5 w-3.5 text-muted-foreground shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" /></svg>
             </button>
             {jenisDropdownOpen && (
-              <div className="absolute left-0 top-full mt-1 z-50 min-w-[120px] rounded-md border border-gray-200 bg-white shadow-md py-1">
+              <div className="absolute left-0 top-full mt-1 z-50 min-w-[120px] rounded-lg border bg-card shadow-md py-1">
                 {(['KAMBING', 'DOMBA', 'SAPI'] as const).map((type) => {
                   const label = type === 'KAMBING' ? 'Kambing' : type === 'DOMBA' ? 'Domba' : 'Sapi';
                   const checked = unscheduledJenisFilter.has(type);
                   return (
-                    <label key={type} className="flex items-center gap-2 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 cursor-pointer select-none">
+                    <label key={type} className="flex items-center gap-2 px-3 py-1.5 text-xs text-foreground hover:bg-muted/40 cursor-pointer select-none">
                       <input
                         type="checkbox"
                         checked={checked}
                         onChange={() => {
                           setUnscheduledJenisFilter((prev) => {
                             const next = new Set(prev);
-                            if (checked) next.delete(type);
-                            else next.add(type);
+                            if (checked) next.delete(type); else next.add(type);
                             return next;
                           });
                           setUnscheduledPage(0);
                         }}
-                        className="h-3.5 w-3.5 rounded border-gray-300 accent-gray-700"
+                        className="h-3.5 w-3.5 rounded border-border"
                       />
                       {label}
                     </label>
@@ -695,64 +541,51 @@ export function DeliveriesAdminView({
           <select
             value={unscheduledCoordFilter}
             onChange={(ev) => { setUnscheduledCoordFilter(ev.target.value as 'ALL' | 'HAS_COORDS' | 'NO_COORDS'); setUnscheduledPage(0); }}
-            className="h-8 rounded-md border border-gray-300 bg-white px-2 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400"
+            className="h-8 rounded-md border bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1"
           >
             <option value="ALL">Semua Koordinat</option>
             <option value="HAS_COORDS">Punya Koordinat</option>
-            <option value="NO_COORDS">Belum Ada Koordinat</option>
+            <option value="NO_COORDS">Belum Ada</option>
           </select>
           {(unscheduledSearch || unscheduledCoordFilter !== 'ALL' || unscheduledPengirimanFilter !== 'ALL' || unscheduledJenisFilter.size > 0) && (
             <button
               type="button"
               onClick={() => { setUnscheduledSearch(''); setUnscheduledCoordFilter('ALL'); setUnscheduledPengirimanFilter('ALL'); setUnscheduledJenisFilter(new Set()); setUnscheduledPage(0); }}
-              className="text-xs text-gray-400 hover:text-gray-700 underline underline-offset-2"
+              className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
             >
               Reset
             </button>
           )}
           {filteredUnscheduled.length !== unscheduled.length && (
-            <span className="text-xs text-gray-400">
-              {filteredUnscheduled.length} dari {unscheduled.length}
-            </span>
+            <span className="text-[11px] text-muted-foreground ml-auto">{filteredUnscheduled.length} dari {unscheduled.length}</span>
           )}
         </div>
 
         {selectedUnscheduled.size > 0 && (
-          <div className="mx-4 sm:mx-5 mt-3 flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-700">
+          <div className="mx-5 mt-3 flex items-center gap-2 rounded-lg border border-info-ring/40 bg-info-bg px-3 py-2 text-sm text-info-fg">
             <span>{selectedUnscheduled.size} dipilih</span>
-            <button
-              className="ml-auto text-xs underline hover:no-underline"
-              onClick={() => setSelectedUnscheduled(new Set())}
-            >
-              Batal
-            </button>
+            <button className="ml-auto text-xs underline hover:no-underline" onClick={() => setSelectedUnscheduled(new Set())}>Batal</button>
           </div>
         )}
 
         {unscheduled.length === 0 ? (
-          <p className="px-5 py-6 text-sm text-gray-400">
-            Semua entry sudah dijadwalkan.
-          </p>
+          <p className="px-5 py-8 text-sm text-muted-foreground text-center">Semua entry sudah dijadwalkan.</p>
         ) : filteredUnscheduled.length === 0 ? (
-          <p className="px-5 py-6 text-sm text-gray-400">
-            Tidak ada entry yang cocok dengan filter.
-          </p>
+          <p className="px-5 py-8 text-sm text-muted-foreground text-center">Tidak ada entry yang cocok dengan filter.</p>
         ) : (
           <>
             {/* Desktop table */}
             <div className="hidden sm:block overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-gray-100 bg-gray-50">
+                  <tr className="border-b bg-muted/20">
                     <th className="pl-5 py-2.5 w-12">
                       <input
                         type="checkbox"
                         checked={allSelected}
-                        ref={(el) => {
-                          if (el) el.indeterminate = someSelected;
-                        }}
+                        ref={(el) => { if (el) el.indeterminate = someSelected; }}
                         onChange={(e) => toggleAll(e.target.checked)}
-                        className="h-4 w-4 rounded border-gray-300 accent-gray-800 cursor-pointer"
+                        className="h-4 w-4 rounded border-border cursor-pointer"
                       />
                     </th>
                     <th className={cn(th, 'w-32')}>Tag</th>
@@ -763,73 +596,43 @@ export function DeliveriesAdminView({
                     <th className={cn(th, 'w-52 pr-5')}>Koordinat</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50">
+                <tbody className="divide-y">
                   {pagedUnscheduled.map((e) => (
-                    <UnscheduledRow
-                      key={e.id}
-                      entry={e}
-                      selected={selectedUnscheduled.has(e.id)}
-                      onToggle={() => toggleOne(e.id)}
-                      pending={pending}
-                      startTransition={startTransition}
-                    />
+                    <UnscheduledRow key={e.id} entry={e} selected={selectedUnscheduled.has(e.id)} onToggle={() => toggleOne(e.id)} pending={pending} startTransition={startTransition} />
                   ))}
                 </tbody>
               </table>
             </div>
 
             {/* Mobile cards */}
-            <div className="sm:hidden divide-y divide-gray-100">
-              <div className="px-4 py-2 bg-gray-50 flex items-center gap-2">
+            <div className="sm:hidden divide-y">
+              <div className="px-4 py-2 bg-muted/20 flex items-center gap-2">
                 <input
                   type="checkbox"
                   checked={allSelected}
-                  ref={(el) => {
-                    if (el) el.indeterminate = someSelected;
-                  }}
+                  ref={(el) => { if (el) el.indeterminate = someSelected; }}
                   onChange={(e) => toggleAll(e.target.checked)}
-                  className="h-4 w-4 rounded border-gray-300 accent-gray-800 cursor-pointer"
+                  className="h-4 w-4 rounded border-border cursor-pointer"
                 />
-                <span className="text-xs text-gray-500">Pilih semua</span>
+                <span className="text-xs text-muted-foreground">Pilih semua</span>
               </div>
               {pagedUnscheduled.map((e) => (
-                <UnscheduledCard
-                  key={e.id}
-                  entry={e}
-                  selected={selectedUnscheduled.has(e.id)}
-                  onToggle={() => toggleOne(e.id)}
-                  pending={pending}
-                  startTransition={startTransition}
-                />
+                <UnscheduledCard key={e.id} entry={e} selected={selectedUnscheduled.has(e.id)} onToggle={() => toggleOne(e.id)} pending={pending} startTransition={startTransition} />
               ))}
             </div>
 
             {/* Pagination */}
             {unscheduledTotalPages > 1 && (
-              <div className="flex items-center justify-between gap-2 border-t border-gray-100 px-4 sm:px-5 py-3">
-                <span className="text-xs text-gray-400">
+              <div className="flex items-center justify-between gap-2 border-t px-5 py-3">
+                <span className="text-[11px] text-muted-foreground">
                   {unscheduledSafePage * UNSCHEDULED_PAGE_SIZE + 1}–{Math.min((unscheduledSafePage + 1) * UNSCHEDULED_PAGE_SIZE, filteredUnscheduled.length)} dari {filteredUnscheduled.length}
                 </span>
                 <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    disabled={unscheduledSafePage === 0}
-                    onClick={() => setUnscheduledPage(unscheduledSafePage - 1)}
-                    className="px-2.5 py-1 text-xs rounded border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
-                  >
-                    ←
-                  </button>
-                  <span className="text-xs text-gray-500 px-1">
-                    {unscheduledSafePage + 1} / {unscheduledTotalPages}
-                  </span>
-                  <button
-                    type="button"
-                    disabled={unscheduledSafePage >= unscheduledTotalPages - 1}
-                    onClick={() => setUnscheduledPage(unscheduledSafePage + 1)}
-                    className="px-2.5 py-1 text-xs rounded border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
-                  >
-                    →
-                  </button>
+                  <button type="button" disabled={unscheduledSafePage === 0} onClick={() => setUnscheduledPage(unscheduledSafePage - 1)}
+                    className="px-2.5 py-1 text-xs rounded-md border text-muted-foreground hover:bg-muted/40 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">←</button>
+                  <span className="text-xs text-muted-foreground px-2">{unscheduledSafePage + 1} / {unscheduledTotalPages}</span>
+                  <button type="button" disabled={unscheduledSafePage >= unscheduledTotalPages - 1} onClick={() => setUnscheduledPage(unscheduledSafePage + 1)}
+                    className="px-2.5 py-1 text-xs rounded-md border text-muted-foreground hover:bg-muted/40 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">→</button>
                 </div>
               </div>
             )}
@@ -838,10 +641,10 @@ export function DeliveriesAdminView({
       </div>
 
       {/* ── Route management ── */}
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-        <div className="space-y-3 border-b border-gray-100 px-4 sm:px-5 py-4">
+      <div className="rounded-xl border bg-card overflow-hidden">
+        <div className="border-b bg-muted/30 px-5 py-3.5 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold text-gray-900">
+            <h2 className="text-sm font-semibold" style={{ fontFamily: SERIF }}>
               Rute — {dateStr}
             </h2>
             <div className="flex flex-wrap gap-2">
@@ -854,92 +657,105 @@ export function DeliveriesAdminView({
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-2 border border-gray-300 rounded-md p-1 pl-3">
-              <label className="text-xs text-gray-500 font-medium">Bagi ke</label>
+            <div className="flex items-center gap-2 rounded-lg border bg-background px-3 py-1.5">
+              <label className="text-[11px] text-muted-foreground font-medium whitespace-nowrap">Bagi ke</label>
               <input
-                type="number"
-                min={1}
+                type="number" min={1}
                 value={customRouteCount}
                 onChange={(e) => setCustomRouteCount(e.target.value === '' ? '' : parseInt(e.target.value))}
                 placeholder={String(Math.max(driverCount, 1))}
-                className="h-6 w-12 rounded bg-white px-1 text-xs text-center border focus:outline-none focus:ring-1"
+                className="h-6 w-10 rounded bg-muted/30 px-1 text-xs text-center border focus:outline-none"
               />
-              <span className="text-xs text-gray-500 mr-2">rute</span>
-              <label className="text-xs text-gray-500 font-medium ml-1">maks</label>
+              <span className="text-[11px] text-muted-foreground">rute · maks</span>
               <input
-                type="number"
-                min={1}
-                max={999}
+                type="number" min={1} max={999}
                 value={maxPerDriver}
                 onChange={(e) => setMaxPerDriver(Math.max(1, parseInt(e.target.value) || 1))}
-                className="h-6 w-12 rounded bg-white px-1 text-xs text-center border focus:outline-none focus:ring-1"
+                className="h-6 w-10 rounded bg-muted/30 px-1 text-xs text-center border focus:outline-none"
               />
-              <span className="text-xs text-gray-500 mr-2">/driver</span>
-              <Button size="sm" onClick={handleGenerate} disabled={pending || !scheduled.length} className="py-1 px-3 h-6">
+              <span className="text-[11px] text-muted-foreground">/driver</span>
+              <button
+                onClick={handleGenerate}
+                disabled={pending || !scheduled.length}
+                className="h-6 px-3 rounded-md text-xs font-semibold transition-all disabled:opacity-40"
+                style={{ background: 'var(--primary)', color: 'var(--sidebar-primary)' }}
+              >
                 Generate
-              </Button>
+              </button>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <label className="text-xs text-gray-500 whitespace-nowrap">Titik awal:</label>
+            <label className="text-[11px] text-muted-foreground whitespace-nowrap font-medium">Titik awal:</label>
             <input
               type="text"
               placeholder="lat,lng atau Google Maps URL"
               value={startInput}
               onChange={(e) => updateStartInput(e.target.value)}
-              className="h-8 w-full rounded-md border border-gray-300 bg-white px-2 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400"
+              className="h-8 w-full rounded-lg border bg-background px-3 text-xs text-foreground focus:outline-none focus:ring-1"
             />
           </div>
         </div>
 
-        <div className="space-y-4 p-4 sm:p-5">
+        <div className="p-4 space-y-4">
           {/* Bucket driver assignment */}
           {buckets && (
-            <div className="space-y-3 rounded-lg border border-blue-200 bg-blue-50/60 p-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-sm font-medium text-gray-800">Pilih driver tiap rute</p>
+            <div className="space-y-3 rounded-xl border border-info-ring/40 bg-info-bg/30 overflow-hidden">
+              <div className="flex flex-wrap items-center justify-between gap-2 px-4 pt-3">
+                <p className="text-sm font-semibold" style={{ fontFamily: SERIF }}>Pilih driver tiap rute</p>
                 <div className="flex gap-2">
                   <Button size="sm" variant="outline" onClick={() => setBuckets(null)}>Batal</Button>
-                  <Button size="sm" onClick={handleCommitDrivers} disabled={pending}>Commit</Button>
+                  <Button size="sm" onClick={handleCommitDrivers} disabled={pending}
+                    style={{ background: 'var(--primary)', color: 'var(--sidebar-primary)' }}>
+                    Commit
+                  </Button>
                 </div>
               </div>
-              {buckets.map((entryIds, i) => (
-                <div key={i} className="flex flex-wrap items-center gap-2 sm:gap-3 rounded-md border border-gray-200 bg-white p-2">
-                  <span className="text-sm font-medium text-gray-700">🚚 Rute {i + 1}</span>
-                  <span className="text-xs text-gray-400">{entryIds.length} stop</span>
-                  <select
-                    value={bucketDrivers[i] ?? ''}
-                    onChange={(e) => setBucketDrivers((prev) => ({ ...prev, [i]: e.target.value }))}
-                    className="ml-auto h-8 w-full sm:w-auto rounded-md border border-gray-300 bg-white px-2 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400"
-                  >
-                    <option value="">Pilih driver…</option>
-                    {assignableDrivers.map((d) => (
-                      <option key={d.id} value={d.id}>{d.name}</option>
-                    ))}
-                  </select>
-                </div>
-              ))}
+              <div className="px-4 pb-4 space-y-2">
+                {buckets.map((entryIds, i) => (
+                  <div key={i} className="flex flex-wrap items-center gap-2 rounded-lg border bg-card px-3 py-2">
+                    <span className="text-sm font-medium text-foreground">🚚 Rute {i + 1}</span>
+                    <span className="text-[11px] text-muted-foreground">{entryIds.length} stop</span>
+                    <select
+                      value={bucketDrivers[i] ?? ''}
+                      onChange={(e) => setBucketDrivers((prev) => ({ ...prev, [i]: e.target.value }))}
+                      className="ml-auto h-8 w-full sm:w-auto rounded-lg border bg-background px-2 text-xs text-foreground focus:outline-none"
+                    >
+                      <option value="">Pilih driver…</option>
+                      {assignableDrivers.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </select>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
           {/* Per-driver route groups */}
           {Array.from(groupedByDriver.entries()).map(([driverId, stops]) => {
             const isUnassigned = driverId === '__unassigned__';
-            const driverName = isUnassigned
-              ? 'Belum di-assign'
-              : (stops[0]?.delivery?.driver?.name ?? driverId);
+            const driverName = isUnassigned ? 'Belum di-assign' : (stops[0]?.delivery?.driver?.name ?? driverId);
+            const doneCount = stops.filter((s) => s.delivery?.status === 'DELIVERED').length;
+            const failCount = stops.filter((s) => s.delivery?.status === 'FAILED').length;
             return (
-              <div key={driverId} className="overflow-hidden rounded-lg border border-gray-200">
+              <div key={driverId} className="rounded-xl border bg-card overflow-hidden">
                 {/* group header */}
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 bg-gray-50 px-4 py-2.5">
-                  <div className="flex items-center gap-2">
-                    <div className={cn('w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 select-none', isUnassigned ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700')}>
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/30 px-4 py-2.5">
+                  <div className="flex items-center gap-2.5">
+                    <div
+                      className={cn('w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 select-none', isUnassigned ? 'bg-warning-bg text-warning-fg' : 'bg-primary')}
+                      style={!isUnassigned ? { color: 'var(--sidebar-primary)' } : undefined}
+                    >
                       {isUnassigned ? '?' : initials(driverName)}
                     </div>
-                    <span className="text-sm font-medium text-gray-900">{driverName}</span>
-                    <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">{stops.length} stop</span>
+                    <div>
+                      <span className="text-sm font-semibold text-foreground" style={{ fontFamily: SERIF }}>{driverName}</span>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-[10px] text-muted-foreground">{stops.length} stop</span>
+                        {doneCount > 0 && <span className="text-[10px] text-success-fg">✓ {doneCount} terkirim</span>}
+                        {failCount > 0 && <span className="text-[10px] text-danger-fg">✗ {failCount} gagal</span>}
+                      </div>
+                    </div>
                   </div>
-                  <Button size="sm" variant="ghost" className="text-xs" onClick={() => handleUnassign(stops.map((s) => s.id))} disabled={pending}>
+                  <Button size="sm" variant="ghost" className="text-xs h-7" onClick={() => handleUnassign(stops.map((s) => s.id))} disabled={pending}>
                     Lepas
                   </Button>
                 </div>
@@ -948,30 +764,39 @@ export function DeliveriesAdminView({
                 <div className="hidden sm:block overflow-x-auto">
                   <table className="w-full">
                     <thead>
-                      <tr className="border-b border-gray-100 bg-gray-50/60">
+                      <tr className="border-b bg-muted/10">
                         <th className={cn(th, 'pl-4 w-10')}>#</th>
                         <th className={cn(th, 'w-36')}>Hewan / SKU</th>
                         <th className={th}>Pembeli</th>
                         <th className={th}>Alamat</th>
                         <th className={cn(th, 'w-28 text-center')}>Pengiriman</th>
-                        <th className={cn(th, 'w-28 text-center')}>Status</th>
-                        <th className={cn(th, 'w-12 pr-4')}></th>
+                        <th className={cn(th, 'w-36 text-center')}>Status</th>
+                        <th className={cn(th, 'w-36')}>Bukti / Catatan</th>
+                        <th className={cn(th, 'w-10 pr-4')}></th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-50">
+                    <tbody className="divide-y">
                       {stops.map((s) => {
                         const href = navigationUrl({ buyerMaps: s.buyerMaps, buyerLat: s.buyerLat, buyerLng: s.buyerLng, buyerAddress: s.buyerAddress });
+                        const ds = DELIVERY_STATUS[s.delivery?.status ?? 'PENDING'] ?? DELIVERY_STATUS.PENDING;
                         return (
-                          <tr key={s.id} className="hover:bg-gray-50 transition-colors">
-                            <td className={cn(td, 'pl-4 text-xs text-gray-400 font-mono')}>{(s.delivery?.sequence ?? 0) + 1}</td>
+                          <tr key={s.id} className="hover:bg-muted/20 transition-colors">
+                            <td className={cn(td, 'pl-4')}>
+                              <span
+                                className="inline-flex w-5 h-5 items-center justify-center rounded-full text-[10px] font-bold text-white"
+                                style={{ background: `var(--${ds.intent}-ring)` }}
+                              >
+                                {(s.delivery?.sequence ?? 0) + 1}
+                              </span>
+                            </td>
                             <td className={td}>
                               <div className="space-y-1">
                                 {s.items.map((item) => (
                                   <div key={item.sku ?? item.tag}>
-                                    <div className="font-medium text-gray-900 text-xs">
+                                    <div className="font-medium text-foreground text-xs">
                                       {item.type ? item.type.charAt(0) + item.type.slice(1).toLowerCase() : ''}{item.grade ? ` ${item.grade}` : ''}
                                     </div>
-                                    <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">
+                                    <span className="font-mono text-[11px] bg-muted/50 px-1.5 py-0.5 rounded text-muted-foreground">
                                       {item.tag ?? item.sku}
                                     </span>
                                   </div>
@@ -979,21 +804,45 @@ export function DeliveriesAdminView({
                               </div>
                             </td>
                             <td className={td}>
-                              <span className="font-medium text-gray-900">{s.buyerName}</span>
-                              {s.buyerPhone && <span className="block text-xs text-gray-400">{s.buyerPhone}</span>}
+                              <span className="font-medium text-foreground">{s.buyerName}</span>
+                              {s.buyerPhone && <span className="block text-xs text-muted-foreground">{s.buyerPhone}</span>}
                             </td>
-                            <td className={cn(td, 'text-xs text-gray-500 max-w-xs truncate')} title={s.buyerAddress ?? undefined}>{s.buyerAddress ?? '—'}</td>
+                            <td className={cn(td, 'text-xs text-muted-foreground max-w-[180px] truncate')} title={s.buyerAddress ?? undefined}>{s.buyerAddress ?? '—'}</td>
                             <td className={cn(td, 'text-center')}>
-                              {s.pengiriman ? (
-                                <ColorBadge color="blue">{formatPengiriman(s.pengiriman)}</ColorBadge>
-                              ) : <span className="text-xs text-gray-400">—</span>}
+                              {s.pengiriman
+                                ? <StatusToken intent="info" outlined size="sm">{formatPengiriman(s.pengiriman)}</StatusToken>
+                                : <span className="text-xs text-muted-foreground">—</span>}
                             </td>
                             <td className={cn(td, 'text-center')}>
-                              <ColorBadge color={STATUS_COLOR[s.delivery?.status ?? ''] ?? 'gray'}>{s.delivery?.status ?? 'PENDING'}</ColorBadge>
+                              <StatusToken intent={ds.intent}>{ds.label}</StatusToken>
+                            </td>
+                            <td className={td}>
+                              {s.delivery?.status === 'DELIVERED' && s.delivery.proofPhotoUrl ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setLightboxUrl(s.delivery!.proofPhotoUrl!)}
+                                  className="group relative block w-14 h-14 rounded-lg overflow-hidden border hover:ring-2 ring-info-ring transition-all"
+                                >
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img src={s.delivery.proofPhotoUrl} alt="bukti kirim" className="w-full h-full object-cover" />
+                                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                                    <span className="opacity-0 group-hover:opacity-100 text-white text-[10px] font-semibold transition-opacity">buka</span>
+                                  </div>
+                                </button>
+                              ) : s.delivery?.status === 'FAILED' && s.delivery.notes ? (
+                                <span className="text-[11px] text-danger-fg" title={s.delivery.notes}>
+                                  ⚠ {s.delivery.notes}
+                                </span>
+                              ) : (
+                                <span className="text-xs text-muted-foreground/40">—</span>
+                              )}
                             </td>
                             <td className={cn(td, 'pr-4 text-right')}>
                               {href && (
-                                <a href={href} target="_blank" rel="noreferrer" title="Buka di Maps" className="inline-flex items-center justify-center w-7 h-7 rounded-md border border-gray-200 text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors text-base">↗</a>
+                                <a href={href} target="_blank" rel="noreferrer" title="Buka di Maps"
+                                  className="inline-flex items-center justify-center w-7 h-7 rounded-lg border text-muted-foreground hover:bg-muted/40 hover:text-foreground transition-colors text-sm">
+                                  ↗
+                                </a>
                               )}
                             </td>
                           </tr>
@@ -1004,36 +853,62 @@ export function DeliveriesAdminView({
                 </div>
 
                 {/* Mobile stop cards */}
-                <div className="sm:hidden divide-y divide-gray-100">
+                <div className="sm:hidden divide-y">
                   {stops.map((s) => {
                     const href = navigationUrl({ buyerMaps: s.buyerMaps, buyerLat: s.buyerLat, buyerLng: s.buyerLng, buyerAddress: s.buyerAddress });
+                    const dsMob = DELIVERY_STATUS[s.delivery?.status ?? 'PENDING'] ?? DELIVERY_STATUS.PENDING;
                     return (
                       <div key={s.id} className="px-4 py-3 space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-gray-400 font-mono w-5">#{(s.delivery?.sequence ?? 0) + 1}</span>
-                            <span className="font-medium text-sm text-gray-900">{s.buyerName}</span>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span
+                              className="w-5 h-5 shrink-0 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
+                              style={{ background: `var(--${dsMob.intent}-ring)` }}
+                            >
+                              {(s.delivery?.sequence ?? 0) + 1}
+                            </span>
+                            <div className="min-w-0">
+                              <span className="font-medium text-sm text-foreground truncate block">{s.buyerName}</span>
+                              {s.delivery?.status === 'DELIVERED' && s.delivery.proofPhotoUrl && (
+                                <button
+                                  type="button"
+                                  onClick={() => setLightboxUrl(s.delivery!.proofPhotoUrl!)}
+                                  className="group relative mt-1 block w-12 h-12 rounded-lg overflow-hidden border hover:ring-2 ring-info-ring transition-all"
+                                >
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img src={s.delivery.proofPhotoUrl} alt="bukti kirim" className="w-full h-full object-cover" />
+                                </button>
+                              )}
+                              {s.delivery?.status === 'FAILED' && s.delivery.notes && (
+                                <span className="block text-[11px] text-danger-fg">
+                                  ⚠ {s.delivery.notes}
+                                </span>
+                              )}
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            {s.pengiriman && <ColorBadge color="blue">{formatPengiriman(s.pengiriman)}</ColorBadge>}
-                            <ColorBadge color={STATUS_COLOR[s.delivery?.status ?? ''] ?? 'gray'}>{s.delivery?.status ?? 'PENDING'}</ColorBadge>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {s.pengiriman && <StatusToken intent="info" outlined size="sm">{formatPengiriman(s.pengiriman)}</StatusToken>}
+                            <StatusToken intent={dsMob.intent}>{dsMob.label}</StatusToken>
                             {href && (
-                              <a href={href} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center w-7 h-7 rounded-md border border-gray-200 text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors text-base">↗</a>
+                              <a href={href} target="_blank" rel="noreferrer"
+                                className="inline-flex items-center justify-center w-7 h-7 rounded-lg border text-muted-foreground hover:bg-muted/40 transition-colors text-sm shrink-0">
+                                ↗
+                              </a>
                             )}
                           </div>
                         </div>
                         <div className="flex flex-wrap gap-1 text-xs">
                           {s.items.map((item) => (
                             <span key={item.sku ?? item.tag} className="inline-flex items-center gap-1">
-                              <span className="font-medium text-gray-700">
+                              <span className="font-medium text-foreground">
                                 {item.type ? item.type.charAt(0) + item.type.slice(1).toLowerCase() : ''}{item.grade ? ` ${item.grade}` : ''}
                               </span>
-                              <span className="font-mono bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">{item.tag ?? item.sku}</span>
+                              <span className="font-mono bg-muted/50 px-1.5 py-0.5 rounded text-muted-foreground text-[10px]">{item.tag ?? item.sku}</span>
                             </span>
                           ))}
                         </div>
-                        {s.buyerAddress && <p className="text-xs text-gray-500 line-clamp-2">{s.buyerAddress}</p>}
-                        {s.buyerPhone && <p className="text-xs text-gray-400">{s.buyerPhone}</p>}
+                        {s.buyerAddress && <p className="text-xs text-muted-foreground line-clamp-2">{s.buyerAddress}</p>}
+                        {s.buyerPhone && <p className="text-xs text-muted-foreground">{s.buyerPhone}</p>}
                       </div>
                     );
                   })}
@@ -1043,12 +918,13 @@ export function DeliveriesAdminView({
           })}
 
           {!scheduled.length && !buckets && (
-            <p className="py-8 text-center text-sm text-gray-400">
-              Belum ada entry dijadwalkan untuk tanggal ini.
-            </p>
+            <div className="py-12 text-center">
+              <p className="text-sm text-muted-foreground">Belum ada entry dijadwalkan untuk tanggal ini.</p>
+            </div>
           )}
         </div>
       </div>
+
     </div>
   );
 }
@@ -1077,32 +953,26 @@ function UnscheduledRow({
 
   function saveCoords() {
     const parsed = parseLatLng(coordInput);
-    if (!parsed && coordInput.trim() !== '') {
-      toast.error('Format: lat,lng (contoh: -6.123,106.456)');
-      return;
-    }
+    if (!parsed && coordInput.trim() !== '') { toast.error('Format: lat,lng (contoh: -6.123,106.456)'); return; }
     startTransition(async () => {
       const r = await updateEntryCoordinates(e.id, parsed?.lat ?? null, parsed?.lng ?? null);
       if ('error' in r) toast.error(r.error);
-      else {
-        toast.success('Koordinat disimpan');
-        setEditing(false);
-      }
+      else { toast.success('Koordinat disimpan'); setEditing(false); }
     });
   }
 
   return (
     <tr
       onClick={() => onToggle()}
-      className={cn('cursor-pointer transition-colors hover:bg-gray-50', selected && 'bg-blue-50 hover:bg-blue-50')}
+      className={cn('cursor-pointer transition-colors hover:bg-muted/20', selected && 'bg-muted/30')}
     >
       <td className="pl-5 py-3" onClick={(ev) => ev.stopPropagation()}>
-        <input type="checkbox" checked={selected} onChange={onToggle} className="h-4 w-4 rounded border-gray-300 accent-gray-800 cursor-pointer" />
+        <input type="checkbox" checked={selected} onChange={onToggle} className="h-4 w-4 rounded border-border cursor-pointer" />
       </td>
       <td className={td}>
         <div className="space-y-0.5">
           {e.items.map((item) => (
-            <span key={item.sku ?? item.tag} className="block font-mono text-xs bg-gray-100 px-2 py-0.5 rounded">
+            <span key={item.sku ?? item.tag} className="block font-mono text-[11px] bg-muted/50 px-2 py-0.5 rounded text-muted-foreground">
               {item.tag ?? item.sku ?? '—'}
             </span>
           ))}
@@ -1111,27 +981,19 @@ function UnscheduledRow({
       <td className={td}>
         <div className="space-y-0.5">
           {e.items.map((item) => {
-            const typeLabel = item.type
-              ? item.type.charAt(0) + item.type.slice(1).toLowerCase()
-              : '—';
+            const typeLabel = item.type ? item.type.charAt(0) + item.type.slice(1).toLowerCase() : '—';
             const detail = item.type === 'SAPI'
               ? (item.weightMin && item.weightMax ? ` · ${item.weightMin}-${item.weightMax}kg` : '')
               : (item.grade ? ` ${item.grade}` : '');
             return (
-              <span key={item.sku ?? item.tag} className="block text-xs text-gray-700">
-                {typeLabel}{detail}
-              </span>
+              <span key={item.sku ?? item.tag} className="block text-xs text-foreground">{typeLabel}{detail}</span>
             );
           })}
         </div>
       </td>
-      <td className={cn(td, 'font-medium text-gray-900')}>{e.buyerName}</td>
-      <td className={cn(td, 'text-xs text-gray-500 max-w-xs truncate')} title={e.buyerAddress ?? undefined}>
-        {e.buyerAddress ?? '—'}
-      </td>
-      <td className={cn(td, 'text-xs text-gray-600')}>
-        {formatPengiriman(e.pengiriman)}
-      </td>
+      <td className={cn(td, 'font-medium text-foreground')}>{e.buyerName}</td>
+      <td className={cn(td, 'text-xs text-muted-foreground max-w-[180px] truncate')} title={e.buyerAddress ?? undefined}>{e.buyerAddress ?? '—'}</td>
+      <td className={cn(td, 'text-xs text-muted-foreground')}>{formatPengiriman(e.pengiriman)}</td>
       <td className={cn(td, 'pr-5')} onClick={(ev) => ev.stopPropagation()}>
         {editing ? (
           <div className="flex items-center gap-1">
@@ -1147,17 +1009,12 @@ function UnscheduledRow({
             <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setEditing(false)}>✕</Button>
           </div>
         ) : (
-          <button
-            type="button"
-            onClick={() => setEditing(true)}
-            className="inline-flex items-center gap-1"
-          >
-            {e.hasCoords ? (
-              <ColorBadge color="green">📍 {e.buyerLat?.toFixed(4)},{e.buyerLng?.toFixed(4)}</ColorBadge>
-            ) : (
-              <ColorBadge color="red">📍 Belum ada</ColorBadge>
-            )}
-            <span className="text-xs text-gray-400 ml-1">✎</span>
+          <button type="button" onClick={() => setEditing(true)} className="inline-flex items-center gap-1">
+            {e.hasCoords
+              ? <StatusToken intent="success" outlined size="sm">📍 {e.buyerLat?.toFixed(4)},{e.buyerLng?.toFixed(4)}</StatusToken>
+              : <StatusToken intent="danger" outlined size="sm">📍 Belum ada</StatusToken>
+            }
+            <span className="text-xs text-muted-foreground ml-1">✎</span>
           </button>
         )}
       </td>
@@ -1187,53 +1044,45 @@ function UnscheduledCard({
 
   function saveCoords() {
     const parsed = parseLatLng(coordInput);
-    if (!parsed && coordInput.trim() !== '') {
-      toast.error('Format: lat,lng');
-      return;
-    }
+    if (!parsed && coordInput.trim() !== '') { toast.error('Format: lat,lng'); return; }
     startTransition(async () => {
       const r = await updateEntryCoordinates(e.id, parsed?.lat ?? null, parsed?.lng ?? null);
       if ('error' in r) toast.error(r.error);
-      else {
-        toast.success('Koordinat disimpan');
-        setEditing(false);
-      }
+      else { toast.success('Koordinat disimpan'); setEditing(false); }
     });
   }
 
   return (
-    <div className={cn('px-4 py-3 space-y-2', selected && 'bg-blue-50')}>
+    <div className={cn('px-4 py-3 space-y-2', selected && 'bg-muted/30')}>
       <div className="flex items-start gap-3">
         <input
           type="checkbox"
           checked={selected}
           onChange={onToggle}
-          className="h-4 w-4 mt-0.5 rounded border-gray-300 accent-gray-800 cursor-pointer shrink-0"
+          className="h-4 w-4 mt-0.5 rounded border-border cursor-pointer shrink-0"
         />
         <div className="flex-1 min-w-0" onClick={onToggle}>
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-medium text-sm text-gray-900 truncate">{e.buyerName}</span>
-            {e.pengiriman && <ColorBadge color="blue">{formatPengiriman(e.pengiriman)}</ColorBadge>}
+            <span className="font-medium text-sm text-foreground truncate">{e.buyerName}</span>
+            {e.pengiriman && <StatusToken intent="info" outlined size="sm">{formatPengiriman(e.pengiriman)}</StatusToken>}
           </div>
           <div className="mt-1 space-y-0.5">
             {e.items.map((item) => {
-              const typeLabel = item.type
-                ? item.type.charAt(0) + item.type.slice(1).toLowerCase()
-                : '—';
+              const typeLabel = item.type ? item.type.charAt(0) + item.type.slice(1).toLowerCase() : '—';
               const detail = item.type === 'SAPI'
                 ? (item.weightMin && item.weightMax ? ` · ${item.weightMin}-${item.weightMax}kg` : '')
                 : (item.grade ? ` ${item.grade}` : '');
               return (
                 <div key={item.sku ?? item.tag} className="flex items-center gap-1.5">
-                  <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">
+                  <span className="font-mono text-[11px] bg-muted/50 px-1.5 py-0.5 rounded text-muted-foreground">
                     {item.tag ?? item.sku ?? '—'}
                   </span>
-                  <span className="text-xs text-gray-600">{typeLabel}{detail}</span>
+                  <span className="text-xs text-foreground">{typeLabel}{detail}</span>
                 </div>
               );
             })}
           </div>
-          {e.buyerAddress && <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{e.buyerAddress}</p>}
+          {e.buyerAddress && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{e.buyerAddress}</p>}
         </div>
       </div>
       <div className="pl-7">
@@ -1252,12 +1101,11 @@ function UnscheduledCard({
           </div>
         ) : (
           <button type="button" onClick={() => setEditing(true)} className="inline-flex items-center gap-1">
-            {e.hasCoords ? (
-              <ColorBadge color="green">📍 {e.buyerLat?.toFixed(4)},{e.buyerLng?.toFixed(4)}</ColorBadge>
-            ) : (
-              <ColorBadge color="red">📍 Belum ada</ColorBadge>
-            )}
-            <span className="text-xs text-gray-400 ml-1">✎</span>
+            {e.hasCoords
+              ? <StatusToken intent="success" outlined size="sm">📍 {e.buyerLat?.toFixed(4)},{e.buyerLng?.toFixed(4)}</StatusToken>
+              : <StatusToken intent="danger" outlined size="sm">📍 Belum ada</StatusToken>
+            }
+            <span className="text-xs text-muted-foreground ml-1">✎</span>
           </button>
         )}
       </div>

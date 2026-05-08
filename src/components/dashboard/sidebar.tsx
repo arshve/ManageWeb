@@ -51,10 +51,10 @@ const adminLinks = [
   { href: '/admin/deliveries', label: 'Delivery', icon: Truck },
   { href: '/admin/antrian', label: 'Antrian', icon: ListChecks },
   { href: '/admin/users', label: 'Kelola User', icon: Users },
-  { href: '/admin/pricing', label: 'Harga', icon: DollarSign },
 ];
 
 const superAdminExtras = [
+  { href: '/admin/pricing', label: 'Harga', icon: DollarSign },
   { href: '/admin/finance', label: 'Keuangan', icon: Wallet },
   { href: '/admin/logs', label: 'Log Aktivitas', icon: History },
 ];

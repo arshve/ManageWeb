@@ -32,6 +32,8 @@ import {
 } from '@/components/dashboard/antrian-request-rows';
 import { formatRupiah, formatWeight } from '@/lib/format';
 
+const SERIF = "var(--font-dm-serif), 'DM Serif Display', serif";
+
 interface SelectedItem {
   livestock: PickerLivestock;
   hargaJual: string;
@@ -61,6 +63,25 @@ const PAYMENT_LABEL: Record<string, string> = {
   DP: 'DP (Uang Muka)',
   LUNAS: 'Lunas',
 };
+
+function SectionCard({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="rounded-xl border bg-card overflow-hidden">
+      <div className="px-5 py-3 border-b bg-muted/30">
+        <h3 className="text-[13px] font-semibold" style={{ fontFamily: SERIF }}>
+          {title}
+        </h3>
+      </div>
+      <div className="p-5 space-y-4">{children}</div>
+    </section>
+  );
+}
 
 export function AdminNewEntryForm({ canViewFinancials }: { canViewFinancials: boolean }) {
   const [mode, setMode] = useState<'LANGSUNG' | 'ANTRIAN'>('LANGSUNG');
@@ -119,19 +140,14 @@ export function AdminNewEntryForm({ canViewFinancials }: { canViewFinancials: bo
         {
           livestock: lv,
           hargaJual: lv.hargaJual?.toString() ?? '',
-          hargaModal:
-            (lv as { hargaModal?: number | null }).hargaModal?.toString() ?? '',
+          hargaModal: (lv as { hargaModal?: number | null }).hargaModal?.toString() ?? '',
           tag: lv.tag ?? '',
         },
       ]);
     }
   }
 
-  function updateItem(
-    id: string,
-    field: 'hargaJual' | 'hargaModal' | 'tag',
-    value: string,
-  ) {
+  function updateItem(id: string, field: 'hargaJual' | 'hargaModal' | 'tag', value: string) {
     setSelectedItems((prev) =>
       prev.map((i) => (i.livestock.id === id ? { ...i, [field]: value } : i)),
     );
@@ -196,30 +212,46 @@ export function AdminNewEntryForm({ canViewFinancials }: { canViewFinancials: bo
       title="Tambah Entry Baru"
       description="Pilih sales, hewan, dan isi data pembeli (Otomatis Disetujui)"
     >
-      <form action={handleSubmit} className="space-y-5 max-w-2xl">
+      <form action={handleSubmit} className="space-y-4 max-w-2xl">
         <input type="hidden" name="pengiriman" value={pengiriman} />
 
         {/* ── Mode Toggle ── */}
-        <div className="flex rounded-lg border overflow-hidden text-sm font-medium">
-          {(['LANGSUNG', 'ANTRIAN'] as const).map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => setMode(m)}
-              className={`flex-1 py-2.5 transition-colors ${
-                mode === m
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-background text-muted-foreground hover:bg-muted'
-              }`}
-            >
-              {m === 'LANGSUNG' ? 'Langsung' : 'Antrian (Stok Belum Ada)'}
-            </button>
-          ))}
+        <div className="grid grid-cols-2 gap-2">
+          {(['LANGSUNG', 'ANTRIAN'] as const).map((m) => {
+            const active = mode === m;
+            return (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setMode(m)}
+                className="rounded-xl border p-4 text-left transition-all duration-150"
+                style={
+                  active
+                    ? {
+                        borderColor: 'oklch(0.22 0.065 145)',
+                        background: 'oklch(0.22 0.065 145 / 0.06)',
+                      }
+                    : undefined
+                }
+              >
+                <p
+                  className="font-semibold text-sm mb-0.5"
+                  style={active ? { color: 'oklch(0.22 0.065 145)' } : undefined}
+                >
+                  {m === 'LANGSUNG' ? 'Langsung' : 'Antrian'}
+                </p>
+                <p className="text-[11px] text-muted-foreground leading-snug">
+                  {m === 'LANGSUNG'
+                    ? 'Hewan sudah tersedia di stok'
+                    : 'Stok belum ada — pesan terlebih dahulu'}
+                </p>
+              </button>
+            );
+          })}
         </div>
 
         {/* ── Penanggung Jawab ── */}
-        <section className="rounded-xl border bg-card p-4 space-y-3">
-          <h3 className="font-semibold text-sm">Penanggung Jawab (Sales)</h3>
+        <SectionCard title="Penanggung Jawab (Sales)">
           <Select
             value={selectedSalesId || 'admin'}
             onValueChange={(val) => {
@@ -264,12 +296,11 @@ export function AdminNewEntryForm({ canViewFinancials }: { canViewFinancials: bo
               )}
             </SelectContent>
           </Select>
-        </section>
+        </SectionCard>
 
         {/* ── Pilih Hewan (Langsung) ── */}
         {mode === 'LANGSUNG' && (
-          <section className="rounded-xl border bg-card p-4 space-y-3">
-            <h3 className="font-semibold text-sm">Pilih Hewan</h3>
+          <SectionCard title="Pilih Hewan">
             <LivestockPicker
               livestock={livestock}
               selectedIds={selectedIds}
@@ -277,31 +308,34 @@ export function AdminNewEntryForm({ canViewFinancials }: { canViewFinancials: bo
             />
 
             {selectedItems.length > 0 && (
-              <div className="border-t pt-3 space-y-2">
-                <p className="text-xs font-medium text-muted-foreground">
+              <div className="border-t pt-4 space-y-2">
+                <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
                   {selectedItems.length} hewan dipilih
                 </p>
                 {selectedItems.map((item) => {
                   const lv = item.livestock;
-                  const typeLabel =
-                    lv.type.charAt(0) + lv.type.slice(1).toLowerCase();
+                  const typeLabel = lv.type.charAt(0) + lv.type.slice(1).toLowerCase();
                   const weightStr = formatWeight(lv.weightMin, lv.weightMax);
                   return (
                     <div
                       key={lv.id}
-                      className="flex items-start gap-2 p-2 rounded-lg border bg-muted/30"
+                      className="flex items-start gap-3 p-3 rounded-lg border bg-muted/20"
                     >
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium truncate">
+                        <p className="text-xs font-semibold truncate mb-0.5">
                           {typeLabel}
                           {lv.grade ? ` · ${lv.grade}` : ''}
                           {weightStr ? ` · ${weightStr}` : ''}
                         </p>
-                        <p className="text-[11px] text-muted-foreground font-mono">
+                        <p className="text-[11px] text-muted-foreground font-mono mb-2">
                           {lv.sku}
                         </p>
-                        <div className={`grid gap-1.5 mt-1.5 ${canViewFinancials ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2'}`}>
-                          <div className="space-y-0.5">
+                        <div
+                          className={`grid gap-2 ${
+                            canViewFinancials ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2'
+                          }`}
+                        >
+                          <div className="space-y-1">
                             <Label className="text-[10px]">Tag</Label>
                             <Input
                               value={item.tag}
@@ -309,38 +343,31 @@ export function AdminNewEntryForm({ canViewFinancials }: { canViewFinancials: bo
                               className="h-7 text-xs bg-muted/50 cursor-default"
                             />
                           </div>
-                          <div className="space-y-0.5">
+                          <div className="space-y-1">
                             <Label className="text-[10px]">Harga Jual *</Label>
                             <RupiahInput
                               value={item.hargaJual}
-                              onValueChange={(v) =>
-                                updateItem(lv.id, 'hargaJual', v)
-                              }
+                              onValueChange={(v) => updateItem(lv.id, 'hargaJual', v)}
                               className="h-7 text-xs"
                               placeholder="3500000"
                             />
                           </div>
                           {canViewFinancials && (
                             <>
-                              <div className="space-y-0.5">
+                              <div className="space-y-1">
                                 <Label className="text-[10px]">Modal</Label>
                                 <RupiahInput
                                   value={item.hargaModal}
-                                  onValueChange={(v) =>
-                                    updateItem(lv.id, 'hargaModal', v)
-                                  }
+                                  onValueChange={(v) => updateItem(lv.id, 'hargaModal', v)}
                                   className="h-7 text-xs"
                                   placeholder="2500000"
                                 />
                               </div>
-                              <div className="space-y-0.5">
+                              <div className="space-y-1">
                                 <Label className="text-[10px]">Profit</Label>
-                                <div className="h-7 flex items-center text-xs text-muted-foreground px-2">
+                                <div className="h-7 flex items-center text-xs px-2 text-muted-foreground">
                                   {item.hargaJual && item.hargaModal
-                                    ? formatRupiah(
-                                        Number(item.hargaJual) -
-                                          Number(item.hargaModal),
-                                      )
+                                    ? formatRupiah(Number(item.hargaJual) - Number(item.hargaModal))
                                     : '—'}
                                 </div>
                               </div>
@@ -351,49 +378,60 @@ export function AdminNewEntryForm({ canViewFinancials }: { canViewFinancials: bo
                       <button
                         type="button"
                         onClick={() => handleToggle(lv.id)}
-                        className="text-muted-foreground hover:text-destructive mt-0.5 shrink-0"
+                        className="text-muted-foreground hover:text-destructive mt-0.5 shrink-0 transition-colors"
                       >
                         <X className="h-4 w-4" />
                       </button>
                     </div>
                   );
                 })}
-                <div className="flex justify-between items-center pt-1 text-sm font-medium border-t">
-                  <span>Total Harga Jual</span>
-                  <span>{formatRupiah(totalHargaJual)}</span>
+                <div
+                  className="flex justify-between items-center pt-3 border-t"
+                >
+                  <span className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
+                    Total Harga Jual
+                  </span>
+                  <span
+                    className="text-base font-bold"
+                    style={{ fontFamily: SERIF, color: 'oklch(0.48 0.13 158)' }}
+                  >
+                    {formatRupiah(totalHargaJual)}
+                  </span>
                 </div>
               </div>
             )}
-          </section>
+          </SectionCard>
         )}
 
         {/* ── Daftar Permintaan (Antrian) ── */}
         {mode === 'ANTRIAN' && (
-          <section className="rounded-xl border bg-card p-4 space-y-3">
-            <div>
-              <h3 className="font-semibold text-sm">Daftar Permintaan</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Isi jenis dan harga yang disepakati. Hewan akan dipilih saat
-                stok tiba.
-              </p>
-            </div>
+          <SectionCard title="Daftar Permintaan">
+            <p className="text-xs text-muted-foreground -mt-1">
+              Isi jenis dan harga yang disepakati. Hewan akan dipilih saat stok tiba.
+            </p>
             <AntrianRequestRows
               rows={requests}
               onChange={setRequests}
               showHargaModal={canViewFinancials}
             />
             {totalAntrianHarga > 0 && (
-              <div className="flex justify-between items-center pt-1 text-sm font-medium border-t">
-                <span>Total Estimasi</span>
-                <span>{formatRupiah(totalAntrianHarga)}</span>
+              <div className="flex justify-between items-center pt-3 border-t">
+                <span className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
+                  Total Estimasi
+                </span>
+                <span
+                  className="text-base font-bold"
+                  style={{ fontFamily: SERIF, color: 'oklch(0.48 0.13 158)' }}
+                >
+                  {formatRupiah(totalAntrianHarga)}
+                </span>
               </div>
             )}
-          </section>
+          </SectionCard>
         )}
 
         {/* ── Data Pembeli ── */}
-        <section className="rounded-xl border bg-card p-4 space-y-4">
-          <h3 className="font-semibold text-sm">Data Pembeli</h3>
+        <SectionCard title="Data Pembeli">
           <div className="space-y-1.5">
             <Label htmlFor="buyerName">Nama Pembeli *</Label>
             <Input id="buyerName" name="buyerName" required />
@@ -414,20 +452,17 @@ export function AdminNewEntryForm({ canViewFinancials }: { canViewFinancials: bo
               placeholder="https://maps.google.com/..."
             />
           </div>
-        </section>
+        </SectionCard>
 
         {/* ── Pengiriman (Langsung only) ── */}
         {mode === 'LANGSUNG' && (
-          <section className="rounded-xl border bg-card p-4 space-y-4">
-            <h3 className="font-semibold text-sm">Pengiriman</h3>
+          <SectionCard title="Pengiriman">
             <Select
               value={pengiriman}
               onValueChange={(val) => setPengiriman(val ?? 'HARI_H')}
             >
               <SelectTrigger>
-                <SelectValue>
-                  {PENGIRIMAN_LABEL[pengiriman] ?? pengiriman}
-                </SelectValue>
+                <SelectValue>{PENGIRIMAN_LABEL[pengiriman] ?? pengiriman}</SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {PENGIRIMAN_OPTIONS.map((o) => (
@@ -437,21 +472,21 @@ export function AdminNewEntryForm({ canViewFinancials }: { canViewFinancials: bo
                 ))}
               </SelectContent>
             </Select>
-          </section>
+          </SectionCard>
         )}
 
         {/* ── Pembayaran ── */}
-        <section className="rounded-xl border bg-card p-4 space-y-4">
-          <h3 className="font-semibold text-sm">Pembayaran</h3>
+        <SectionCard title="Pembayaran">
           {(mode === 'LANGSUNG' ? totalHargaJual : totalAntrianHarga) > 0 && (
-            <div className="flex justify-between text-sm text-muted-foreground border-b pb-2">
-              <span>
+            <div className="flex justify-between items-center pb-3 border-b -mt-1">
+              <span className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
                 Total {mode === 'ANTRIAN' ? 'Estimasi ' : ''}Harga Jual
               </span>
-              <span className="font-medium text-foreground">
-                {formatRupiah(
-                  mode === 'LANGSUNG' ? totalHargaJual : totalAntrianHarga,
-                )}
+              <span
+                className="text-base font-bold"
+                style={{ fontFamily: SERIF, color: 'oklch(0.48 0.13 158)' }}
+              >
+                {formatRupiah(mode === 'LANGSUNG' ? totalHargaJual : totalAntrianHarga)}
               </span>
             </div>
           )}
@@ -462,20 +497,12 @@ export function AdminNewEntryForm({ canViewFinancials }: { canViewFinancials: bo
               onValueChange={(val) => setPaymentStatus(val ?? 'BELUM_BAYAR')}
             >
               <SelectTrigger>
-                <SelectValue>
-                  {PAYMENT_LABEL[paymentStatus] ?? paymentStatus}
-                </SelectValue>
+                <SelectValue>{PAYMENT_LABEL[paymentStatus] ?? paymentStatus}</SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="BELUM_BAYAR" label="Belum Bayar">
-                  Belum Bayar
-                </SelectItem>
-                <SelectItem value="DP" label="DP (Uang Muka)">
-                  DP (Uang Muka)
-                </SelectItem>
-                <SelectItem value="LUNAS" label="Lunas">
-                  Lunas
-                </SelectItem>
+                <SelectItem value="BELUM_BAYAR" label="Belum Bayar">Belum Bayar</SelectItem>
+                <SelectItem value="DP" label="DP (Uang Muka)">DP (Uang Muka)</SelectItem>
+                <SelectItem value="LUNAS" label="Lunas">Lunas</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -489,17 +516,16 @@ export function AdminNewEntryForm({ canViewFinancials }: { canViewFinancials: bo
             <Label>Bukti Transfer</Label>
             <BuktiTransferUpload onChange={setBuktiTransferUrls} />
           </div>
-        </section>
+        </SectionCard>
 
         {/* ── Catatan ── */}
-        <section className="rounded-xl border bg-card p-4 space-y-3">
-          <h3 className="font-semibold text-sm">Catatan</h3>
+        <SectionCard title="Catatan">
           <Textarea name="notes" rows={2} placeholder="Catatan tambahan..." />
-        </section>
+        </SectionCard>
 
         <Button
           type="submit"
-          className="w-full h-12 text-base"
+          className="w-full h-11 font-semibold"
           disabled={loading}
         >
           {loading

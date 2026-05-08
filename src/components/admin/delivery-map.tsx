@@ -34,20 +34,13 @@ export type MapDriver = {
   lastLocationAt: string | null;
 };
 
-const DRIVER_COLORS = [
-  '#2563eb',
-  '#dc2626',
-  '#16a34a',
-  '#ea580c',
-  '#9333ea',
-  '#0891b2',
-  '#ca8a04',
-  '#db2777',
-];
+// CSS var strings for use in HTML style attributes (DivIcon markers).
+// Values live in --pin-1…--pin-8 in globals.css (Layer 3) — edit there.
+const PIN_COLORS = Array.from({ length: 8 }, (_, i) => `var(--pin-${i + 1})`);
 
 function colorFor(driverId: string | null, index: number): string {
-  if (!driverId) return '#64748b';
-  return DRIVER_COLORS[index % DRIVER_COLORS.length];
+  if (!driverId) return 'var(--pin-unassigned)';
+  return PIN_COLORS[index % PIN_COLORS.length];
 }
 
 function numberedIcon(n: number, color: string): L.DivIcon {
@@ -150,6 +143,15 @@ export function DeliveryMap({
     return { driverGroups: groups, driverIndexMap: indexMap };
   }, [stops]);
 
+  // SVG stroke (Polyline) can't resolve CSS custom properties — read computed values once.
+  const resolvedPinColors = useMemo(() => {
+    if (typeof window === 'undefined') return PIN_COLORS; // SSR fallback (strings ignored by Leaflet SSR)
+    const styles = getComputedStyle(document.documentElement);
+    return Array.from({ length: 8 }, (_, i) =>
+      styles.getPropertyValue(`--pin-${i + 1}`).trim() || PIN_COLORS[i],
+    );
+  }, []);
+
   const routeCacheRef = useRef<Record<string, [number, number][]>>({});
   const [routeVersion, setRouteVersion] = useState(0);
   const [routingFailed, setRoutingFailed] = useState(false);
@@ -235,7 +237,7 @@ export function DeliveryMap({
   return (
     <div className="space-y-2">
     {routingFailed && (
-      <p className="text-xs text-yellow-700 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-950/40 border border-yellow-200 dark:border-yellow-800 rounded px-3 py-2">
+      <p className="text-xs text-warning-fg bg-warning-bg border border-warning-ring/40 rounded px-3 py-2">
         ⚠ Gagal memuat rute jalan dari OSRM — menampilkan garis lurus. Periksa koneksi internet lalu refresh halaman.
       </p>
     )}
@@ -262,7 +264,8 @@ export function DeliveryMap({
 
         {Array.from(driverGroups.entries()).map(([key, list]) => {
           const idx = driverIndexMap.get(key) ?? 0;
-          const color = colorFor(key === '__unassigned__' ? null : key, idx);
+          const markerColor = colorFor(key === '__unassigned__' ? null : key, idx);
+          const lineColor = resolvedPinColors[idx % resolvedPinColors.length];
           const coordsStr = [
             `${depot.lng},${depot.lat}`,
             ...list.map((s) => `${s.lng},${s.lat}`),
@@ -280,14 +283,14 @@ export function DeliveryMap({
               {key !== '__unassigned__' && (
                 <Polyline
                   positions={linePoints}
-                  pathOptions={{ color, weight: 4, opacity: 0.8 }}
+                  pathOptions={{ color: lineColor, weight: 4, opacity: 0.8 }}
                 />
               )}
               {list.map((s) => (
                 <Marker
                   key={s.id}
                   position={[s.lat, s.lng]}
-                  icon={numberedIcon((s.sequence ?? 0) + 1, color)}
+                  icon={numberedIcon((s.sequence ?? 0) + 1, markerColor)}
                 >
                   <Popup>
                     <strong>{s.buyerName}</strong>
@@ -307,7 +310,7 @@ export function DeliveryMap({
         {drivers.map((d) => {
           if (d.lastLat == null || d.lastLng == null) return null;
           const idx = driverIndexMap.get(d.id) ?? 0;
-          const color = DRIVER_COLORS[idx % DRIVER_COLORS.length];
+          const color = colorFor(d.id, idx);
           return (
             <Marker
               key={`ping-${d.id}`}

@@ -6,7 +6,6 @@ import type {
   MapStop,
   MapDriver,
 } from '@/components/admin/delivery-map-loader';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getDefaultDepot } from '@/lib/delivery/depot';
 
 type SearchParams = { date?: string };
@@ -63,6 +62,8 @@ export default async function AdminDeliveriesPage({
             status: true,
             driverId: true,
             deliveredAt: true,
+            notes: true,
+            proofPhotoUrl: true,
             driver: { select: { id: true, name: true } },
           },
         },

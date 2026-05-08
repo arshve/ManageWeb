@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { Scale, ArrowRight, Beef } from 'lucide-react';
 import { formatRupiah, formatWeight } from '@/lib/format';
 import type { AvailableLivestock } from '@/app/actions/livestock';
+import { StatusToken } from '@/components/ui/status-token';
 
 /* ─── Grade colour map ─────────────────────────────────────────────────────── */
 const gradeConfig: Record<
@@ -12,27 +13,27 @@ const gradeConfig: Record<
 > = {
   A: {
     label: 'Grade A',
-    bg: 'bg-amber-50 dark:bg-amber-950/40',
-    text: 'text-amber-600 dark:text-amber-400',
-    dot: 'bg-amber-500',
+    bg: 'bg-success-bg',
+    text: 'text-success-fg',
+    dot: 'bg-success-ring',
   },
   B: {
     label: 'Grade B',
-    bg: 'bg-yellow-50 dark:bg-yellow-950/40',
-    text: 'text-yellow-600 dark:text-yellow-500',
-    dot: 'bg-yellow-500',
+    bg: 'bg-warning-bg',
+    text: 'text-warning-fg',
+    dot: 'bg-warning-ring',
   },
   C: {
     label: 'Grade C',
-    bg: 'bg-neutral-100 dark:bg-neutral-800',
-    text: 'text-neutral-500 dark:text-neutral-400',
-    dot: 'bg-neutral-400',
+    bg: 'bg-neutral-bg',
+    text: 'text-neutral-fg',
+    dot: 'bg-neutral-ring',
   },
   D: {
     label: 'Grade D',
-    bg: 'bg-stone-100 dark:bg-stone-800',
-    text: 'text-stone-500 dark:text-stone-400',
-    dot: 'bg-stone-400',
+    bg: 'bg-muted',
+    text: 'text-muted-foreground',
+    dot: 'bg-neutral-ring',
   },
 };
 
@@ -127,17 +128,7 @@ export function AnimalCard({ item, priority = false }: AnimalCardProps) {
             {typeInfo.emoji} {typeInfo.label}
             {item.grade ? ` Grade ${item.grade}` : ''}
           </h3>
-          <span
-            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full
-              text-[10px] font-medium tracking-wide
-              bg-emerald-50 text-emerald-700
-              dark:bg-emerald-950/40 dark:text-emerald-400
-              border border-emerald-200/60 dark:border-emerald-800/50
-              shrink-0"
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            Tersedia
-          </span>
+          <StatusToken intent="success" dot size="sm">Tersedia</StatusToken>
         </div>
 
         {/* Weight */}

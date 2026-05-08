@@ -8,8 +8,9 @@ import {
   type MapStop,
   type MapDriver,
 } from '@/components/admin/delivery-map-loader';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getDefaultDepot } from '@/lib/delivery/depot';
+
+const SERIF = "var(--font-dm-serif), 'DM Serif Display', serif";
 
 type SearchParams = { date?: string };
 
@@ -98,18 +99,20 @@ export default async function DriverPage({
     >
       {isToday && <LocationPinger />}
       {mapStops.length > 0 && (
-        <Card className="mb-4">
-          <CardHeader>
-            <CardTitle className="text-base">Peta Rute Anda</CardTitle>
-          </CardHeader>
-          <CardContent>
+        <div className="rounded-xl border bg-card overflow-hidden mb-4">
+          <div className="px-5 py-3 border-b bg-muted/30">
+            <h2 className="text-[13px] font-semibold" style={{ fontFamily: SERIF }}>
+              Peta Rute Anda
+            </h2>
+          </div>
+          <div className="p-4">
             <DeliveryMap
               depot={depotForMap}
               stops={mapStops}
               drivers={mapDrivers}
             />
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
       <DriverRunView
         deliveryDate={dateStr}
@@ -120,6 +123,7 @@ export default async function DriverPage({
           status: d.status,
           deliveredAt: d.deliveredAt?.toISOString() ?? null,
           notes: d.notes,
+          proofPhotoUrl: d.proofPhotoUrl ?? null,
           entry: {
             buyerName: d.entry.buyerName,
             buyerPhone: d.entry.buyerPhone,

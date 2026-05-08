@@ -40,7 +40,7 @@ export default function CataloguePage() {
           <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100 leading-[1.1] mb-4">
             Hewan Qurban
             <br />
-            <span className="text-emerald-600 dark:text-emerald-400">
+            <span className="text-success-fg">
               Terpercaya
             </span>
           </h1>

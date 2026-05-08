@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Millenials Farm — Offline</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #f8f7f4;
+      color: #1a1a1a;
+      text-align: center;
+      padding: 24px;
+      gap: 8px;
+    }
+    img { width: 56px; height: 56px; margin-bottom: 12px; opacity: 0.7; }
+    h1 { font-size: 1.25rem; font-weight: 600; }
+    p { color: #666; font-size: 0.875rem; line-height: 1.5; max-width: 280px; }
+    button {
+      margin-top: 20px;
+      padding: 10px 24px;
+      background: #1a2e1d;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.875rem;
+      cursor: pointer;
+    }
+    button:active { opacity: 0.85; }
+  </style>
+</head>
+<body>
+  <img src="/logo.png" alt="Millenials Farm" />
+  <h1>Tidak ada koneksi</h1>
+  <p>Periksa koneksi internet Anda lalu coba lagi.</p>
+  <button onclick="window.location.reload()">Coba lagi</button>
+</body>
+</html>

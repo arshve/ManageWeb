@@ -86,6 +86,7 @@ import {
 import { BuktiTransferUpload } from '@/components/dashboard/bukti-transfer-upload';
 import { PdfMenu } from '@/components/dashboard/pdf-menu';
 import { LivestockPhotoLink } from '@/components/dashboard/livestock-photo-link';
+import { StatusToken } from '@/components/ui/status-token';
 import Image from 'next/image';
 
 export interface EntryItemData {
@@ -979,8 +980,8 @@ function PendingEditBanner({
   loading: boolean;
 }) {
   return (
-    <div className="rounded-md border border-yellow-300 bg-yellow-50 dark:bg-yellow-950/20 p-3 space-y-2">
-      <div className="flex items-center gap-2 text-xs font-medium text-yellow-800 dark:text-yellow-300">
+    <div className="rounded-md border border-warning-ring/40 bg-warning-bg/30 p-3 space-y-2">
+      <div className="flex items-center gap-2 text-xs font-medium text-warning-fg">
         <Clock className="h-3.5 w-3.5" />
         <span>Perubahan diajukan oleh {pendingRequest.proposedByName}</span>
       </div>
@@ -1336,7 +1337,7 @@ function EntryRow({
               const wLabel = req.type === 'SAPI' ? formatWeight(req.weightMin, req.weightMax) : null;
               return (
                 <div key={req.id} className="flex items-center gap-1.5 text-xs text-muted-foreground italic">
-                  <span className="bg-amber-100 text-amber-700 text-[10px] font-medium px-1 rounded">antrian</span>
+                  <StatusToken intent="warning" size="sm">antrian</StatusToken>
                   <span>{req.type}{req.grade ? ' ' + req.grade : ''}{wLabel ? ' · ' + wLabel : ''}</span>
                 </div>
               );
@@ -1396,7 +1397,7 @@ function EntryRow({
             delivery={entry.delivery}
           />
           {pendingRequest && (
-            <span className="mt-1 inline-block text-[9px] font-medium text-yellow-700 bg-yellow-100 dark:bg-yellow-900/40 dark:text-yellow-300 px-1.5 py-0.5 rounded-full">
+            <span className="mt-1 inline-block text-[9px] font-medium text-warning-fg bg-warning-bg px-1.5 py-0.5 rounded-full">
               Perubahan Diajukan
             </span>
           )}
@@ -1595,7 +1596,7 @@ function MobileEntryCard({
         </div>
         <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
           {pendingRequest && (
-            <span className="text-[9px] font-medium text-yellow-700 bg-yellow-100 dark:bg-yellow-900/40 dark:text-yellow-300 px-1.5 py-0.5 rounded-full">
+            <span className="text-[9px] font-medium text-warning-fg bg-warning-bg px-1.5 py-0.5 rounded-full">
               Perubahan Diajukan
             </span>
           )}
@@ -1681,7 +1682,7 @@ function MobileEntryCard({
                   const w = req.type === 'SAPI' ? formatWeight(req.weightMin, req.weightMax) : null;
                   return (
                     <div key={req.id} className="mt-1 flex items-center gap-1 text-xs text-muted-foreground italic">
-                      <span className="bg-amber-100 text-amber-700 text-[10px] font-medium px-1 rounded not-italic">antrian</span>
+                      <StatusToken intent="warning" size="sm">antrian</StatusToken>
                       <span>{req.type}{req.grade ? ` ${req.grade}` : ''}{w ? ` · ${w}` : ''}</span>
                     </div>
                   );
@@ -1863,7 +1864,7 @@ function DeliveryIcon({
       ? 'Belum di-assign driver'
       : 'Belum masuk rute';
   const iconClass = `h-4 w-4 ${
-    assigned ? 'text-yellow-500' : 'text-muted-foreground/40'
+    assigned ? 'text-warning-fg' : 'text-muted-foreground/40'
   }`;
   return (
     <IconTooltip label={label}>
@@ -1941,7 +1942,7 @@ function StatusIcon({ status }: { status: string }) {
     status === 'APPROVED'
       ? { Icon: CheckCircle2, label: 'Disetujui', className: 'text-primary' }
       : status === 'PENDING'
-        ? { Icon: Clock, label: 'Menunggu', className: 'text-yellow-600' }
+        ? { Icon: Clock, label: 'Menunggu', className: 'text-warning-fg' }
         : { Icon: XCircle, label: 'Ditolak', className: 'text-destructive' };
   return (
     <IconTooltip label={label}>

@@ -146,7 +146,7 @@ export function FilterBar({
                     'text-sm whitespace-nowrap',
                     'transition-all duration-200',
                     isActive
-                      ? 'font-semibold text-neutral-900 dark:text-neutral-100 underline underline-offset-4 decoration-2 decoration-emerald-500'
+                      ? 'font-semibold text-neutral-900 dark:text-neutral-100 underline underline-offset-4 decoration-2 decoration-[var(--success-ring)]'
                       : 'font-normal text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300 active:scale-95',
                   ].join(' ')}
                 >

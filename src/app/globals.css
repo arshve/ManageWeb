@@ -39,6 +39,21 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --color-success-bg: var(--success-bg);
+  --color-success-fg: var(--success-fg);
+  --color-success-ring: var(--success-ring);
+  --color-warning-bg: var(--warning-bg);
+  --color-warning-fg: var(--warning-fg);
+  --color-warning-ring: var(--warning-ring);
+  --color-info-bg: var(--info-bg);
+  --color-info-fg: var(--info-fg);
+  --color-info-ring: var(--info-ring);
+  --color-danger-bg: var(--danger-bg);
+  --color-danger-fg: var(--danger-fg);
+  --color-danger-ring: var(--danger-ring);
+  --color-neutral-bg: var(--neutral-bg);
+  --color-neutral-fg: var(--neutral-fg);
+  --color-neutral-ring: var(--neutral-ring);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -48,73 +63,261 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* ════════════════════════════════════════════════════════════════════════
+   STEP 1 — RAW PALETTE (3 swappable scales)
+   Add new scales here. Reference only via role mapping in Step 2.
+   ════════════════════════════════════════════════════════════════════════ */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.965 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.965 0 0);
-  --muted-foreground: oklch(0.45 0 0);
-  --accent: oklch(0.955 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.915 0 0);
-  --input: oklch(0.915 0 0);
-  --ring: oklch(0.205 0 0);
-  --chart-1: oklch(0.205 0 0);
-  --chart-2: oklch(0.55 0 0);
-  --chart-3: oklch(0.40 0 0);
-  --chart-4: oklch(0.70 0 0);
-  --chart-5: oklch(0.85 0 0);
+  /* carbon-black — dark teal-black, hue ≈ 175 */
+  --cb-50:  oklch(0.965 0.003 174);
+  --cb-100: oklch(0.927 0.006 183);
+  --cb-200: oklch(0.853 0.014 174);
+  --cb-300: oklch(0.778 0.020 176);
+  --cb-400: oklch(0.700 0.026 177);
+  --cb-500: oklch(0.622 0.035 176);
+  --cb-600: oklch(0.529 0.028 177);
+  --cb-700: oklch(0.433 0.023 175);
+  --cb-800: oklch(0.332 0.017 173);
+  --cb-900: oklch(0.221 0.008 182);
+  --cb-950: oklch(0.187 0.007 179);
+
+  /* granite — cool gray, hue ≈ 213 */
+  --gr-50:  oklch(0.963 0.003 229);
+  --gr-100: oklch(0.925 0.005 214);
+  --gr-200: oklch(0.851 0.011 211);
+  --gr-300: oklch(0.773 0.016 212);
+  --gr-400: oklch(0.695 0.022 208);
+  --gr-500: oklch(0.613 0.029 212);
+  --gr-600: oklch(0.524 0.023 208);
+  --gr-700: oklch(0.428 0.018 212);
+  --gr-800: oklch(0.328 0.014 211);
+  --gr-900: oklch(0.218 0.006 214);
+  --gr-950: oklch(0.184 0.005 220);
+
+  /* cool-steel — steel blue-gray, hue ≈ 219 */
+  --cs-50:  oklch(0.962 0.003 220);
+  --cs-100: oklch(0.926 0.008 217);
+  --cs-200: oklch(0.850 0.014 220);
+  --cs-300: oklch(0.773 0.023 219);
+  --cs-400: oklch(0.693 0.029 220);
+  --cs-500: oklch(0.613 0.038 220);
+  --cs-600: oklch(0.522 0.031 220);
+  --cs-700: oklch(0.429 0.026 219);
+  --cs-800: oklch(0.328 0.018 220);
+  --cs-900: oklch(0.220 0.011 217);
+  --cs-950: oklch(0.183 0.008 229);
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   LAYER 2 — STATUS RAMPS  (fixed semantic, NOT swapped with brand)
+   Four hues chosen for maximum perceptual distance (35–64° apart).
+   Key stops: 50 = light bg · 500 = ring/accent · 700 = text · 900 = dark bg
+                                                   400 = dark ring · 200 = dark text
+   ════════════════════════════════════════════════════════════════════════ */
+:root {
+  /* success — green, hue 155 */
+  --success-50:  oklch(0.96 0.02 155);
+  --success-100: oklch(0.93 0.03 155);
+  --success-200: oklch(0.85 0.07 155);
+  --success-300: oklch(0.75 0.10 155);
+  --success-400: oklch(0.65 0.13 155);
+  --success-500: oklch(0.52 0.15 155);
+  --success-600: oklch(0.45 0.14 155);
+  --success-700: oklch(0.38 0.12 155);
+  --success-800: oklch(0.30 0.09 155);
+  --success-900: oklch(0.22 0.06 155);
+  --success-950: oklch(0.15 0.04 155);
+
+  /* warning — teal, hue 190 (midpoint between green + blue → distinct from both) */
+  --warning-50:  oklch(0.96 0.02 190);
+  --warning-100: oklch(0.93 0.03 190);
+  --warning-200: oklch(0.85 0.07 190);
+  --warning-300: oklch(0.75 0.10 190);
+  --warning-400: oklch(0.65 0.13 190);
+  --warning-500: oklch(0.50 0.15 190);
+  --warning-600: oklch(0.43 0.14 190);
+  --warning-700: oklch(0.36 0.12 190);
+  --warning-800: oklch(0.28 0.09 190);
+  --warning-900: oklch(0.20 0.05 190);
+  --warning-950: oklch(0.14 0.04 190);
+
+  /* info — blue, hue 254 */
+  --info-50:  oklch(0.96 0.02 254);
+  --info-100: oklch(0.93 0.04 254);
+  --info-200: oklch(0.85 0.08 254);
+  --info-300: oklch(0.75 0.12 254);
+  --info-400: oklch(0.63 0.16 254);
+  --info-500: oklch(0.49 0.18 254);
+  --info-600: oklch(0.43 0.17 254);
+  --info-700: oklch(0.36 0.14 254);
+  --info-800: oklch(0.28 0.10 254);
+  --info-900: oklch(0.20 0.05 254);
+  --info-950: oklch(0.14 0.04 254);
+
+  /* danger — red, hue 27 */
+  --danger-50:  oklch(0.96 0.02 27);
+  --danger-100: oklch(0.93 0.03 27);
+  --danger-200: oklch(0.84 0.08 27);
+  --danger-300: oklch(0.74 0.11 27);
+  --danger-400: oklch(0.63 0.13 27);
+  --danger-500: oklch(0.52 0.13 27);
+  --danger-600: oklch(0.46 0.13 27);
+  --danger-700: oklch(0.42 0.12 27);
+  --danger-800: oklch(0.33 0.10 27);
+  --danger-900: oklch(0.26 0.07 27);
+  --danger-950: oklch(0.18 0.05 27);
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   LAYER 3 — MAP-PIN RAMP  (fixed categorical, high-chroma for OSM legibility)
+   8 hues across 145°→280° (~19° stride), chroma 0.15–0.20.
+   Edit only this block to retune map marker colors.
+   ════════════════════════════════════════════════════════════════════════ */
+:root {
+  --pin-1: oklch(0.52 0.17 145);  /* brand green  */
+  --pin-2: oklch(0.51 0.16 165);  /* green-teal   */
+  --pin-3: oklch(0.51 0.15 185);  /* teal         */
+  --pin-4: oklch(0.52 0.16 205);  /* blue-teal    */
+  --pin-5: oklch(0.50 0.16 225);  /* steel blue   */
+  --pin-6: oklch(0.50 0.18 245);  /* slate blue   */
+  --pin-7: oklch(0.49 0.20 262);  /* powder blue  */
+  --pin-8: oklch(0.48 0.16 280);  /* indigo       */
+  --pin-unassigned: oklch(0.52 0.02 213);  /* muted granite */
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   STEP 2 — ROLE ↔ SCALE MAPPING  (edit only this block to retheme)
+   surface  → neutral backgrounds, borders, muted text
+   brand    → primary, foreground, sidebar base
+   focus    → ring, interactive hover/active chrome
+   ════════════════════════════════════════════════════════════════════════ */
+:root {
+  /* surface → granite */
+  --surface-50:  var(--gr-50);   --surface-100: var(--gr-100); --surface-200: var(--gr-200);
+  --surface-300: var(--gr-300);  --surface-400: var(--gr-400); --surface-500: var(--gr-500);
+  --surface-600: var(--gr-600);  --surface-700: var(--gr-700); --surface-800: var(--gr-800);
+  --surface-900: var(--gr-900);  --surface-950: var(--gr-950);
+
+  /* brand → carbon-black */
+  --brand-50:  var(--cb-50);   --brand-100: var(--cb-100); --brand-200: var(--cb-200);
+  --brand-300: var(--cb-300);  --brand-400: var(--cb-400); --brand-500: var(--cb-500);
+  --brand-600: var(--cb-600);  --brand-700: var(--cb-700); --brand-800: var(--cb-800);
+  --brand-900: var(--cb-900);  --brand-950: var(--cb-950);
+
+  /* focus → cool-steel */
+  --focus-50:  var(--cs-50);   --focus-100: var(--cs-100); --focus-200: var(--cs-200);
+  --focus-300: var(--cs-300);  --focus-400: var(--cs-400); --focus-500: var(--cs-500);
+  --focus-600: var(--cs-600);  --focus-700: var(--cs-700); --focus-800: var(--cs-800);
+  --focus-900: var(--cs-900);  --focus-950: var(--cs-950);
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   STEP 3 — SEMANTIC TOKENS  (do not edit; reference only role + status + pin vars)
+   ════════════════════════════════════════════════════════════════════════ */
+:root {
+  --background:          var(--surface-50);
+  --foreground:          var(--brand-900);
+  --card:                oklch(1 0 0);
+  --card-foreground:     var(--brand-900);
+  --popover:             oklch(1 0 0);
+  --popover-foreground:  var(--brand-900);
+  --primary:             var(--brand-900);
+  --primary-foreground:  var(--surface-50);
+  --secondary:           var(--surface-100);
+  --secondary-foreground:var(--brand-700);
+  --muted:               var(--surface-100);
+  --muted-foreground:    var(--surface-600);
+  --accent:              var(--surface-100);
+  --accent-foreground:   var(--brand-700);
+  --destructive:         oklch(0.577 0.245 27.325);
+  --border:              var(--surface-200);
+  --input:               var(--surface-200);
+  --ring:                var(--focus-500);
+  --chart-1:             var(--success-500);
+  --chart-2:             var(--focus-500);
+  --chart-3:             var(--info-500);
+  --chart-4:             var(--surface-500);
+  --chart-5:             var(--warning-500);
   --radius: 0.5rem;
-  --sidebar: oklch(0.145 0 0);
-  --sidebar-foreground: oklch(0.965 0 0);
-  --sidebar-primary: oklch(0.985 0 0);
-  --sidebar-primary-foreground: oklch(0.145 0 0);
-  --sidebar-accent: oklch(0.22 0 0);
-  --sidebar-accent-foreground: oklch(0.965 0 0);
-  --sidebar-border: oklch(0.25 0 0);
-  --sidebar-ring: oklch(0.985 0 0);
+
+  /* Status intents — reference status ramps (Layer 2) */
+  --success-bg:   var(--success-50);
+  --success-fg:   var(--success-700);
+  --success-ring: var(--success-500);
+  --warning-bg:   var(--warning-50);
+  --warning-fg:   var(--warning-700);
+  --warning-ring: var(--warning-500);
+  --info-bg:      var(--info-50);
+  --info-fg:      var(--info-700);
+  --info-ring:    var(--info-500);
+  --danger-bg:    var(--danger-50);
+  --danger-fg:    var(--danger-700);
+  --danger-ring:  var(--danger-500);
+  --neutral-bg:   var(--surface-100);
+  --neutral-fg:   var(--surface-600);
+  --neutral-ring: var(--surface-400);
+
+  /* Sidebar */
+  --sidebar:                    var(--brand-900);
+  --sidebar-foreground:         var(--surface-100);
+  --sidebar-primary:            var(--focus-300);
+  --sidebar-primary-foreground: var(--brand-900);
+  --sidebar-accent:             var(--brand-800);
+  --sidebar-accent-foreground:  var(--focus-200);
+  --sidebar-border:             var(--brand-800);
+  --sidebar-ring:               var(--focus-400);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.195 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.195 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.985 0 0);
-  --primary-foreground: oklch(0.145 0 0);
-  --secondary: oklch(0.25 0 0);
-  --secondary-foreground: oklch(0.935 0 0);
-  --muted: oklch(0.25 0 0);
-  --muted-foreground: oklch(0.60 0 0);
-  --accent: oklch(0.25 0 0);
-  --accent-foreground: oklch(0.935 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.985 0 0);
-  --chart-1: oklch(0.985 0 0);
-  --chart-2: oklch(0.70 0 0);
-  --chart-3: oklch(0.50 0 0);
-  --chart-4: oklch(0.35 0 0);
-  --chart-5: oklch(0.25 0 0);
-  --sidebar: oklch(0.12 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.985 0 0);
-  --sidebar-primary-foreground: oklch(0.145 0 0);
-  --sidebar-accent: oklch(0.22 0 0);
-  --sidebar-accent-foreground: oklch(0.965 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.985 0 0);
+  --background:          var(--brand-950);
+  --foreground:          var(--surface-50);
+  --card:                var(--brand-900);
+  --card-foreground:     var(--surface-50);
+  --popover:             var(--brand-900);
+  --popover-foreground:  var(--surface-50);
+  --primary:             var(--surface-100);
+  --primary-foreground:  var(--brand-900);
+  --secondary:           var(--brand-800);
+  --secondary-foreground:var(--surface-200);
+  --muted:               var(--brand-800);
+  --muted-foreground:    var(--surface-500);
+  --accent:              var(--brand-800);
+  --accent-foreground:   var(--surface-200);
+  --destructive:         oklch(0.704 0.191 22.216);
+  --border:              oklch(1 0 0 / 10%);
+  --input:               oklch(1 0 0 / 15%);
+  --ring:                var(--focus-400);
+  --chart-1:             var(--success-400);
+  --chart-2:             var(--focus-400);
+  --chart-3:             var(--info-400);
+  --chart-4:             var(--surface-400);
+  --chart-5:             var(--warning-400);
+
+  /* Status intents — inverted stops for dark surfaces */
+  --success-bg:   var(--success-900);
+  --success-fg:   var(--success-200);
+  --success-ring: var(--success-400);
+  --warning-bg:   var(--warning-900);
+  --warning-fg:   var(--warning-200);
+  --warning-ring: var(--warning-400);
+  --info-bg:      var(--info-900);
+  --info-fg:      var(--info-200);
+  --info-ring:    var(--info-400);
+  --danger-bg:    var(--danger-900);
+  --danger-fg:    var(--danger-200);
+  --danger-ring:  var(--danger-400);
+  --neutral-bg:   var(--surface-900);
+  --neutral-fg:   var(--surface-300);
+  --neutral-ring: var(--surface-500);
+
+  --sidebar:                    var(--brand-950);
+  --sidebar-foreground:         var(--surface-100);
+  --sidebar-primary:            var(--focus-300);
+  --sidebar-primary-foreground: var(--brand-950);
+  --sidebar-accent:             var(--brand-900);
+  --sidebar-accent-foreground:  var(--focus-200);
+  --sidebar-border:             oklch(1 0 0 / 10%);
+  --sidebar-ring:               var(--focus-400);
 }
 
 @layer base {

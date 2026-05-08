@@ -1514,33 +1514,35 @@ function EntryRow({
       {/* Inline edit row */}
       {isEditing && (
         <tr className="border-b bg-muted/20">
-          <td colSpan={isAdmin ? 12 : 8} className="p-4 flex flex-col gap-3">
-            <EntryEditFields
-              entry={entry}
-              isAdmin={isAdmin}
-              canViewFinancials={canViewFinancials}
-              isSalesOnApproved={isSalesOnApproved}
-              isAdminOnApproved={isAdminOnApproved}
-              form={form}
-              update={update}
-              setBuktiTransferUrls={setBuktiTransferUrls}
-              itemPrices={itemPrices}
-              updateItemPrice={updateItemPrice}
-              swapLivestock={swapLivestock}
-              resetSwap={resetSwap}
-              salesUsers={salesUsers}
-            />
-            {pendingRequest && (
-              <PendingEditBanner
-                pendingRequest={pendingRequest}
-                isAdmin={isAdmin}
+          <td colSpan={isAdmin ? 12 : 8} className="p-4">
+            <div className="flex flex-col gap-3">
+              <EntryEditFields
                 entry={entry}
-                onApprove={handleApproveEdit}
-                onReject={handleRejectEdit}
-                onCancel={handleCancelEdit}
-                loading={loading}
+                isAdmin={isAdmin}
+                canViewFinancials={canViewFinancials}
+                isSalesOnApproved={isSalesOnApproved}
+                isAdminOnApproved={isAdminOnApproved}
+                form={form}
+                update={update}
+                setBuktiTransferUrls={setBuktiTransferUrls}
+                itemPrices={itemPrices}
+                updateItemPrice={updateItemPrice}
+                swapLivestock={swapLivestock}
+                resetSwap={resetSwap}
+                salesUsers={salesUsers}
               />
-            )}
+              {pendingRequest && (
+                <PendingEditBanner
+                  pendingRequest={pendingRequest}
+                  isAdmin={isAdmin}
+                  entry={entry}
+                  onApprove={handleApproveEdit}
+                  onReject={handleRejectEdit}
+                  onCancel={handleCancelEdit}
+                  loading={loading}
+                />
+              )}
+            </div>
           </td>
         </tr>
       )}

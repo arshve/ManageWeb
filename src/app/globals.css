@@ -174,15 +174,15 @@
    Edit only this block to retune map marker colors.
    ════════════════════════════════════════════════════════════════════════ */
 :root {
-  --pin-1: oklch(0.52 0.17 145);  /* brand green  */
-  --pin-2: oklch(0.51 0.16 165);  /* green-teal   */
-  --pin-3: oklch(0.51 0.15 185);  /* teal         */
-  --pin-4: oklch(0.52 0.16 205);  /* blue-teal    */
-  --pin-5: oklch(0.50 0.16 225);  /* steel blue   */
-  --pin-6: oklch(0.50 0.18 245);  /* slate blue   */
-  --pin-7: oklch(0.49 0.20 262);  /* powder blue  */
-  --pin-8: oklch(0.48 0.16 280);  /* indigo       */
-  --pin-unassigned: oklch(0.52 0.02 213);  /* muted granite */
+  --pin-1: oklch(0.55 0.27 145);  /* vivid green   */
+  --pin-2: oklch(0.52 0.26 250);  /* vivid blue    */
+  --pin-3: oklch(0.56 0.26 25);   /* vivid red     */
+  --pin-4: oklch(0.58 0.23 60);   /* amber/orange  */
+  --pin-5: oklch(0.50 0.27 295);  /* purple        */
+  --pin-6: oklch(0.55 0.25 185);  /* teal/cyan     */
+  --pin-7: oklch(0.57 0.25 340);  /* hot pink      */
+  --pin-8: oklch(0.62 0.20 85);   /* chartreuse    */
+  --pin-unassigned: oklch(0.42 0.02 213);  /* dark granite  */
 }
 
 /* ════════════════════════════════════════════════════════════════════════

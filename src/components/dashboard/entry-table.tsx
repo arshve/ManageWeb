@@ -70,6 +70,7 @@ import {
   rejectEntry,
   deleteEntry,
   proposeEntryEdit,
+  directEditEntryItems,
   approveEntryEdit,
   rejectEntryEdit,
   cancelEntryEdit,
@@ -723,6 +724,7 @@ function useEntryRow(entry: EntryData, onSaved: () => void, isAdmin = false) {
   }
 
   const isSalesOnApproved = !isAdmin && entry.status === 'APPROVED';
+  const isAdminOnApproved = isAdmin && entry.status === 'APPROVED';
   const pendingRequest = entry.editRequests?.[0] ?? null;
 
   async function handleSave() {
@@ -757,6 +759,15 @@ function useEntryRow(entry: EntryData, onSaved: () => void, isAdmin = false) {
           return;
         }
         toast.success('Perubahan harga/hewan diajukan ke admin');
+      } else if (isAdminOnApproved && itemChanges.length > 0) {
+        const fd = new FormData();
+        fd.set('itemChanges', JSON.stringify(itemChanges));
+        const res = await directEditEntryItems(entry.id, fd);
+        if ('error' in res) {
+          toast.error(String(res.error));
+          setLoading(false);
+          return;
+        }
       }
 
       // Non-item fields always go through updateEntry directly
@@ -775,8 +786,9 @@ function useEntryRow(entry: EntryData, onSaved: () => void, isAdmin = false) {
       buktiTransferUrls.forEach((url) => formData.append('buktiTransfer', url));
       if (buktiTransferUrls.length === 0) formData.set('buktiTransferCleared', 'true');
 
-      // Admin or sales-on-PENDING: item changes also go through updateEntry
-      if (!isSalesOnApproved) {
+      // Sales-on-PENDING and non-approved admin: item changes go through updateEntry
+      // Admin-on-approved with livestock changes: already handled by directEditEntryItems above
+      if (!isSalesOnApproved && !(isAdminOnApproved && itemChanges.length > 0)) {
         formData.set('itemPrices', JSON.stringify(
           itemPrices.map((ip) => ({
             id: ip.id,
@@ -844,11 +856,17 @@ function useEntryRow(entry: EntryData, onSaved: () => void, isAdmin = false) {
     else toast.success('Permintaan dibatalkan');
   }
 
-  function swapLivestock(entryItemId: string, livestockId: string, sku: string, grade: string | null) {
+  function swapLivestock(entryItemId: string, livestockId: string, sku: string, grade: string | null, hargaJual: number | null) {
     setItemPrices((prev) =>
       prev.map((ip) =>
         ip.id === entryItemId
-          ? { ...ip, pendingLivestockId: livestockId, pendingLivestockSku: sku, pendingLivestockGrade: grade }
+          ? {
+              ...ip,
+              pendingLivestockId: livestockId,
+              pendingLivestockSku: sku,
+              pendingLivestockGrade: grade,
+              ...(hargaJual != null ? { hargaJual: String(hargaJual) } : {}),
+            }
           : ip,
       ),
     );
@@ -875,6 +893,7 @@ function useEntryRow(entry: EntryData, onSaved: () => void, isAdmin = false) {
     buktiTransferUrls,
     setBuktiTransferUrls,
     isSalesOnApproved,
+    isAdminOnApproved,
     pendingRequest,
     handleSave,
     handleApprove,
@@ -894,7 +913,7 @@ function LivestockSwapDialog({
 }: {
   currentLivestock: EntryItemData['livestock'];
   pendingLivestockSku: string | null;
-  onSwap: (livestockId: string, sku: string, grade: string | null) => void;
+  onSwap: (livestockId: string, sku: string, grade: string | null, hargaJual: number | null) => void;
   onReset: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -951,7 +970,7 @@ function LivestockSwapDialog({
               onToggle={(id) => {
                 const lv = options.find((o) => o.id === id);
                 if (!lv) return;
-                onSwap(lv.id, lv.sku, lv.grade);
+                onSwap(lv.id, lv.sku, lv.grade, lv.hargaJual);
                 setOpen(false);
               }}
             />
@@ -1038,6 +1057,7 @@ function EntryEditFields({
   isAdmin,
   canViewFinancials,
   isSalesOnApproved,
+  isAdminOnApproved,
   form,
   update,
   itemPrices,
@@ -1051,6 +1071,7 @@ function EntryEditFields({
   isAdmin: boolean;
   canViewFinancials: boolean;
   isSalesOnApproved: boolean;
+  isAdminOnApproved: boolean;
   form: ReturnType<typeof useEntryRow>['form'];
   update: ReturnType<typeof useEntryRow>['update'];
   itemPrices: ItemPriceState[];
@@ -1080,11 +1101,11 @@ function EntryEditFields({
                 {typeLabel}{lv.grade ? ` · ${lv.grade}` : ''}
                 {isMatiItem && <span className="text-destructive text-[10px] font-semibold">MATI</span>}
                 <span className="text-muted-foreground font-mono text-[10px]">{lv.sku}</span>
-                {isSalesOnApproved && (
+                {(isSalesOnApproved || isAdminOnApproved) && (
                   <LivestockSwapDialog
                     currentLivestock={lv}
                     pendingLivestockSku={ip.pendingLivestockSku}
-                    onSwap={(livestockId, sku, grade) => swapLivestock(ip.id, livestockId, sku, grade)}
+                    onSwap={(livestockId, sku, grade, hargaJual) => swapLivestock(ip.id, livestockId, sku, grade, hargaJual)}
                     onReset={() => resetSwap(ip.id)}
                   />
                 )}
@@ -1133,6 +1154,11 @@ function EntryEditFields({
         {isSalesOnApproved && (
           <p className="text-[11px] text-muted-foreground">
             Perubahan hewan &amp; Harga Jual perlu persetujuan admin.
+          </p>
+        )}
+        {isAdminOnApproved && (
+          <p className="text-[11px] text-muted-foreground">
+            Perubahan hewan &amp; Harga Jual akan langsung diterapkan.
           </p>
         )}
         {itemPrices.length > 1 && (
@@ -1292,6 +1318,7 @@ function EntryRow({
     swapLivestock,
     resetSwap,
     isSalesOnApproved,
+    isAdminOnApproved,
     pendingRequest,
     handleSave,
     handleApprove,
@@ -1493,6 +1520,7 @@ function EntryRow({
               isAdmin={isAdmin}
               canViewFinancials={canViewFinancials}
               isSalesOnApproved={isSalesOnApproved}
+              isAdminOnApproved={isAdminOnApproved}
               form={form}
               update={update}
               setBuktiTransferUrls={setBuktiTransferUrls}
@@ -1550,6 +1578,7 @@ function MobileEntryCard({
     swapLivestock,
     resetSwap,
     isSalesOnApproved,
+    isAdminOnApproved,
     pendingRequest,
     handleSave,
     handleApprove,
@@ -1621,6 +1650,7 @@ function MobileEntryCard({
               isAdmin={isAdmin}
               canViewFinancials={canViewFinancials}
               isSalesOnApproved={isSalesOnApproved}
+              isAdminOnApproved={isAdminOnApproved}
               form={form}
               update={update}
               setBuktiTransferUrls={setBuktiTransferUrls}

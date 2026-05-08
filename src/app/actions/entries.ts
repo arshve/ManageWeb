@@ -618,6 +618,73 @@ export async function proposeEntryEdit(entryId: string, formData: FormData) {
   return { success: true };
 }
 
+export async function directEditEntryItems(entryId: string, formData: FormData) {
+  const admin = await requireRole('ADMIN', 'SUPER_ADMIN');
+
+  const entry = await prisma.entry.findUnique({
+    where: { id: entryId },
+    include: { items: { include: { livestock: true } } },
+  });
+  if (!entry) return { error: 'Entry tidak ditemukan' };
+  if (entry.status !== 'APPROVED') return { error: 'Hanya entry yang sudah disetujui yang dapat diubah langsung' };
+
+  const itemChanges: ItemChange[] = JSON.parse(formData.get('itemChanges') as string);
+  if (!Array.isArray(itemChanges) || itemChanges.length === 0) {
+    return { error: 'Tidak ada perubahan item' };
+  }
+
+  for (const ic of itemChanges) {
+    const entryItem = entry.items.find((i) => i.id === ic.entryItemId);
+    if (!entryItem) return { error: `Item tidak ditemukan: ${ic.entryItemId}` };
+    if (ic.livestockId !== entryItem.livestockId) {
+      const lv = await prisma.livestock.findUnique({ where: { id: ic.livestockId } });
+      if (!lv) return { error: `Hewan tidak ditemukan: ${ic.livestockId}` };
+      if (lv.isSold) return { error: `Hewan ${lv.sku} sudah terjual` };
+    }
+  }
+
+  await prisma.$transaction(async (tx) => {
+    for (const ic of itemChanges) {
+      const entryItem = entry.items.find((i) => i.id === ic.entryItemId)!;
+      const livestock = ic.livestockId !== entryItem.livestockId
+        ? await tx.livestock.findUniqueOrThrow({ where: { id: ic.livestockId } })
+        : entryItem.livestock;
+
+      if (ic.livestockId !== entryItem.livestockId) {
+        await tx.livestock.update({ where: { id: entryItem.livestockId }, data: { isSold: false } });
+        await tx.livestock.update({ where: { id: ic.livestockId }, data: { isSold: true } });
+      }
+
+      const hargaModal = livestock.hargaModal ?? entryItem.hargaModal;
+      const resellerCut = entryItem.resellerCut;
+      const hpp = hargaModal !== null ? hargaModal + (resellerCut ?? 0) : null;
+      const profit = hpp !== null ? ic.hargaJual - hpp : null;
+
+      await tx.entryItem.update({
+        where: { id: ic.entryItemId },
+        data: { livestockId: ic.livestockId, hargaJual: ic.hargaJual, hargaModal, hpp, profit },
+      });
+    }
+
+    await tx.entry.update({ where: { id: entryId }, data: { sortAt: new Date() } });
+  });
+
+  await logAudit({
+    actor: admin,
+    action: 'UPDATE',
+    entity: 'Entry',
+    entityId: entryId,
+    label: `${entry.invoiceNo} — hewan/harga diubah admin`,
+    before: { items: entry.items.map((i) => ({ id: i.id, livestockId: i.livestockId, hargaJual: i.hargaJual })) },
+    after: { itemChanges },
+  });
+
+  revalidatePath('/admin');
+  revalidatePath('/sales');
+  revalidatePath('/admin/entries');
+  return { success: true };
+}
+
 export async function approveEntryEdit(requestId: string) {
   const admin = await requireRole('ADMIN', 'SUPER_ADMIN');
 

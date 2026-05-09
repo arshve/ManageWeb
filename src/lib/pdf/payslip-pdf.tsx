@@ -61,14 +61,14 @@ const SC = {
 // Type is now short (weight range "310-320" or grade "D"), so keep it narrow.
 
 const RC = {
-  c0: '8%',  // Tag
-  c1: '12%', // Sales
+  c0: '12%', // Tag  — widened: "STRESS-0508" needs ~50px, 12% ≈ 57px
+  c1: '11%', // Sales
   c2: '8%',  // Hewan
-  c3: '10%', // Type  ("310-320" / "D")
+  c3: '8%',  // Type  ("310-320" / "D")
   c4: '15%', // Harga Jual
-  c5: '13%', // Cut
+  c5: '10%', // Cut   — "Rp150,000" fits at 10%
   c6: '14%', // Pembeli
-  c7: '20%', // Alamat
+  c7: '22%', // Alamat
 };
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
@@ -152,9 +152,9 @@ const S = StyleSheet.create({
   // Summary table cells
   td: { fontSize: 9, color: '#111111' },
   tdBold: { fontSize: 9, fontFamily: 'Helvetica-Bold', color: '#111111' },
-  // Recap table cells — smaller font, locked width so nothing bleeds
-  tdR: { fontSize: 7.5, color: '#111111', flexShrink: 0, flexGrow: 0 },
-  tdRBold: { fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: '#111111', flexShrink: 0, flexGrow: 0 },
+  // Recap table cells — width is controlled by rcell View, not by Text flex
+  tdR: { fontSize: 7.5, color: '#111111' },
+  tdRBold: { fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: '#111111' },
 
   // Cell wrapper with right-border separator
   rcell: {
@@ -264,7 +264,7 @@ function RecapTable({ items }: { items: RecapItem[] }) {
           key={idx}
           style={[S.dataRow, { backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f2f2f2' }]}
         >
-          <View style={[S.rcell, { width: RC.c0 }]}><Text style={S.tdR}>{item.tag ?? ''}</Text></View>
+          <View style={[S.rcell, { width: RC.c0 }]}><Text style={S.tdR}>{(item.tag ?? '').replace(/-/g, '-​')}</Text></View>
           <View style={[S.rcell, { width: RC.c1 }]}><Text style={S.tdR}>{item.salesName}</Text></View>
           <View style={[S.rcell, { width: RC.c2 }]}><Text style={S.tdR}>{item.hewan}</Text></View>
           <View style={[S.rcell, { width: RC.c3 }]}><Text style={S.tdR}>{item.type}</Text></View>

@@ -89,6 +89,8 @@ function StatusBadge({ status }: { status: string }) {
 
 export function FinanceView({ entries, salesUsers, cashflows }: FinanceViewProps) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [salesPage, setSalesPage] = useState(0);
+  const SALES_PAGE_SIZE = 5;
   const [cashflow, setCashflow] = useState<CashflowItem[]>(cashflows);
   const [cfType, setCfType] = useState<'PENGELUARAN' | 'PEMASUKAN'>('PENGELUARAN');
   const [cfName, setCfName] = useState('');
@@ -150,6 +152,9 @@ export function FinanceView({ entries, salesUsers, cashflows }: FinanceViewProps
     });
     return Array.from(map.values()).filter((r) => r.entries.length > 0);
   }, [entries, salesUsers]);
+
+  const salesPageCount = Math.ceil(perSales.length / SALES_PAGE_SIZE);
+  const pagedSales = perSales.slice(salesPage * SALES_PAGE_SIZE, (salesPage + 1) * SALES_PAGE_SIZE);
 
   const allExpanded = perSales.length > 0 && perSales.every((r) => expanded.has(r.user.id));
 
@@ -320,16 +325,40 @@ export function FinanceView({ entries, salesUsers, cashflows }: FinanceViewProps
             Belum ada data penjualan
           </div>
         ) : (
-          <div className="flex flex-col gap-2">
-            {perSales.map((record) => (
-              <SalesCard
-                key={record.user.id}
-                record={record}
-                isOpen={expanded.has(record.user.id)}
-                onToggle={() => toggleOne(record.user.id)}
-              />
-            ))}
-          </div>
+          <>
+            <div className="flex flex-col gap-2">
+              {pagedSales.map((record) => (
+                <SalesCard
+                  key={record.user.id}
+                  record={record}
+                  isOpen={expanded.has(record.user.id)}
+                  onToggle={() => toggleOne(record.user.id)}
+                />
+              ))}
+            </div>
+            {salesPageCount > 1 && (
+              <div className="flex items-center justify-between mt-3">
+                <span className="text-[11px] text-muted-foreground tabular-nums">
+                  {salesPage * SALES_PAGE_SIZE + 1}–{Math.min((salesPage + 1) * SALES_PAGE_SIZE, perSales.length)} dari {perSales.length}
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    disabled={salesPage === 0}
+                    onClick={() => setSalesPage((p) => p - 1)}
+                    className="px-2.5 py-1 text-xs rounded-md border text-muted-foreground hover:bg-muted/40 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  >←</button>
+                  <span className="text-[11px] text-muted-foreground tabular-nums px-1">
+                    {salesPage + 1} / {salesPageCount}
+                  </span>
+                  <button
+                    disabled={salesPage >= salesPageCount - 1}
+                    onClick={() => setSalesPage((p) => p + 1)}
+                    className="px-2.5 py-1 text-xs rounded-md border text-muted-foreground hover:bg-muted/40 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  >→</button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 

@@ -21,7 +21,7 @@ const SECRET = new TextEncoder().encode(
 );
 
 // Name of the cookie that stores the JWT token
-const COOKIE_NAME = 'mf-session';
+const COOKIE_NAME = 'mf-session-v2';
 
 /**
  * Creates a new session for a user after successful login.
@@ -32,8 +32,7 @@ const COOKIE_NAME = 'mf-session';
  * @returns The signed JWT token string
  */
 export async function createSession(userId: string, role: string) {
-  const dep = process.env.VERCEL_DEPLOYMENT_ID ?? 'local';
-  const token = await new SignJWT({ userId, role, dep })
+  const token = await new SignJWT({ userId, role })
     .setProtectedHeader({ alg: 'HS256' })
     .setExpirationTime('7d')
     .sign(SECRET);
@@ -64,8 +63,6 @@ export async function getSessionUserId(): Promise<string | null> {
 
   try {
     const { payload } = await jwtVerify(token, SECRET);
-    const currentDep = process.env.VERCEL_DEPLOYMENT_ID ?? 'local';
-    if (payload.dep !== currentDep) return null;
     return (payload.userId as string) || null;
   } catch {
     return null;

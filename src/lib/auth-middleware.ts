@@ -21,7 +21,7 @@ const SECRET = new TextEncoder().encode(
   process.env.SESSION_SECRET || "millenials-farm-dev-secret-change-in-prod"
 );
 
-const COOKIE_NAME = "mf-session";
+const COOKIE_NAME = "mf-session-v2";
 
 /**
  * Verifies the session cookie and handles route protection.

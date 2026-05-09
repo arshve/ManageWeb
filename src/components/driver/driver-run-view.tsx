@@ -6,7 +6,7 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { compressImage } from '@/lib/image';
+import { compressImage, addWatermark } from '@/lib/image';
 
 import { cn } from '@/lib/utils';
 import { StatusToken, intentVars, DELIVERY_STATUS } from '@/components/ui/status-token';
@@ -411,8 +411,18 @@ function StopCard({
     const file = e.target.files?.[0];
     if (!file) return;
     const compressed = await compressImage(file);
-    setPhotoFile(compressed);
-    setPhotoPreview(URL.createObjectURL(compressed));
+    const coords = await new Promise<GeolocationCoordinates | null>((resolve) => {
+      if (!navigator.geolocation) { resolve(null); return; }
+      const timer = setTimeout(() => resolve(null), 5000);
+      navigator.geolocation.getCurrentPosition(
+        (pos) => { clearTimeout(timer); resolve(pos.coords); },
+        () => { clearTimeout(timer); resolve(null); },
+        { enableHighAccuracy: true, timeout: 5000 },
+      );
+    });
+    const watermarked = await addWatermark(compressed, coords?.latitude, coords?.longitude);
+    setPhotoFile(watermarked);
+    setPhotoPreview(URL.createObjectURL(watermarked));
   }
 
   function clearPhoto() {

@@ -52,13 +52,13 @@ export default async function DriverPage({
           buyerMaps: true,
           buyerLat: true,
           buyerLng: true,
-          sales: { select: { name: true } },
+          sales: { select: { name: true, phone: true } },
           items: {
             select: {
               id: true,
               loadedAt: true,
               loadedBy: true,
-              livestock: { select: { sku: true, tag: true, type: true, grade: true, photoUrl: true } },
+              livestock: { select: { sku: true, tag: true, type: true, grade: true, photoUrl: true, weightMin: true, weightMax: true } },
             },
           },
         },
@@ -137,6 +137,7 @@ export default async function DriverPage({
             buyerLat: d.entry.buyerLat,
             buyerLng: d.entry.buyerLng,
             salesName: d.entry.sales.name,
+            salesPhone: d.entry.sales.phone ?? null,
             items: d.entry.items.map((i) => ({
               itemId: i.id,
               loadedAt: i.loadedAt?.toISOString() ?? null,

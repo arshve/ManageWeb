@@ -831,6 +831,7 @@ export function DeliveriesAdminView({
                         <th className={cn(th, 'pl-4 w-10')}>#</th>
                         <th className={cn(th, 'w-36')}>Hewan / SKU</th>
                         <th className={th}>Pembeli</th>
+                        <th className={cn(th, 'w-28')}>Sales</th>
                         <th className={th}>Alamat</th>
                         <th className={cn(th, 'w-28 text-center')}>Pengiriman</th>
                         <th className={cn(th, 'w-36 text-center')}>Status</th>
@@ -904,6 +905,7 @@ export function DeliveriesAdminView({
                               <span className="font-medium text-foreground">{s.buyerName}</span>
                               {s.buyerPhone && <span className="block text-xs text-muted-foreground">{s.buyerPhone}</span>}
                             </td>
+                            <td className={cn(td, 'text-xs text-muted-foreground whitespace-nowrap')}>{s.salesName ?? '—'}</td>
                             <td className={cn(td, 'text-xs text-muted-foreground max-w-[180px] truncate')} title={s.buyerAddress ?? undefined}>{s.buyerAddress ?? '—'}</td>
                             <td className={cn(td, 'text-center')}>
                               {s.pengiriman
@@ -966,6 +968,7 @@ export function DeliveriesAdminView({
                             </span>
                             <div className="min-w-0">
                               <span className="font-medium text-sm text-foreground truncate block">{s.buyerName}</span>
+                              {s.salesName && <span className="text-[11px] text-muted-foreground">{s.salesName}</span>}
                               {s.delivery?.status === 'DELIVERED' && s.delivery.proofPhotoUrl && (
                                 <button
                                   type="button"

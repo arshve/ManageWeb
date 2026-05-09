@@ -7,9 +7,14 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { compressImage, addWatermark } from '@/lib/image';
+import { getLastDriverCoords } from '@/components/driver/location-pinger';
 
 import { cn } from '@/lib/utils';
-import { StatusToken, intentVars, DELIVERY_STATUS } from '@/components/ui/status-token';
+import {
+  StatusToken,
+  intentVars,
+  DELIVERY_STATUS,
+} from '@/components/ui/status-token';
 
 const SERIF = "var(--font-dm-serif), 'DM Serif Display', serif";
 import {
@@ -61,6 +66,7 @@ type Stop = {
     buyerLat: number | null;
     buyerLng: number | null;
     salesName: string;
+    salesPhone: string | null;
     items: {
       itemId: string;
       loadedAt: string | null;
@@ -69,6 +75,8 @@ type Stop = {
       type: string;
       grade: string | null;
       photoUrl: string | null;
+      weightMin: number | null;
+      weightMax: number | null;
     }[];
   };
 };
@@ -98,26 +106,35 @@ export function DriverRunView({
     stops.length > 0 && stops.every((s) => s.status === 'ASSIGNED');
 
   const [checkedItems, setCheckedItems] = useState<Set<string>>(
-    () => new Set(
-      stops.flatMap((s) => s.entry.items)
-        .filter((i) => i.loadedAt)
-        .map((i) => i.itemId),
-    ),
+    () =>
+      new Set(
+        stops
+          .flatMap((s) => s.entry.items)
+          .filter((i) => i.loadedAt)
+          .map((i) => i.itemId),
+      ),
   );
 
   useEffect(() => {
     const channel = supabase
       .channel('entryitem-loadout-driver')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'EntryItem' }, (payload) => {
-        const row = payload.new as { id: string; loadedAt: string | null };
-        setCheckedItems((prev) => {
-          const next = new Set(prev);
-          if (row.loadedAt) next.add(row.id); else next.delete(row.id);
-          return next;
-        });
-      })
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'EntryItem' },
+        (payload) => {
+          const row = payload.new as { id: string; loadedAt: string | null };
+          setCheckedItems((prev) => {
+            const next = new Set(prev);
+            if (row.loadedAt) next.add(row.id);
+            else next.delete(row.id);
+            return next;
+          });
+        },
+      )
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const {
@@ -133,15 +150,19 @@ export function DriverRunView({
     const allItems = assigned.flatMap((s) => s.entry.items);
     const loaded = allItems.filter((i) => checkedItems.has(i.itemId)).length;
     const partial = assigned.some(
-      (s) => s.entry.items.some((i) => checkedItems.has(i.itemId)) && !s.entry.items.every((i) => checkedItems.has(i.itemId)),
+      (s) =>
+        s.entry.items.some((i) => checkedItems.has(i.itemId)) &&
+        !s.entry.items.every((i) => checkedItems.has(i.itemId)),
     );
-    const skipped = assigned.some(
-      (s) => s.entry.items.every((i) => !checkedItems.has(i.itemId)),
+    const skipped = assigned.some((s) =>
+      s.entry.items.every((i) => !checkedItems.has(i.itemId)),
     );
     const pEntries = assigned
       .filter((s) => !s.entry.items.every((i) => checkedItems.has(i.itemId)))
       .map((s) => {
-        const loadedCount = s.entry.items.filter((i) => checkedItems.has(i.itemId)).length;
+        const loadedCount = s.entry.items.filter((i) =>
+          checkedItems.has(i.itemId),
+        ).length;
         return `${s.entry.buyerName} (${loadedCount}/${s.entry.items.length} dimuat)`;
       });
     return {
@@ -158,7 +179,8 @@ export function DriverRunView({
   function handleToggleItem(itemId: string, checked: boolean) {
     setCheckedItems((prev) => {
       const next = new Set(prev);
-      if (checked) next.add(itemId); else next.delete(itemId);
+      if (checked) next.add(itemId);
+      else next.delete(itemId);
       return next;
     });
     startToggleTransition(async () => {
@@ -167,17 +189,25 @@ export function DriverRunView({
         toast.error(r.error);
         setCheckedItems((prev) => {
           const next = new Set(prev);
-          if (checked) next.delete(itemId); else next.add(itemId);
+          if (checked) next.delete(itemId);
+          else next.add(itemId);
           return next;
         });
       }
     });
   }
 
-  function handleToggleAll(deliveryId: string, items: Stop['entry']['items'], checked: boolean) {
+  function handleToggleAll(
+    deliveryId: string,
+    items: Stop['entry']['items'],
+    checked: boolean,
+  ) {
     setCheckedItems((prev) => {
       const next = new Set(prev);
-      items.forEach((i) => { if (checked) next.add(i.itemId); else next.delete(i.itemId); });
+      items.forEach((i) => {
+        if (checked) next.add(i.itemId);
+        else next.delete(i.itemId);
+      });
       return next;
     });
     startToggleTransition(async () => {
@@ -186,7 +216,10 @@ export function DriverRunView({
         toast.error(r.error);
         setCheckedItems((prev) => {
           const next = new Set(prev);
-          items.forEach((i) => { if (checked) next.delete(i.itemId); else next.add(i.itemId); });
+          items.forEach((i) => {
+            if (checked) next.delete(i.itemId);
+            else next.add(i.itemId);
+          });
           return next;
         });
       }
@@ -215,7 +248,10 @@ export function DriverRunView({
   }
 
   function handleStart() {
-    if (needsConfirm) { setConfirmOpen(true); return; }
+    if (needsConfirm) {
+      setConfirmOpen(true);
+      return;
+    }
     doStart();
   }
 
@@ -225,9 +261,14 @@ export function DriverRunView({
       if ('error' in r) toast.error(r.error);
       else {
         const extras: string[] = [];
-        if ('skipped' in r && r.skipped > 0) extras.push(`${r.skipped} stop dikembalikan ke unscheduled`);
-        if ('splitEntries' in r && r.splitEntries > 0) extras.push(`${r.splitEntries} entry dipecah`);
-        toast.success('Rute dimulai! Hati-hati di jalan.' + (extras.length ? ` (${extras.join(', ')})` : ''));
+        if ('skipped' in r && r.skipped > 0)
+          extras.push(`${r.skipped} stop dikembalikan ke unscheduled`);
+        if ('splitEntries' in r && r.splitEntries > 0)
+          extras.push(`${r.splitEntries} entry dipecah`);
+        toast.success(
+          'Rute dimulai! Hati-hati di jalan.' +
+            (extras.length ? ` (${extras.join(', ')})` : ''),
+        );
       }
     });
   }
@@ -282,15 +323,23 @@ export function DriverRunView({
         {stops.length > 0 && (
           <div className="mt-3">
             <div className="flex justify-between text-xs font-medium mb-1.5">
-              <span className="text-muted-foreground uppercase tracking-[0.08em] text-[10px] font-bold">Progress</span>
-              <span className="text-sm font-bold text-success-fg" style={{ fontFamily: SERIF }}>
+              <span className="text-muted-foreground uppercase tracking-[0.08em] text-[10px] font-bold">
+                Progress
+              </span>
+              <span
+                className="text-sm font-bold text-success-fg"
+                style={{ fontFamily: SERIF }}
+              >
                 {deliveredCount} / {stops.length}
               </span>
             </div>
             <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
               <div
                 className="h-full rounded-full transition-all duration-500 ease-in-out"
-                style={{ width: `${progress}%`, background: 'var(--success-ring)' }}
+                style={{
+                  width: `${progress}%`,
+                  background: 'var(--success-ring)',
+                }}
               />
             </div>
           </div>
@@ -302,25 +351,35 @@ export function DriverRunView({
         <>
           <div className="rounded-xl border bg-card overflow-hidden">
             <div className="px-4 py-2.5 border-b bg-muted/30 flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-muted-foreground">Checklist Muatan</span>
-              <span className={cn(
-                'text-xs font-semibold px-2 py-0.5 rounded-full',
-                totalLoaded === totalAssignedItems && totalAssignedItems > 0
-                  ? 'bg-success-bg text-success-fg'
-                  : totalLoaded > 0
-                    ? 'bg-warning-bg text-warning-fg'
-                    : 'bg-muted text-muted-foreground',
-              )}>
+              <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
+                Checklist Muatan
+              </span>
+              <span
+                className={cn(
+                  'text-xs font-semibold px-2 py-0.5 rounded-full',
+                  totalLoaded === totalAssignedItems && totalAssignedItems > 0
+                    ? 'bg-success-bg text-success-fg'
+                    : totalLoaded > 0
+                      ? 'bg-warning-bg text-warning-fg'
+                      : 'bg-muted text-muted-foreground',
+                )}
+              >
                 {totalLoaded}/{totalAssignedItems} dimuat
               </span>
             </div>
             <p className="px-4 py-2 text-xs text-muted-foreground border-b">
-              Centang setiap hewan yang sudah naik ke kendaraan sebelum berangkat.
+              Centang setiap hewan yang sudah naik ke kendaraan sebelum
+              berangkat.
             </p>
           </div>
           <button
             className="w-full h-14 rounded-xl text-base font-bold flex items-center justify-center gap-2.5 transition-all disabled:opacity-60"
-            style={{ background: 'var(--primary)', color: 'var(--sidebar-primary)', fontFamily: SERIF, boxShadow: '0 4px 24px oklch(0.22 0.065 145 / 0.25)' }}
+            style={{
+              background: 'var(--primary)',
+              color: 'var(--sidebar-primary)',
+              fontFamily: SERIF,
+              boxShadow: '0 4px 24px oklch(0.22 0.065 145 / 0.25)',
+            }}
             onClick={handleStart}
             disabled={pending || totalLoaded === 0}
           >
@@ -338,7 +397,12 @@ export function DriverRunView({
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Batal</AlertDialogCancel>
-                <AlertDialogAction onClick={() => { setConfirmOpen(false); doStart(); }}>
+                <AlertDialogAction
+                  onClick={() => {
+                    setConfirmOpen(false);
+                    doStart();
+                  }}
+                >
                   Lanjutkan
                 </AlertDialogAction>
               </AlertDialogFooter>
@@ -351,29 +415,32 @@ export function DriverRunView({
       <div className="flex flex-col gap-4">
         {[...stops]
           .sort((a, b) => {
-            const done = (s: Stop) => s.status === 'DELIVERED' || s.status === 'FAILED';
+            const done = (s: Stop) =>
+              s.status === 'DELIVERED' || s.status === 'FAILED';
             if (done(a) !== done(b)) return done(a) ? 1 : -1;
             return (a.sequence ?? 0) - (b.sequence ?? 0);
           })
           .map((s) => (
-          <StopCard
-            key={s.id}
-            stop={s}
-            isCurrent={isToday && current?.id === s.id && !notStarted}
-            readOnly={!isToday}
-            checkedItems={checkedItems}
-            onToggleItem={handleToggleItem}
-            onToggleAll={handleToggleAll}
-            toggleDisabled={togglePending}
-          />
-        ))}
+            <StopCard
+              key={s.id}
+              stop={s}
+              isCurrent={isToday && current?.id === s.id && !notStarted}
+              readOnly={!isToday}
+              checkedItems={checkedItems}
+              onToggleItem={handleToggleItem}
+              onToggleAll={handleToggleAll}
+              toggleDisabled={togglePending}
+            />
+          ))}
 
         {stops.length === 0 && (
           <div className="flex flex-col items-center justify-center p-12 text-center border rounded-xl bg-muted/20 border-dashed mt-8">
             <div className="size-14 rounded-full flex items-center justify-center mb-4 bg-primary/10">
               <Clock className="size-7 text-success-fg" />
             </div>
-            <h3 className="font-bold text-lg" style={{ fontFamily: SERIF }}>Tidak Ada Jadwal</h3>
+            <h3 className="font-bold text-lg" style={{ fontFamily: SERIF }}>
+              Tidak Ada Jadwal
+            </h3>
             <p className="text-sm text-muted-foreground mt-1 max-w-xs">
               Tidak ada pengiriman untuk tanggal ini.
             </p>
@@ -398,7 +465,11 @@ function StopCard({
   readOnly: boolean;
   checkedItems: Set<string>;
   onToggleItem: (itemId: string, checked: boolean) => void;
-  onToggleAll: (deliveryId: string, items: Stop['entry']['items'], checked: boolean) => void;
+  onToggleAll: (
+    deliveryId: string,
+    items: Stop['entry']['items'],
+    checked: boolean,
+  ) => void;
   toggleDisabled: boolean;
 }) {
   const [notes, setNotes] = useState('');
@@ -406,21 +477,22 @@ function StopCard({
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const done = stop.status === 'DELIVERED' || stop.status === 'FAILED';
+  const [collapsed, setCollapsed] = useState(done);
+
+  useEffect(() => {
+    if (done) setCollapsed(true);
+  }, [done]);
 
   async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     const compressed = await compressImage(file);
-    const coords = await new Promise<GeolocationCoordinates | null>((resolve) => {
-      if (!navigator.geolocation) { resolve(null); return; }
-      const timer = setTimeout(() => resolve(null), 5000);
-      navigator.geolocation.getCurrentPosition(
-        (pos) => { clearTimeout(timer); resolve(pos.coords); },
-        () => { clearTimeout(timer); resolve(null); },
-        { enableHighAccuracy: true, timeout: 5000 },
-      );
-    });
-    const watermarked = await addWatermark(compressed, coords?.latitude, coords?.longitude);
+    const coords = getLastDriverCoords();
+    const watermarked = await addWatermark(
+      compressed,
+      coords?.lat,
+      coords?.lng,
+    );
     setPhotoFile(watermarked);
     setPhotoPreview(URL.createObjectURL(watermarked));
   }
@@ -448,9 +520,12 @@ function StopCard({
     if (photoFile) {
       const fd = new FormData();
       fd.append('file', photoFile);
-      const res = await fetch('/api/upload?folder=delivery-proof', { method: 'POST', body: fd });
+      const res = await fetch('/api/upload?folder=delivery-proof', {
+        method: 'POST',
+        body: fd,
+      });
       if (res.ok) {
-        const { url } = await res.json() as { url: string };
+        const { url } = (await res.json()) as { url: string };
         proofUrl = url;
       } else {
         toast.error('Gagal upload foto bukti — coba lagi');
@@ -477,7 +552,6 @@ function StopCard({
     setBusy(false);
   }
 
-
   const ds = DELIVERY_STATUS[stop.status] ?? DELIVERY_STATUS.ASSIGNED;
 
   return (
@@ -487,35 +561,60 @@ function StopCard({
         isCurrent ? 'shadow-md' : '',
         done ? 'opacity-70' : '',
       )}
-      style={isCurrent ? { borderColor: 'var(--primary)', boxShadow: '0 0 0 1px oklch(0.22 0.065 145 / 0.15), 0 4px 16px oklch(0.22 0.065 145 / 0.12)' } : {}}
+      style={
+        isCurrent
+          ? {
+              borderColor: 'var(--primary)',
+              boxShadow:
+                '0 0 0 1px oklch(0.22 0.065 145 / 0.15), 0 4px 16px oklch(0.22 0.065 145 / 0.12)',
+            }
+          : {}
+      }
     >
       {/* ── Card Header ── */}
-      <div
-        className="px-4 py-2.5 border-b flex justify-between items-center"
-        style={{ ...intentVars(ds.intent), background: 'var(--token-bg)', borderColor: 'var(--token-ring)' }}
+      <button
+        type="button"
+        className="w-full px-4 py-2.5 border-b flex justify-between items-center text-left"
+        style={{
+          ...intentVars(ds.intent),
+          background: 'var(--token-bg)',
+          borderColor: 'var(--token-ring)',
+        }}
+        onClick={() => setCollapsed((c) => !c)}
       >
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 min-w-0">
           <span
             className="size-7 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
             style={{ background: 'var(--token-ring)', fontFamily: SERIF }}
           >
             {stop.sequence + 1}
           </span>
-          <div className="flex flex-wrap gap-1">
+          <div className="flex flex-wrap gap-1 min-w-0">
             {stop.entry.items.map((lv) => (
-              <span key={lv.sku} className="text-xs font-mono tracking-tight text-muted-foreground bg-muted/70 px-1.5 py-0.5 rounded">
+              <span
+                key={lv.sku}
+                className="text-xs font-mono tracking-tight text-muted-foreground bg-muted/70 px-1.5 py-0.5 rounded"
+              >
                 {lv.tag ?? lv.sku}
               </span>
             ))}
           </div>
         </div>
-        <StatusToken intent={ds.intent}>{ds.label}</StatusToken>
-      </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <StatusToken intent={ds.intent}>{ds.label}</StatusToken>
+          <Navigation
+            className={cn('size-3.5 text-muted-foreground transition-transform duration-200', collapsed ? '' : 'rotate-180')}
+          />
+        </div>
+      </button>
 
-      <div className="p-4 flex flex-col gap-4">
+      {!collapsed && <div className="p-4 flex flex-col gap-4">
         {/* ── Buyer Info ── */}
         <div>
-          <h3 className="text-xl font-bold leading-tight" style={{ fontFamily: SERIF }}>
+          <h3
+            className="text-xl font-bold leading-tight"
+            style={{ fontFamily: SERIF }}
+          >
             {stop.entry.buyerName}
           </h3>
           <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">
@@ -561,7 +660,10 @@ function StopCard({
           ) : stop.entry.buyerPhone ? (
             <a
               href={`tel:${stop.entry.buyerPhone}`}
-              className={cn(buttonVariants({ variant: 'outline' }), 'flex-1 gap-2')}
+              className={cn(
+                buttonVariants({ variant: 'outline' }),
+                'flex-1 gap-2',
+              )}
             >
               <Phone className="size-4" />
               Telepon
@@ -577,27 +679,57 @@ function StopCard({
         {/* ── Animal Details ── */}
         {(() => {
           const isAssigned = stop.status === 'ASSIGNED';
-          const loadedCount = stop.entry.items.filter((i) => checkedItems.has(i.itemId)).length;
+          const loadedCount = stop.entry.items.filter((i) =>
+            checkedItems.has(i.itemId),
+          ).length;
           const total = stop.entry.items.length;
           const allLoaded = loadedCount === total;
           return (
             <div className="rounded-lg border bg-muted/30 overflow-hidden">
               <div className="px-3 py-2 border-b bg-muted/30 flex items-center justify-between">
-                <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
-                  Detail Hewan · Sales: {stop.entry.salesName}
+                <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground flex items-center gap-1 flex-wrap">
+                  <span>Sales: {stop.entry.salesName}</span>
+                  {stop.entry.salesPhone && (() => {
+                    const itemLines = stop.entry.items.map((lv) => {
+                      const label = lv.type.charAt(0) + lv.type.slice(1).toLowerCase() + (lv.grade ? ` ${lv.grade}` : '');
+                      const weight = lv.type === 'SAPI' && (lv.weightMin || lv.weightMax) ? ` ${lv.weightMin ?? '?'}-${lv.weightMax ?? '?'}kg` : '';
+                      return `• ${label}${weight} (${lv.tag ?? lv.sku})`;
+                    }).join('\n');
+                    const msg = `Halo ${stop.entry.salesName}, update pengiriman stop #${stop.sequence + 1}:\n\nPembeli: ${stop.entry.buyerName}\nAlamat: ${stop.entry.buyerAddress ?? '-'}\n\nHewan:\n${itemLines}\n\nStatus: ${DELIVERY_STATUS[stop.status]?.label ?? stop.status}`;
+                    const waHref = `https://wa.me/${formatWaNumber(stop.entry.salesPhone)}?text=${encodeURIComponent(msg)}`;
+                    return (
+                      <a
+                        href={waHref}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="underline underline-offset-2 hover:text-foreground transition-colors"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        | {stop.entry.salesPhone}
+                      </a>
+                    );
+                  })()}
                 </p>
                 {isAssigned && (
                   <div className="flex items-center gap-2">
-                    <span className={cn(
-                      'text-xs font-semibold px-1.5 py-0.5 rounded-full',
-                      allLoaded ? 'bg-success-bg text-success-fg' : loadedCount > 0 ? 'bg-warning-bg text-warning-fg' : 'bg-muted text-muted-foreground',
-                    )}>
+                    <span
+                      className={cn(
+                        'text-xs font-semibold px-1.5 py-0.5 rounded-full',
+                        allLoaded
+                          ? 'bg-success-bg text-success-fg'
+                          : loadedCount > 0
+                            ? 'bg-warning-bg text-warning-fg'
+                            : 'bg-muted text-muted-foreground',
+                      )}
+                    >
                       {loadedCount}/{total}
                     </span>
                     <button
                       className="text-[10px] text-muted-foreground underline underline-offset-2 disabled:opacity-40"
                       disabled={toggleDisabled}
-                      onClick={() => onToggleAll(stop.id, stop.entry.items, !allLoaded)}
+                      onClick={() =>
+                        onToggleAll(stop.id, stop.entry.items, !allLoaded)
+                      }
                     >
                       {allLoaded ? 'Hapus semua' : 'Centang semua'}
                     </button>
@@ -607,14 +739,24 @@ function StopCard({
               <div className="p-3 flex flex-col gap-2">
                 {stop.entry.items.map((lv) => {
                   const typeLabel =
-                    lv.type.charAt(0) + lv.type.slice(1).toLowerCase() +
+                    lv.type.charAt(0) +
+                    lv.type.slice(1).toLowerCase() +
                     (lv.grade ? ' Grade ' + lv.grade : '');
                   const isChecked = checkedItems.has(lv.itemId);
                   return (
                     <div
                       key={lv.itemId}
-                      className={cn('flex gap-3 items-center rounded-lg transition-colors', isAssigned ? 'cursor-pointer hover:bg-muted/60 -mx-1 px-1 py-1' : '')}
-                      onClick={isAssigned && !toggleDisabled ? () => onToggleItem(lv.itemId, !isChecked) : undefined}
+                      className={cn(
+                        'flex gap-3 items-center rounded-lg transition-colors',
+                        isAssigned
+                          ? 'cursor-pointer hover:bg-muted/60 -mx-1 px-1 py-1'
+                          : '',
+                      )}
+                      onClick={
+                        isAssigned && !toggleDisabled
+                          ? () => onToggleItem(lv.itemId, !isChecked)
+                          : undefined
+                      }
                     >
                       {isAssigned && (
                         <Checkbox
@@ -631,8 +773,24 @@ function StopCard({
                         thumbnailClassName="size-12"
                       />
                       <div className="text-sm flex-1 min-w-0">
-                        <p className={cn('font-semibold truncate', isAssigned && isChecked ? 'text-success-fg' : 'text-foreground')}>{typeLabel}</p>
-                        <p className="text-xs text-muted-foreground truncate">Tag: {lv.tag || '—'}</p>
+                        <p
+                          className={cn(
+                            'font-semibold truncate',
+                            isAssigned && isChecked
+                              ? 'text-success-fg'
+                              : 'text-foreground',
+                          )}
+                        >
+                          {typeLabel}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          Tag: {lv.tag || '—'}
+                        </p>
+                        {lv.type === 'SAPI' && (lv.weightMin || lv.weightMax) && (
+                          <p className="text-xs text-muted-foreground">
+                            {lv.weightMin ?? '?'}–{lv.weightMax ?? '?'} kg
+                          </p>
+                        )}
                       </div>
                     </div>
                   );
@@ -655,7 +813,11 @@ function StopCard({
             {/* Bukti kirim photo capture */}
             {photoPreview ? (
               <div className="relative rounded-lg overflow-hidden border">
-                <img src={photoPreview} alt="Bukti kirim" className="w-full max-h-48 object-cover" />
+                <img
+                  src={photoPreview}
+                  alt="Bukti kirim"
+                  className="w-full max-h-48 object-cover"
+                />
                 <button
                   onClick={clearPhoto}
                   className="absolute top-2 right-2 size-7 rounded-full bg-black/60 flex items-center justify-center"
@@ -663,13 +825,17 @@ function StopCard({
                   <X className="size-4 text-white" />
                 </button>
                 <div className="absolute bottom-0 left-0 right-0 px-3 py-1.5 bg-black/50">
-                  <p className="text-[11px] text-white/80">Foto bukti pengiriman</p>
+                  <p className="text-[11px] text-white/80">
+                    Foto bukti pengiriman
+                  </p>
                 </div>
               </div>
             ) : (
               <label className="flex items-center gap-2.5 px-4 py-2.5 rounded-lg border border-dashed cursor-pointer transition-colors hover:bg-muted/40">
                 <Camera className="size-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Foto bukti kirim (opsional)</span>
+                <span className="text-sm text-muted-foreground">
+                  Foto bukti kirim (opsional)
+                </span>
                 <input
                   type="file"
                   accept="image/*"
@@ -706,8 +872,17 @@ function StopCard({
         {done && (stop.notes || stop.proofPhotoUrl) && (
           <div className="flex flex-col gap-2">
             {stop.proofPhotoUrl && (
-              <a href={stop.proofPhotoUrl} target="_blank" rel="noreferrer" className="block rounded-lg overflow-hidden border relative group">
-                <img src={stop.proofPhotoUrl} alt="Bukti kirim" className="w-full max-h-48 object-cover" />
+              <a
+                href={stop.proofPhotoUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="block rounded-lg overflow-hidden border relative group"
+              >
+                <img
+                  src={stop.proofPhotoUrl}
+                  alt="Bukti kirim"
+                  className="w-full max-h-48 object-cover"
+                />
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
                 <div className="absolute bottom-0 left-0 right-0 px-3 py-1.5 bg-black/40">
                   <p className="text-[11px] text-white/90 flex items-center gap-1.5">
@@ -719,14 +894,15 @@ function StopCard({
             )}
             {stop.notes && (
               <div className="text-sm bg-muted/30 p-3 rounded-lg border border-dashed">
-                <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground block mb-1">Catatan:</span>
+                <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground block mb-1">
+                  Catatan:
+                </span>
                 <span className="text-foreground">{stop.notes}</span>
               </div>
             )}
           </div>
         )}
-      </div>
+      </div>}
     </div>
   );
 }
-

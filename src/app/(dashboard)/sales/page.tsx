@@ -62,7 +62,9 @@ export default async function SalesPage() {
       id: entry.id,
       invoiceNo: entry.invoiceNo,
       status: entry.status,
-      hargaJual: entry.items.reduce((s, i) => s + i.hargaJual, 0),
+      hargaJual: entry.items.length > 0
+        ? entry.items.reduce((s, i) => s + i.hargaJual, 0)
+        : entry.requests.reduce((s, r) => s + r.hargaJual, 0),
       hargaModal: entry.items.reduce((s, i) => s + (i.hargaModal ?? 0), 0),
       resellerCut: entry.items.reduce((s, i) => s + (i.resellerCut ?? 0), 0),
       hpp: entry.items.reduce((s, i) => s + (i.hpp ?? 0), 0),

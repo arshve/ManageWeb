@@ -27,6 +27,7 @@ import {
   emptyRow,
   rowsToJson,
   type RequestRow,
+  type PricingMap,
 } from '@/components/dashboard/antrian-request-rows';
 import { formatRupiah, formatWeight } from '@/lib/format';
 import { X } from 'lucide-react';
@@ -58,6 +59,7 @@ const PAYMENT_LABEL: Record<string, string> = {
 export default function NewEntryPage() {
   const [mode, setMode] = useState<'LANGSUNG' | 'ANTRIAN'>('LANGSUNG');
   const [livestock, setLivestock] = useState<PickerLivestock[]>([]);
+  const [pricing, setPricing] = useState<PricingMap>({});
   const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
   const [requests, setRequests] = useState<RequestRow[]>([emptyRow()]);
   const [pengiriman, setPengiriman] = useState('HARI_H');
@@ -76,6 +78,25 @@ export default function NewEntryPage() {
       .then(setLivestock)
       .catch(() => toast.error('Gagal memuat data hewan'));
   }, [mode]);
+
+  useEffect(() => {
+    fetch('/api/pricing', { cache: 'no-store' })
+      .then((res) => res.json())
+      .then((rows: { animalType: string; grade: string; hargaJual: number }[]) => {
+        const map: PricingMap = {};
+        for (const r of rows) map[`${r.animalType}_${r.grade}`] = r.hargaJual;
+        setPricing(map);
+        // pre-fill hargaJual on the initial empty row
+        setRequests((prev) =>
+          prev.map((row) => {
+            if (row.hargaJual) return row;
+            const ref = map[`${row.type}_${row.grade}`];
+            return ref ? { ...row, hargaJual: ref.toString() } : row;
+          }),
+        );
+      })
+      .catch(() => {});
+  }, []);
 
   const selectedIds = selectedItems.map((i) => i.livestock.id);
   const totalHargaJual = selectedItems.reduce(
@@ -267,7 +288,7 @@ export default function NewEntryPage() {
                 dipilih admin saat stok tiba.
               </p>
             </div>
-            <AntrianRequestRows rows={requests} onChange={setRequests} />
+            <AntrianRequestRows rows={requests} onChange={setRequests} pricing={pricing} />
             {totalAntrianHarga > 0 && (
               <div className="flex justify-between items-center pt-1 text-sm font-medium border-t">
                 <span>Total Estimasi</span>

@@ -75,7 +75,13 @@ import {
   rejectEntryEdit,
   cancelEntryEdit,
   getAvailableLivestockForSwap,
+  updateEntryRequests,
 } from '@/app/actions/entries';
+import {
+  AntrianRequestRows,
+  rowsToJson,
+  type RequestRow,
+} from '@/components/dashboard/antrian-request-rows';
 import { toast } from 'sonner';
 import {
   formatRupiah,
@@ -713,6 +719,19 @@ function useEntryRow(entry: EntryData, onSaved: () => void, isAdmin = false) {
   const [buktiTransferUrls, setBuktiTransferUrls] = useState<string[]>(
     entry.buktiTransfer ?? [],
   );
+  const [requestRows, setRequestRows] = useState<RequestRow[]>(() =>
+    entry.requests.map((r) => ({
+      _id: r.id,
+      type: r.type as RequestRow['type'],
+      grade: r.grade ?? 'A',
+      weightMin: r.weightMin?.toString() ?? '',
+      weightMax: r.weightMax?.toString() ?? '',
+      hargaJual: r.hargaJual.toString(),
+      hargaModal: '',
+      resellerCut: '',
+      notes: '',
+    })),
+  );
 
   function update(field: string, value: string | boolean) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -804,10 +823,19 @@ function useEntryRow(entry: EntryData, onSaved: () => void, isAdmin = false) {
       const result = await updateEntry(entry.id, formData);
       if ('error' in result) {
         toast.error(String(result.error));
-      } else {
-        if (!isSalesOnApproved || itemChanges.length === 0) toast.success('Entry diperbarui');
-        onSaved();
+        return;
       }
+
+      if (entry.requests.length > 0) {
+        const reqResult = await updateEntryRequests(entry.id, rowsToJson(requestRows));
+        if ('error' in reqResult) {
+          toast.error(String(reqResult.error));
+          return;
+        }
+      }
+
+      if (!isSalesOnApproved || itemChanges.length === 0) toast.success('Entry diperbarui');
+      onSaved();
     } catch {
       toast.error('Terjadi kesalahan');
     }
@@ -893,6 +921,8 @@ function useEntryRow(entry: EntryData, onSaved: () => void, isAdmin = false) {
     loading,
     buktiTransferUrls,
     setBuktiTransferUrls,
+    requestRows,
+    setRequestRows,
     isSalesOnApproved,
     isAdminOnApproved,
     pendingRequest,
@@ -1066,6 +1096,8 @@ function EntryEditFields({
   swapLivestock,
   resetSwap,
   setBuktiTransferUrls,
+  requestRows,
+  setRequestRows,
   salesUsers,
 }: {
   entry: EntryData;
@@ -1080,6 +1112,8 @@ function EntryEditFields({
   swapLivestock: ReturnType<typeof useEntryRow>['swapLivestock'];
   resetSwap: ReturnType<typeof useEntryRow>['resetSwap'];
   setBuktiTransferUrls: ReturnType<typeof useEntryRow>['setBuktiTransferUrls'];
+  requestRows: ReturnType<typeof useEntryRow>['requestRows'];
+  setRequestRows: ReturnType<typeof useEntryRow>['setRequestRows'];
   salesUsers: SalesUser[];
 }) {
   return (
@@ -1169,6 +1203,18 @@ function EntryEditFields({
           </div>
         )}
       </div>
+
+      {/* ── Antrian requests ── */}
+      {entry.requests.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <p className="text-xs font-medium text-muted-foreground">Antrian ({requestRows.length})</p>
+          <AntrianRequestRows
+            rows={requestRows}
+            onChange={setRequestRows}
+            showHargaModal={canViewFinancials}
+          />
+        </div>
+      )}
 
       {/* ── Order-level fields ── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -1318,6 +1364,8 @@ const EntryRow = memo(function EntryRow({
     updateItemPrice,
     swapLivestock,
     resetSwap,
+    requestRows,
+    setRequestRows,
     isSalesOnApproved,
     isAdminOnApproved,
     pendingRequest,
@@ -1530,6 +1578,8 @@ const EntryRow = memo(function EntryRow({
                 updateItemPrice={updateItemPrice}
                 swapLivestock={swapLivestock}
                 resetSwap={resetSwap}
+                requestRows={requestRows}
+                setRequestRows={setRequestRows}
                 salesUsers={salesUsers}
               />
               {pendingRequest && (
@@ -1580,6 +1630,8 @@ const MobileEntryCard = memo(function MobileEntryCard({
     updateItemPrice,
     swapLivestock,
     resetSwap,
+    requestRows,
+    setRequestRows,
     isSalesOnApproved,
     isAdminOnApproved,
     pendingRequest,
@@ -1661,6 +1713,8 @@ const MobileEntryCard = memo(function MobileEntryCard({
               updateItemPrice={updateItemPrice}
               swapLivestock={swapLivestock}
               resetSwap={resetSwap}
+              requestRows={requestRows}
+              setRequestRows={setRequestRows}
               salesUsers={salesUsers}
             />
             {pendingRequest && (

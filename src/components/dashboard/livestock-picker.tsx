@@ -33,13 +33,17 @@ export function LivestockPicker({
   livestock,
   selectedIds,
   onToggle,
+  initialType = 'ALL',
+  initialGrade = 'ALL',
 }: {
   livestock: PickerLivestock[];
   selectedIds: string[];
   onToggle: (id: string) => void;
+  initialType?: string;
+  initialGrade?: string;
 }) {
-  const [typeFilter, setTypeFilter] = useState('ALL');
-  const [gradeFilter, setGradeFilter] = useState('ALL');
+  const [typeFilter, setTypeFilter] = useState(initialType);
+  const [gradeFilter, setGradeFilter] = useState(initialGrade);
   const [weightFilter, setWeightFilter] = useState('ALL');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);

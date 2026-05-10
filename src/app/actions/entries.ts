@@ -506,7 +506,7 @@ export async function updateEntryRequests(entryId: string, requestsJson: string)
   }
 
   await prisma.$transaction([
-    prisma.entryRequest.deleteMany({ where: { entryId } }),
+    prisma.entryRequest.deleteMany({ where: { entryId, isFulfilled: false } }),
     prisma.entryRequest.createMany({
       data: rawRequests.map((r) => ({
         entryId,

@@ -15,7 +15,6 @@ import {
 } from '@/components/ui/select';
 import { RupiahInput } from '@/components/ui/rupiah-input';
 import { Field, FieldLabel } from '@/components/ui/field';
-import { Card, CardContent } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -27,10 +26,24 @@ import {
   LivestockPicker,
   type PickerLivestock,
 } from '@/components/dashboard/livestock-picker';
-import { fulfillEntryRequest } from '@/app/actions/entries';
+import {
+  AntrianRequestRows,
+  type RequestRow,
+  rowsToJson,
+} from '@/components/dashboard/antrian-request-rows';
+import { fulfillEntryRequest, updateEntryRequests, updateEntry } from '@/app/actions/entries';
 import { formatRupiah, formatWeight } from '@/lib/format';
 import { toast } from 'sonner';
-import { CheckCircle2, Clock, Package, Search } from 'lucide-react';
+import {
+  CheckCircle2,
+  Clock,
+  Package,
+  Search,
+  Pencil,
+  ChevronDown,
+  Save,
+  XCircle,
+} from 'lucide-react';
 
 type QueueRequest = {
   id: string;
@@ -52,6 +65,7 @@ type QueueRequest = {
     buyerPhone: string | null;
     status: string;
     salesName: string | null;
+    salesId: string | null;
   };
 };
 
@@ -67,6 +81,12 @@ type AvailableLivestock = {
   weightMax: number | null;
   condition: string;
   photoUrl: string | null;
+};
+
+type EntryGroup = {
+  entryId: string;
+  entry: QueueRequest['entry'];
+  requests: QueueRequest[];
 };
 
 const TYPE_LABEL: Record<string, string> = {
@@ -96,22 +116,204 @@ function StatusBadge({ status }: { status: string }) {
   return <StatusToken intent={ds.intent} size="sm">{ds.label}</StatusToken>;
 }
 
+function requestToRow(req: QueueRequest): RequestRow {
+  return {
+    _id: req.id,
+    type: req.type,
+    grade: req.grade ?? 'A',
+    weightMin: req.weightMin?.toString() ?? '',
+    weightMax: req.weightMax?.toString() ?? '',
+    hargaJual: req.hargaJual.toString(),
+    hargaModal: req.hargaModal?.toString() ?? '',
+    resellerCut: req.resellerCut?.toString() ?? '',
+    notes: req.notes ?? '',
+  };
+}
+
+// ─── Mobile card per entry ────────────────────────────────────────────────────
+
+function QueueEntryCard({
+  group,
+  canEdit,
+  canViewFinancials,
+  onFulfill,
+}: {
+  group: EntryGroup;
+  canEdit: boolean;
+  canViewFinancials: boolean;
+  onFulfill: (req: QueueRequest) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [rows, setRows] = useState<RequestRow[]>([]);
+  const [pending, startTransition] = useTransition();
+  const router = useRouter();
+
+  const hasUnfulfilled = group.requests.some((r) => !r.isFulfilled);
+  const allFulfilled = group.requests.every((r) => r.isFulfilled);
+  const open = expanded || editing;
+
+  function startEdit() {
+    setRows(group.requests.filter((r) => !r.isFulfilled).map(requestToRow));
+    setEditing(true);
+    setExpanded(true);
+  }
+
+  function cancelEdit() {
+    setEditing(false);
+    setRows([]);
+  }
+
+  function handleSave() {
+    startTransition(async () => {
+      const result = await updateEntryRequests(group.entry.id, rowsToJson(rows));
+      if ('error' in result) {
+        toast.error(result.error);
+      } else {
+        toast.success('Antrian berhasil diperbarui');
+        setEditing(false);
+        router.refresh();
+      }
+    });
+  }
+
+  return (
+    <div className={`rounded-lg border shadow-sm overflow-hidden ${allFulfilled ? 'bg-success-bg/40' : 'bg-card'}`}>
+      {/* Header */}
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => !editing && setExpanded((v) => !v)}
+        onKeyDown={(e) => {
+          if (!editing && (e.key === 'Enter' || e.key === ' ')) {
+            e.preventDefault();
+            setExpanded((v) => !v);
+          }
+        }}
+        className="w-full flex items-center gap-2 p-3 text-left hover:bg-muted/30 transition-colors cursor-pointer"
+      >
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-medium truncate">{group.entry.buyerName}</div>
+          <div className="text-xs text-muted-foreground truncate mt-0.5">
+            {group.entry.invoiceNo}
+            {group.entry.salesName ? ` · ${group.entry.salesName}` : ''}
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <StatusBadge status={group.entry.status} />
+          <span className="text-xs text-muted-foreground flex items-center gap-0.5">
+            <Clock className="size-3" />
+            {relativeTime(group.requests[0].createdAt)}
+          </span>
+          {canEdit && hasUnfulfilled && !editing && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); startEdit(); }}
+              className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+              title="Edit antrian"
+            >
+              <Pencil className="size-3.5" />
+            </button>
+          )}
+        </div>
+        <ChevronDown
+          className={`size-4 text-muted-foreground shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
+        />
+      </div>
+
+      {/* Body */}
+      {open && (
+        <div className="border-t">
+          {editing ? (
+            <div className="p-3 flex flex-col gap-3">
+              <AntrianRequestRows
+                rows={rows}
+                onChange={setRows}
+                showHargaModal={canViewFinancials}
+              />
+              <div className="flex gap-2 pt-2 border-t">
+                <Button size="sm" className="flex-1" onClick={handleSave} disabled={pending}>
+                  <Save className="size-3.5 mr-1" />
+                  {pending ? 'Menyimpan...' : 'Simpan'}
+                </Button>
+                <Button size="sm" variant="outline" className="flex-1" onClick={cancelEdit} disabled={pending}>
+                  <XCircle className="size-3.5 mr-1" />
+                  Batal
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="divide-y text-sm">
+              {group.requests.map((req, idx) => (
+                <div
+                  key={req.id}
+                  className={`px-3 py-2.5 flex items-center gap-3 ${req.isFulfilled ? 'bg-success-bg/30' : ''}`}
+                >
+                  <div className="flex-1 min-w-0 flex flex-col gap-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-xs text-muted-foreground">{idx + 1}.</span>
+                      <Badge variant="secondary" className="text-xs">{TYPE_LABEL[req.type]}</Badge>
+                      <Badge variant="outline" className="text-xs">{detailLabel(req)}</Badge>
+                      {req.isFulfilled && (
+                        <span className="inline-flex items-center gap-1 text-xs text-success-fg font-medium">
+                          <CheckCircle2 className="size-3.5" />
+                          Selesai
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 text-xs">
+                      <span className="font-medium">{formatRupiah(req.hargaJual)}</span>
+                      {req.notes && (
+                        <span className="text-muted-foreground italic truncate">{req.notes}</span>
+                      )}
+                    </div>
+                  </div>
+                  {!req.isFulfilled && (
+                    <Button size="sm" onClick={() => onFulfill(req)}>
+                      Fulfill
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Main view ────────────────────────────────────────────────────────────────
+
 export function QueueView({
   requests,
   availableLivestock,
   canViewFinancials,
+  currentUserId,
+  isAdmin,
 }: {
   requests: QueueRequest[];
   availableLivestock: AvailableLivestock[];
   canViewFinancials: boolean;
+  currentUserId: string;
+  isAdmin: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+
+  // Fulfill dialog
   const [fulfillTarget, setFulfillTarget] = useState<QueueRequest | null>(null);
   const [pickedId, setPickedId] = useState<string | null>(null);
   const [hargaModal, setHargaModal] = useState('');
   const [resellerCut, setResellerCut] = useState('');
 
+  // Desktop edit dialog
+  const [editGroup, setEditGroup] = useState<EntryGroup | null>(null);
+  const [editRows, setEditRows] = useState<RequestRow[]>([]);
+  const [editBuyerName, setEditBuyerName] = useState('');
+  const [editPending, startEditTransition] = useTransition();
+
+  // Filters
   const [search, setSearch] = useState('');
   const [jenisFilter, setJenisFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -119,7 +321,6 @@ export function QueueView({
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return requests.filter((r) => {
-      // fulfilled rows always shown alongside their pending siblings
       if (!r.isFulfilled) {
         if (jenisFilter !== 'ALL' && r.type !== jenisFilter) return false;
         if (statusFilter !== 'ALL' && r.entry.status !== statusFilter) return false;
@@ -134,12 +335,26 @@ export function QueueView({
     });
   }, [requests, search, jenisFilter, statusFilter]);
 
-  const filteredLivestock: PickerLivestock[] = useMemo(() => {
-    if (!fulfillTarget) return [];
-    return availableLivestock
-      .filter((l) => l.type === fulfillTarget.type)
-      .map((l) => ({ ...l, hargaJual: l.hargaJual }));
-  }, [fulfillTarget, availableLivestock]);
+  // Group by entry for mobile cards
+  const grouped = useMemo(() => {
+    const map = new Map<string, EntryGroup>();
+    for (const r of filtered) {
+      if (!map.has(r.entryId)) {
+        map.set(r.entryId, { entryId: r.entryId, entry: r.entry, requests: [] });
+      }
+      map.get(r.entryId)!.requests.push(r);
+    }
+    return [...map.values()];
+  }, [filtered]);
+
+  const pickerLivestock: PickerLivestock[] = useMemo(
+    () => availableLivestock.map((l) => ({ ...l, hargaJual: l.hargaJual })),
+    [availableLivestock],
+  );
+
+  function canEditEntry(entry: QueueRequest['entry']) {
+    return isAdmin || currentUserId === entry.salesId;
+  }
 
   function openFulfill(req: QueueRequest) {
     setFulfillTarget(req);
@@ -173,6 +388,29 @@ export function QueueView({
         setFulfillTarget(null);
         router.refresh();
       }
+    });
+  }
+
+  function openEditDesktop(group: EntryGroup) {
+    setEditRows(group.requests.filter((r) => !r.isFulfilled).map(requestToRow));
+    setEditBuyerName(group.entry.buyerName);
+    setEditGroup(group);
+  }
+
+  function handleEditSave() {
+    if (!editGroup) return;
+    startEditTransition(async () => {
+      const fd = new FormData();
+      fd.set('buyerName', editBuyerName);
+      const [entryResult, reqResult] = await Promise.all([
+        updateEntry(editGroup.entry.id, fd),
+        updateEntryRequests(editGroup.entry.id, rowsToJson(editRows)),
+      ]);
+      if ('error' in entryResult) { toast.error(entryResult.error); return; }
+      if ('error' in reqResult) { toast.error(reqResult.error); return; }
+      toast.success('Antrian berhasil diperbarui');
+      setEditGroup(null);
+      router.refresh();
     });
   }
 
@@ -247,91 +485,89 @@ export function QueueView({
                   <th className="text-right px-4 py-3 font-medium text-muted-foreground">Aksi</th>
                 </tr>
               </thead>
-              <tbody className="divide-y">
-                {filtered.map((req) => (
-                  <tr key={req.id} className={`transition-colors ${req.isFulfilled ? 'bg-success-bg/40 text-muted-foreground' : 'hover:bg-muted/30'}`}>
-                    <td className="px-4 py-3 font-mono text-xs">{req.entry.invoiceNo}</td>
-                    <td className="px-4 py-3 font-medium">{req.entry.buyerName}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{req.entry.salesName ?? '-'}</td>
-                    <td className="px-4 py-3">{TYPE_LABEL[req.type]}</td>
-                    <td className="px-4 py-3">{detailLabel(req)}</td>
-                    <td className="px-4 py-3 font-medium">{formatRupiah(req.hargaJual)}</td>
-                    <td className="px-4 py-3">
-                      <span className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Clock className="size-3" />
-                        {relativeTime(req.createdAt)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge status={req.entry.status} />
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      {req.isFulfilled ? (
-                        <span className="inline-flex items-center gap-1 text-xs text-success-fg font-medium">
-                          <CheckCircle2 className="size-4" />
-                          Selesai
+              <tbody>
+                {grouped.map((group, gi) => (
+                  <>
+                    {/* Entry group header */}
+                    <tr
+                      key={`hdr-${group.entryId}`}
+                      className={`border-t ${gi === 0 ? 'border-t-0' : ''} bg-muted/30`}
+                    >
+                      <td className="px-4 py-2 font-mono text-xs text-muted-foreground">
+                        {group.entry.invoiceNo}
+                      </td>
+                      <td className="px-4 py-2 font-semibold text-sm">{group.entry.buyerName}</td>
+                      <td className="px-4 py-2 text-xs text-muted-foreground">{group.entry.salesName ?? '-'}</td>
+                      <td colSpan={3} />
+                      <td className="px-4 py-2">
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Clock className="size-3" />
+                          {relativeTime(group.requests[0].createdAt)}
                         </span>
-                      ) : (
-                        <Button size="sm" onClick={() => openFulfill(req)}>
-                          Fulfill
-                        </Button>
-                      )}
-                    </td>
-                  </tr>
+                      </td>
+                      <td className="px-4 py-2">
+                        <StatusBadge status={group.entry.status} />
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        {canEditEntry(group.entry) && group.requests.some((r) => !r.isFulfilled) && (
+                          <button
+                            type="button"
+                            onClick={() => openEditDesktop(group)}
+                            className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                            title="Edit antrian"
+                          >
+                            <Pencil className="size-3.5" />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                    {/* Request sub-rows */}
+                    {group.requests.map((req) => (
+                      <tr
+                        key={req.id}
+                        className={`border-t border-border/50 transition-colors ${req.isFulfilled ? 'bg-success-bg/30 text-muted-foreground' : 'hover:bg-muted/20'}`}
+                      >
+                        <td colSpan={3} />
+                        <td className="px-4 py-2.5 pl-8">{TYPE_LABEL[req.type]}</td>
+                        <td className="px-4 py-2.5">{detailLabel(req)}</td>
+                        <td className="px-4 py-2.5 font-medium">{formatRupiah(req.hargaJual)}</td>
+                        <td colSpan={2} />
+                        <td className="px-4 py-2.5 text-right">
+                          {req.isFulfilled ? (
+                            <span className="inline-flex items-center gap-1 text-xs text-success-fg font-medium">
+                              <CheckCircle2 className="size-4" />
+                              Selesai
+                            </span>
+                          ) : (
+                            <Button size="sm" onClick={() => openFulfill(req)}>
+                              Fulfill
+                            </Button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </>
                 ))}
               </tbody>
             </table>
           </div>
 
-          {/* Mobile cards */}
+          {/* Mobile: grouped collapsible cards */}
           <div className="md:hidden flex flex-col gap-3">
-            {filtered.map((req) => (
-              <Card key={req.id} className={req.isFulfilled ? 'bg-success-bg/40' : ''}>
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0 flex flex-col gap-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-medium text-sm">{req.entry.buyerName}</span>
-                        <StatusBadge status={req.entry.status} />
-                      </div>
-                      <p className="text-xs text-muted-foreground font-mono">{req.entry.invoiceNo}</p>
-                      <div className="flex flex-wrap gap-1.5 text-xs">
-                        <Badge variant="secondary">{TYPE_LABEL[req.type]}</Badge>
-                        <Badge variant="outline">{detailLabel(req)}</Badge>
-                      </div>
-                      <div className="flex flex-wrap gap-3 text-xs pt-0.5">
-                        <span className="font-medium">{formatRupiah(req.hargaJual)}</span>
-                        {req.entry.salesName && (
-                          <span className="text-muted-foreground">{req.entry.salesName}</span>
-                        )}
-                        <span className="text-muted-foreground flex items-center gap-1">
-                          <Clock className="size-3" />
-                          {relativeTime(req.createdAt)}
-                        </span>
-                      </div>
-                      {req.notes && (
-                        <p className="text-xs text-muted-foreground italic truncate">{req.notes}</p>
-                      )}
-                    </div>
-                    {req.isFulfilled ? (
-                      <span className="inline-flex items-center gap-1 text-xs text-success-fg font-medium shrink-0">
-                        <CheckCircle2 className="size-4" />
-                        Selesai
-                      </span>
-                    ) : (
-                      <Button size="sm" onClick={() => openFulfill(req)}>
-                        Fulfill
-                      </Button>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+            {grouped.map((group) => (
+              <QueueEntryCard
+                key={group.entryId}
+                group={group}
+                canEdit={canEditEntry(group.entry)}
+                canViewFinancials={canViewFinancials}
+                onFulfill={openFulfill}
+              />
             ))}
           </div>
         </>
       )}
 
-      {/* Fulfill Modal */}
+      {/* Fulfill Dialog */}
       <Dialog open={!!fulfillTarget} onOpenChange={(open) => !open && setFulfillTarget(null)}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -373,15 +609,17 @@ export function QueueView({
                 <p className="text-xs font-medium text-muted-foreground mb-2">
                   Pilih satu hewan dari stok tersedia ({TYPE_LABEL[fulfillTarget.type]}):
                 </p>
-                {filteredLivestock.length === 0 ? (
+                {pickerLivestock.filter((l) => l.type === fulfillTarget.type).length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-6 border rounded-lg">
                     Tidak ada stok {TYPE_LABEL[fulfillTarget.type]} tersedia saat ini.
                   </p>
                 ) : (
                   <LivestockPicker
-                    livestock={filteredLivestock}
+                    livestock={pickerLivestock}
                     selectedIds={pickedId ? [pickedId] : []}
                     onToggle={handleToggle}
+                    initialType={fulfillTarget.type}
+                    initialGrade={fulfillTarget.grade ?? 'ALL'}
                   />
                 )}
               </div>
@@ -427,15 +665,52 @@ export function QueueView({
           )}
 
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setFulfillTarget(null)}
-              disabled={pending}
-            >
+            <Button variant="outline" onClick={() => setFulfillTarget(null)} disabled={pending}>
               Batal
             </Button>
             <Button onClick={handleConfirm} disabled={!pickedId || pending}>
               {pending ? 'Menyimpan...' : 'Konfirmasi Fulfillment'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Desktop Edit Dialog */}
+      <Dialog open={!!editGroup} onOpenChange={(open) => !open && setEditGroup(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Edit Antrian — {editGroup?.entry.buyerName}
+            </DialogTitle>
+          </DialogHeader>
+
+          {editGroup && (
+            <div className="flex flex-col gap-4">
+              <p className="text-xs text-muted-foreground">
+                {editGroup.entry.invoiceNo} · {editGroup.requests.filter((r) => !r.isFulfilled).length} permintaan belum terpenuhi
+              </p>
+              <Field>
+                <FieldLabel className="text-xs">Nama Pembeli</FieldLabel>
+                <Input
+                  value={editBuyerName}
+                  onChange={(e) => setEditBuyerName(e.target.value)}
+                  className="h-9 text-sm"
+                />
+              </Field>
+              <AntrianRequestRows
+                rows={editRows}
+                onChange={setEditRows}
+                showHargaModal={canViewFinancials}
+              />
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditGroup(null)} disabled={editPending}>
+              Batal
+            </Button>
+            <Button onClick={handleEditSave} disabled={editPending}>
+              {editPending ? 'Menyimpan...' : 'Simpan'}
             </Button>
           </DialogFooter>
         </DialogContent>

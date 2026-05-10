@@ -16,8 +16,10 @@ import { X, Plus } from 'lucide-react';
 
 export interface RequestRow {
   _id: string;
-  type: 'KAMBING' | 'DOMBA';
+  type: 'KAMBING' | 'DOMBA' | 'SAPI';
   grade: string;
+  weightMin: string;
+  weightMax: string;
   hargaJual: string;
   hargaModal: string;
   resellerCut: string;
@@ -29,6 +31,8 @@ export function emptyRow(): RequestRow {
     _id: Math.random().toString(36).slice(2),
     type: 'KAMBING',
     grade: 'A',
+    weightMin: '',
+    weightMax: '',
     hargaJual: '',
     hargaModal: '',
     resellerCut: '',
@@ -42,11 +46,13 @@ export function rowsToJson(rows: RequestRow[]): string {
       const hargaJual = Number(r.hargaJual) || 0;
       const hargaModal = r.hargaModal ? Number(r.hargaModal) : null;
       const resellerCut = r.resellerCut ? Number(r.resellerCut) : null;
+      const weightMin = r.type === 'SAPI' && r.weightMin ? Number(r.weightMin) : null;
+      const weightMax = r.type === 'SAPI' && r.weightMax ? Number(r.weightMax) : null;
       return {
         type: r.type,
-        grade: r.grade || null,
-        weightMin: null,
-        weightMax: null,
+        grade: r.type !== 'SAPI' ? (r.grade || null) : null,
+        weightMin,
+        weightMax,
         hargaJual,
         hargaModal,
         resellerCut,
@@ -58,15 +64,24 @@ export function rowsToJson(rows: RequestRow[]): string {
 
 const GRADES = ['SUPER', 'A', 'B', 'C', 'D'];
 
+// key: `${type}_${grade}` → hargaJual
+export type PricingMap = Record<string, number>;
+
 export function AntrianRequestRows({
   rows,
   onChange,
   showHargaModal = false,
+  pricing = {},
 }: {
   rows: RequestRow[];
   onChange: (rows: RequestRow[]) => void;
   showHargaModal?: boolean;
+  pricing?: PricingMap;
 }) {
+  function refPrice(type: string, grade: string): string {
+    return pricing[`${type}_${grade}`]?.toString() ?? '';
+  }
+
   function update(id: string, field: keyof RequestRow, value: string) {
     onChange(rows.map((r) => (r._id === id ? { ...r, [field]: value } : r)));
   }
@@ -105,8 +120,13 @@ export function AntrianRequestRows({
                 onValueChange={(v) => {
                   if (!v) return;
                   const t = v as RequestRow['type'];
-                  update(row._id, 'type', t);
-                  if (!row.grade) update(row._id, 'grade', 'A');
+                  const grade = row.grade || 'A';
+                  const ref = t !== 'SAPI' ? refPrice(t, grade) : '';
+                  onChange(rows.map((r) =>
+                    r._id === row._id
+                      ? { ...r, type: t, grade: t !== 'SAPI' ? grade : r.grade, hargaJual: t === 'SAPI' ? '' : ref || r.hargaJual }
+                      : r,
+                  ));
                 }}
               >
                 <SelectTrigger className="h-8 text-xs">
@@ -115,26 +135,60 @@ export function AntrianRequestRows({
                 <SelectContent alignItemWithTrigger={false}>
                   <SelectItem value="KAMBING">Kambing</SelectItem>
                   <SelectItem value="DOMBA">Domba</SelectItem>
+                  <SelectItem value="SAPI">Sapi</SelectItem>
                 </SelectContent>
               </Select>
             </Field>
 
-            <Field>
-              <FieldLabel className="text-[11px]">Grade</FieldLabel>
-              <Select
-                value={row.grade || 'A'}
-                onValueChange={(v) => v && update(row._id, 'grade', v)}
-              >
-                <SelectTrigger className="h-8 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent alignItemWithTrigger={false}>
-                  {GRADES.map((g) => (
-                    <SelectItem key={g} value={g}>{g}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
+            {row.type === 'SAPI' ? (
+              <div className="grid grid-cols-2 gap-1 col-span-1">
+                <Field>
+                  <FieldLabel className="text-[11px]">Min kg</FieldLabel>
+                  <Input
+                    type="number"
+                    value={row.weightMin}
+                    onChange={(e) => update(row._id, 'weightMin', e.target.value)}
+                    className="h-8 text-xs"
+                    placeholder="200"
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel className="text-[11px]">Max kg</FieldLabel>
+                  <Input
+                    type="number"
+                    value={row.weightMax}
+                    onChange={(e) => update(row._id, 'weightMax', e.target.value)}
+                    className="h-8 text-xs"
+                    placeholder="300"
+                  />
+                </Field>
+              </div>
+            ) : (
+              <Field>
+                <FieldLabel className="text-[11px]">Grade</FieldLabel>
+                <Select
+                  value={row.grade || 'A'}
+                  onValueChange={(v) => {
+                    if (!v) return;
+                    const ref = refPrice(row.type, v);
+                    onChange(rows.map((r) =>
+                      r._id === row._id
+                        ? { ...r, grade: v, hargaJual: ref || r.hargaJual }
+                        : r,
+                    ));
+                  }}
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent alignItemWithTrigger={false}>
+                    {GRADES.map((g) => (
+                      <SelectItem key={g} value={g}>{g}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            )}
           </div>
 
           {/* Pricing */}

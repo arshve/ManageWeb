@@ -3,6 +3,7 @@ import { requireRole, isSuperAdmin } from '@/lib/auth';
 import { DashboardShell } from '@/components/dashboard/dashboard-shell';
 import { QueueView } from '@/components/admin/queue-view';
 
+
 export default async function AntrianPage() {
   const profile = await requireRole('ADMIN', 'SUPER_ADMIN');
   const canViewFinancials = isSuperAdmin(profile.role);
@@ -24,7 +25,7 @@ export default async function AntrianPage() {
             buyerPhone: true,
             status: true,
             createdAt: true,
-            sales: { select: { name: true } },
+            sales: { select: { id: true, name: true } },
           },
         },
       },
@@ -69,6 +70,7 @@ export default async function AntrianPage() {
       buyerPhone: r.entry.buyerPhone,
       status: r.entry.status,
       salesName: r.entry.sales?.name ?? null,
+      salesId: r.entry.sales?.id ?? null,
     },
   }));
 
@@ -77,7 +79,13 @@ export default async function AntrianPage() {
       title="Antrian Hewan"
       description="Permintaan pembeli yang menunggu stok tersedia"
     >
-      <QueueView requests={serializedRequests} availableLivestock={availableLivestock} canViewFinancials={canViewFinancials} />
+      <QueueView
+        requests={serializedRequests}
+        availableLivestock={availableLivestock}
+        canViewFinancials={canViewFinancials}
+        currentUserId={profile.id}
+        isAdmin={true}
+      />
     </DashboardShell>
   );
 }

@@ -29,7 +29,7 @@ export default async function AntrianPage() {
           },
         },
       },
-      orderBy: [{ isFulfilled: 'asc' }, { type: 'asc' }, { grade: 'asc' }, { createdAt: 'asc' }],
+      orderBy: [{ entry: { createdAt: 'asc' } }, { isFulfilled: 'asc' }, { createdAt: 'asc' }],
     }),
     prisma.livestock.findMany({
       where: { isSold: false, condition: { not: 'MATI' } },

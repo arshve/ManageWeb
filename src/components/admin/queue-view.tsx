@@ -143,7 +143,7 @@ function QueueEntryCard({
   canViewFinancials: boolean;
   onFulfill: (req: QueueRequest) => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const [editing, setEditing] = useState(false);
   const [rows, setRows] = useState<RequestRow[]>([]);
   const [pending, startTransition] = useTransition();
@@ -316,36 +316,66 @@ export function QueueView({
   // Filters
   const [search, setSearch] = useState('');
   const [jenisFilter, setJenisFilter] = useState('ALL');
-  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [gradeFilter, setGradeFilter] = useState('ALL');
+  const [weightMinFilter, setWeightMinFilter] = useState('');
+  const [weightMaxFilter, setWeightMaxFilter] = useState('');
+  const [page, setPage] = useState(0);
 
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase();
-    return requests.filter((r) => {
-      if (!r.isFulfilled) {
-        if (jenisFilter !== 'ALL' && r.type !== jenisFilter) return false;
-        if (statusFilter !== 'ALL' && r.entry.status !== statusFilter) return false;
-      }
-      if (
-        q &&
-        !r.entry.buyerName.toLowerCase().includes(q) &&
-        !r.entry.invoiceNo.toLowerCase().includes(q)
-      )
-        return false;
-      return true;
-    });
-  }, [requests, search, jenisFilter, statusFilter]);
+  const PAGE_SIZE = 10;
+  const GRADES = ['SUPER', 'A', 'B', 'C', 'D'] as const;
 
-  // Group by entry for mobile cards
+  function handleJenisChange(v: string) {
+    setJenisFilter(v);
+    setGradeFilter('ALL');
+    setWeightMinFilter('');
+    setWeightMaxFilter('');
+    setPage(0);
+  }
+
+  // Group-first: group all requests, then filter groups
   const grouped = useMemo(() => {
     const map = new Map<string, EntryGroup>();
-    for (const r of filtered) {
+    for (const r of requests) {
       if (!map.has(r.entryId)) {
         map.set(r.entryId, { entryId: r.entryId, entry: r.entry, requests: [] });
       }
       map.get(r.entryId)!.requests.push(r);
     }
     return [...map.values()];
-  }, [filtered]);
+  }, [requests]);
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    return grouped.filter((g) => {
+      if (q && !g.entry.buyerName.toLowerCase().includes(q) && !(g.entry.salesName?.toLowerCase().includes(q) ?? false)) return false;
+      if (jenisFilter !== 'ALL') {
+        const hasType = g.requests.some((r) => !r.isFulfilled && r.type === jenisFilter);
+        if (!hasType) return false;
+      }
+      if (jenisFilter !== 'ALL' && jenisFilter !== 'SAPI' && gradeFilter !== 'ALL') {
+        const hasGrade = g.requests.some((r) => !r.isFulfilled && r.type === jenisFilter && r.grade === gradeFilter);
+        if (!hasGrade) return false;
+      }
+      if (jenisFilter === 'SAPI') {
+        const wMin = weightMinFilter ? Number(weightMinFilter) : null;
+        const wMax = weightMaxFilter ? Number(weightMaxFilter) : null;
+        if (wMin !== null || wMax !== null) {
+          const hasWeight = g.requests.some((r) => {
+            if (r.isFulfilled || r.type !== 'SAPI') return false;
+            if (wMin !== null && (r.weightMin ?? 0) < wMin) return false;
+            if (wMax !== null && (r.weightMax ?? Infinity) > wMax) return false;
+            return true;
+          });
+          if (!hasWeight) return false;
+        }
+      }
+      return true;
+    });
+  }, [grouped, search, jenisFilter, gradeFilter, weightMinFilter, weightMaxFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages - 1);
+  const pagedGroups = filtered.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
 
   const pickerLivestock: PickerLivestock[] = useMemo(
     () => availableLivestock.map((l) => ({ ...l, hargaJual: l.hargaJual })),
@@ -429,38 +459,68 @@ export function QueueView({
   return (
     <>
       {/* Filter bar */}
-      <div className="flex flex-col sm:flex-row gap-2 mb-4">
-        <div className="relative flex-1">
+      <div className="flex flex-col gap-2 mb-4">
+        <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
-            placeholder="Cari pembeli atau invoice..."
+            placeholder="Cari nama pembeli atau sales..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setPage(0); }}
             className="pl-9"
           />
         </div>
-        <Select value={jenisFilter} onValueChange={(v) => v && setJenisFilter(v)}>
-          <SelectTrigger className="w-full sm:w-36">
-            <SelectValue placeholder="Semua Jenis" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="ALL">Semua Jenis</SelectItem>
-            <SelectItem value="KAMBING">Kambing</SelectItem>
-            <SelectItem value="DOMBA">Domba</SelectItem>
-            <SelectItem value="SAPI">Sapi</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={statusFilter} onValueChange={(v) => v && setStatusFilter(v)}>
-          <SelectTrigger className="w-full sm:w-36">
-            <SelectValue placeholder="Semua Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="ALL">Semua Status</SelectItem>
-            <SelectItem value="PENDING">Menunggu</SelectItem>
-            <SelectItem value="APPROVED">Disetujui</SelectItem>
-            <SelectItem value="REJECTED">Ditolak</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="flex flex-wrap gap-2">
+          <Select value={jenisFilter} onValueChange={(v) => v && handleJenisChange(v)}>
+            <SelectTrigger className="w-36">
+              <SelectValue placeholder="Semua Jenis" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">Semua Jenis</SelectItem>
+              <SelectItem value="KAMBING">Kambing</SelectItem>
+              <SelectItem value="DOMBA">Domba</SelectItem>
+              <SelectItem value="SAPI">Sapi</SelectItem>
+            </SelectContent>
+          </Select>
+          {(jenisFilter === 'KAMBING' || jenisFilter === 'DOMBA') && (
+            <Select value={gradeFilter} onValueChange={(v) => { if (v) { setGradeFilter(v); setPage(0); } }}>
+              <SelectTrigger className="w-32">
+                <SelectValue placeholder="Semua Grade" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Semua Grade</SelectItem>
+                {(['SUPER', 'A', 'B', 'C', 'D'] as const).map((g) => (
+                  <SelectItem key={g} value={g}>{g}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {jenisFilter === 'SAPI' && (
+            <>
+              <div className="flex items-center gap-1">
+                <Input
+                  type="number"
+                  placeholder="Min kg"
+                  value={weightMinFilter}
+                  onChange={(e) => { setWeightMinFilter(e.target.value); setPage(0); }}
+                  className="w-24 h-9 text-sm"
+                />
+                <span className="text-muted-foreground text-sm">–</span>
+                <Input
+                  type="number"
+                  placeholder="Max kg"
+                  value={weightMaxFilter}
+                  onChange={(e) => { setWeightMaxFilter(e.target.value); setPage(0); }}
+                  className="w-24 h-9 text-sm"
+                />
+              </div>
+            </>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {filtered.length === grouped.length
+            ? `${grouped.length} antrian`
+            : `${filtered.length} dari ${grouped.length} antrian`}
+        </p>
       </div>
 
       {filtered.length === 0 ? (
@@ -486,7 +546,7 @@ export function QueueView({
                 </tr>
               </thead>
               <tbody>
-                {grouped.map((group, gi) => (
+                {pagedGroups.map((group, gi) => (
                   <>
                     {/* Entry group header */}
                     <tr
@@ -554,7 +614,7 @@ export function QueueView({
 
           {/* Mobile: grouped collapsible cards */}
           <div className="md:hidden flex flex-col gap-3">
-            {grouped.map((group) => (
+            {pagedGroups.map((group) => (
               <QueueEntryCard
                 key={group.entryId}
                 group={group}
@@ -564,6 +624,31 @@ export function QueueView({
               />
             ))}
           </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 pt-4">
+              <button
+                type="button"
+                disabled={safePage === 0}
+                onClick={() => setPage(safePage - 1)}
+                className="px-3 py-1.5 text-sm rounded border disabled:opacity-30 hover:bg-muted"
+              >
+                ←
+              </button>
+              <span className="text-sm text-muted-foreground">
+                {safePage + 1} / {totalPages}
+              </span>
+              <button
+                type="button"
+                disabled={safePage >= totalPages - 1}
+                onClick={() => setPage(safePage + 1)}
+                className="px-3 py-1.5 text-sm rounded border disabled:opacity-30 hover:bg-muted"
+              >
+                →
+              </button>
+            </div>
+          )}
         </>
       )}
 

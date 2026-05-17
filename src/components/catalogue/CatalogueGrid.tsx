@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { Beef, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AnimalCard } from './AnimalCard';
-import { FilterBar, type FilterType, type GradeFilter, type SortOrder } from './FilterBar';
+import { FilterBar, type FilterType, type GradeFilter, type SortOrder, type Availability } from './FilterBar';
 import { StatsBar } from './StatsBar';
 import { formatWeight } from '@/lib/format';
 import type { AvailableLivestock } from '@/app/actions/livestock';
@@ -26,36 +26,43 @@ export function CatalogueGrid({ livestock }: CatalogueGridProps) {
   const [activeSort, setActiveSort] = useState<SortOrder>('newest');
   const [activeGrade, setActiveGrade] = useState<GradeFilter>('ALL');
   const [activeWeight, setActiveWeight] = useState('ALL');
+  const [availability, setAvailability] = useState<Availability>('AVAIL');
 
   const [page, setPage] = useState(0);
 
+  /* ── Availability-filtered base (for counts + weight options) ─────────── */
+  const availFiltered = useMemo(() => {
+    if (availability === 'AVAIL') return livestock.filter((l) => !l.isSold);
+    return livestock;
+  }, [livestock, availability]);
+
   /* ── Counts per type for filter pills ─────────────────────────────────── */
   const counts = useMemo<Record<string, number>>(() => {
-    const base = livestock.reduce<Record<string, number>>((acc, item) => {
+    const base = availFiltered.reduce<Record<string, number>>((acc, item) => {
       acc[item.type] = (acc[item.type] ?? 0) + 1;
       return acc;
     }, {});
-    return { ALL: livestock.length, ...base };
-  }, [livestock]);
+    return { ALL: availFiltered.length, ...base };
+  }, [availFiltered]);
 
   /* ── Weight options from type-filtered data ───────────────────────────── */
   const weightOptions = useMemo(() => {
     const source = activeFilter !== 'ALL'
-      ? livestock.filter((l) => l.type === activeFilter)
-      : livestock;
+      ? availFiltered.filter((l) => l.type === activeFilter)
+      : availFiltered;
     const set = new Set<string>();
     source.forEach((l) => {
       const w = formatWeight(l.weightMin, l.weightMax);
       if (w) set.add(w);
     });
     return Array.from(set).sort();
-  }, [livestock, activeFilter]);
+  }, [availFiltered, activeFilter]);
 
   const showGrades = activeFilter !== 'SAPI';
 
   /* ── Filter + Sort ────────────────────────────────────────────────────── */
   const filtered = useMemo(() => {
-    let result = livestock;
+    let result = availFiltered;
 
     if (activeFilter !== 'ALL') {
       result = result.filter((item) => item.type === activeFilter);
@@ -82,7 +89,7 @@ export function CatalogueGrid({ livestock }: CatalogueGridProps) {
     }
 
     return result;
-  }, [livestock, activeFilter, activeGrade, activeWeight, activeSort]);
+  }, [availFiltered, activeFilter, activeGrade, activeWeight, activeSort]);
 
   /* ── Pagination ────────────────────────────────────────────────────────── */
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -90,6 +97,7 @@ export function CatalogueGrid({ livestock }: CatalogueGridProps) {
   const paged = filtered.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
 
   const hasActiveFilters =
+    availability !== 'AVAIL' ||
     activeFilter !== 'ALL' ||
     activeGrade !== 'ALL' ||
     activeWeight !== 'ALL' ||
@@ -114,7 +122,12 @@ export function CatalogueGrid({ livestock }: CatalogueGridProps) {
     setActiveSort(s);
     setPage(0);
   }
+  function handleAvailabilityChange(a: Availability) {
+    setAvailability(a);
+    setPage(0);
+  }
   function handleReset() {
+    setAvailability('AVAIL');
     setActiveFilter('ALL');
     setActiveSort('newest');
     setActiveGrade('ALL');
@@ -135,11 +148,13 @@ export function CatalogueGrid({ livestock }: CatalogueGridProps) {
         activeSort={activeSort}
         activeGrade={activeGrade}
         activeWeight={activeWeight}
+        availability={availability}
 
         onFilterChange={handleFilterChange}
         onSortChange={handleSortChange}
         onGradeChange={handleGradeChange}
         onWeightChange={handleWeightChange}
+        onAvailabilityChange={handleAvailabilityChange}
 
         onReset={handleReset}
         counts={counts}
@@ -159,7 +174,7 @@ export function CatalogueGrid({ livestock }: CatalogueGridProps) {
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
               {paged.map((item, index) => (
-                <AnimalCard key={item.id} item={item} priority={safePage === 0 && index < 3} />
+                <AnimalCard key={item.id} item={item} priority={safePage === 0 && index < 3} isSold={item.isSold} />
               ))}
             </div>
 

@@ -28,34 +28,38 @@ import type { AnimalType, AnimalGrade } from "@/generated/prisma/client";
  */
 export async function upsertPricing(formData: FormData) {
   const actor = await requireRole("ADMIN", "SUPER_ADMIN");
+  try {
+    const animalType = formData.get("animalType") as AnimalType;
+    const grade = formData.get("grade") as AnimalGrade;
+    const hargaBeli = Number(formData.get("hargaBeli"));
+    const hargaJual = Number(formData.get("hargaJual"));
 
-  const animalType = formData.get("animalType") as AnimalType;
-  const grade = formData.get("grade") as AnimalGrade;
-  const hargaBeli = Number(formData.get("hargaBeli"));
-  const hargaJual = Number(formData.get("hargaJual"));
+    const before = await prisma.pricing.findUnique({
+      where: { animalType_grade: { animalType, grade } },
+    });
 
-  const before = await prisma.pricing.findUnique({
-    where: { animalType_grade: { animalType, grade } },
-  });
+    const upserted = await prisma.pricing.upsert({
+      where: { animalType_grade: { animalType, grade } },
+      create: { animalType, grade, hargaBeli, hargaJual },
+      update: { hargaBeli, hargaJual },
+    });
 
-  const upserted = await prisma.pricing.upsert({
-    where: { animalType_grade: { animalType, grade } },
-    create: { animalType, grade, hargaBeli, hargaJual },
-    update: { hargaBeli, hargaJual },
-  });
+    await logAudit({
+      actor,
+      action: before ? "UPDATE" : "CREATE",
+      entity: "Pricing",
+      entityId: upserted.id,
+      label: `${animalType} ${grade}`,
+      before: before ?? undefined,
+      after: upserted,
+    });
 
-  await logAudit({
-    actor,
-    action: before ? "UPDATE" : "CREATE",
-    entity: "Pricing",
-    entityId: upserted.id,
-    label: `${animalType} ${grade}`,
-    before: before ?? undefined,
-    after: upserted,
-  });
-
-  revalidatePath("/admin/pricing");
-  return { success: true };
+    revalidatePath("/admin/pricing");
+    return { success: true };
+  } catch (err) {
+    console.error('[upsertPricing]', err);
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 /**
@@ -66,21 +70,25 @@ export async function upsertPricing(formData: FormData) {
  */
 export async function deletePricing(id: string) {
   const actor = await requireRole("ADMIN", "SUPER_ADMIN");
+  try {
+    const before = await prisma.pricing.findUnique({ where: { id } });
+    if (!before) return { error: "Harga tidak ditemukan" };
 
-  const before = await prisma.pricing.findUnique({ where: { id } });
-  if (!before) return { error: "Harga tidak ditemukan" };
+    await prisma.pricing.delete({ where: { id } });
 
-  await prisma.pricing.delete({ where: { id } });
+    await logAudit({
+      actor,
+      action: "DELETE",
+      entity: "Pricing",
+      entityId: id,
+      label: `${before.animalType} ${before.grade}`,
+      before,
+    });
 
-  await logAudit({
-    actor,
-    action: "DELETE",
-    entity: "Pricing",
-    entityId: id,
-    label: `${before.animalType} ${before.grade}`,
-    before,
-  });
-
-  revalidatePath("/admin/pricing");
-  return { success: true };
+    revalidatePath("/admin/pricing");
+    return { success: true };
+  } catch (err) {
+    console.error('[deletePricing]', err);
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
 }

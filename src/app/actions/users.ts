@@ -34,53 +34,47 @@ function validateNoUpperOrSpace(value: string, label: string): string | null {
  */
 export async function createUser(formData: FormData) {
   const actor = await requireRole('ADMIN', 'SUPER_ADMIN');
+  try {
+    const username = formData.get('username') as string;
+    const password = formData.get('password') as string;
+    const name = formData.get('name') as string;
+    const phone = (formData.get('phone') as string) || null;
+    const rekBank = (formData.get('rekBank') as string) || null;
+    const role =
+      (formData.get('role') as 'SUPER_ADMIN' | 'ADMIN' | 'SALES' | 'MANAGE' | 'DRIVER') ||
+      'SALES';
 
-  const username = formData.get('username') as string;
-  const password = formData.get('password') as string;
-  const name = formData.get('name') as string;
-  const phone = (formData.get('phone') as string) || null;
-  const rekBank = (formData.get('rekBank') as string) || null;
-  const role =
-    (formData.get('role') as 'SUPER_ADMIN' | 'ADMIN' | 'SALES' | 'MANAGE' | 'DRIVER') ||
-    'SALES';
+    if (role === 'SUPER_ADMIN' && actor.role !== 'SUPER_ADMIN') {
+      return { error: 'Hanya Super Admin yang bisa membuat user Super Admin' };
+    }
 
-  if (role === 'SUPER_ADMIN' && actor.role !== 'SUPER_ADMIN') {
-    return { error: 'Hanya Super Admin yang bisa membuat user Super Admin' };
+    const usernameErr = validateNoUpperOrSpace(username, 'Username');
+    if (usernameErr) return { error: usernameErr };
+    const passwordErr = validateNoUpperOrSpace(password, 'Password');
+    if (passwordErr) return { error: passwordErr };
+
+    const existing = await prisma.profile.findUnique({ where: { username } });
+    if (existing) return { error: 'Username sudah terdaftar' };
+
+    const created = await prisma.profile.create({
+      data: { username, password: hashSync(password, 10), name, phone, rekBank, role },
+    });
+
+    await logAudit({
+      actor,
+      action: 'CREATE',
+      entity: 'Profile',
+      entityId: created.id,
+      label: `${created.username} — ${created.name}`,
+      after: created,
+    });
+
+    revalidatePath('/admin/users');
+    return { success: true };
+  } catch (err) {
+    console.error('[createUser]', err);
+    return { error: err instanceof Error ? err.message : String(err) };
   }
-
-  const usernameErr = validateNoUpperOrSpace(username, 'Username');
-  if (usernameErr) return { error: usernameErr };
-  const passwordErr = validateNoUpperOrSpace(password, 'Password');
-  if (passwordErr) return { error: passwordErr };
-
-  // Check for duplicate username
-  const existing = await prisma.profile.findUnique({ where: { username } });
-  if (existing) {
-    return { error: 'Username sudah terdaftar' };
-  }
-
-  const created = await prisma.profile.create({
-    data: {
-      username,
-      password: hashSync(password, 10),
-      name,
-      phone,
-      rekBank,
-      role,
-    },
-  });
-
-  await logAudit({
-    actor,
-    action: 'CREATE',
-    entity: 'Profile',
-    entityId: created.id,
-    label: `${created.username} — ${created.name}`,
-    after: created,
-  });
-
-  revalidatePath('/admin/users');
-  return { success: true };
 }
 
 /**
@@ -94,46 +88,46 @@ export async function createUser(formData: FormData) {
  */
 export async function updateUser(id: string, formData: FormData) {
   const actor = await requireRole('ADMIN', 'SUPER_ADMIN');
+  try {
+    const before = await prisma.profile.findUnique({ where: { id } });
+    if (!before) return { error: 'User tidak ditemukan' };
 
-  const before = await prisma.profile.findUnique({ where: { id } });
-  if (!before) return { error: 'User tidak ditemukan' };
+    const name = formData.get('name') as string;
+    const phone = (formData.get('phone') as string) || null;
+    const rekBank = (formData.get('rekBank') as string) || null;
+    const role = formData.get('role') as 'SUPER_ADMIN' | 'ADMIN' | 'SALES' | 'MANAGE' | 'DRIVER';
+    if ((role === 'SUPER_ADMIN' || before.role === 'SUPER_ADMIN') && actor.role !== 'SUPER_ADMIN') {
+      return { error: 'Hanya Super Admin yang bisa mengubah user Super Admin' };
+    }
+    const isActive = formData.get('isActive') === 'true';
+    const newPassword = formData.get('newPassword') as string;
 
-  const name = formData.get('name') as string;
-  const phone = (formData.get('phone') as string) || null;
-  const rekBank = (formData.get('rekBank') as string) || null;
-  const role = formData.get('role') as 'SUPER_ADMIN' | 'ADMIN' | 'SALES' | 'MANAGE' | 'DRIVER';
-  if ((role === 'SUPER_ADMIN' || before.role === 'SUPER_ADMIN') && actor.role !== 'SUPER_ADMIN') {
-    return { error: 'Hanya Super Admin yang bisa mengubah user Super Admin' };
+    const data: Record<string, unknown> = { name, phone, rekBank, role, isActive };
+
+    if (newPassword && newPassword.length >= 4) {
+      const pwErr = validateNoUpperOrSpace(newPassword, 'Password');
+      if (pwErr) return { error: pwErr };
+      data.password = hashSync(newPassword, 10);
+    }
+
+    const updated = await prisma.profile.update({ where: { id }, data });
+
+    await logAudit({
+      actor,
+      action: 'UPDATE',
+      entity: 'Profile',
+      entityId: id,
+      label: `${updated.username} — ${updated.name}`,
+      before,
+      after: { ...updated, passwordChanged: Boolean(data.password) },
+    });
+
+    revalidatePath('/admin/users');
+    return { success: true };
+  } catch (err) {
+    console.error('[updateUser]', err);
+    return { error: err instanceof Error ? err.message : String(err) };
   }
-  const isActive = formData.get('isActive') === 'true';
-  const newPassword = formData.get('newPassword') as string;
-
-  const data: Record<string, unknown> = { name, phone, rekBank, role, isActive };
-
-  // Only update password if a new one was provided
-  if (newPassword && newPassword.length >= 4) {
-    const pwErr = validateNoUpperOrSpace(newPassword, 'Password');
-    if (pwErr) return { error: pwErr };
-    data.password = hashSync(newPassword, 10);
-  }
-
-  const updated = await prisma.profile.update({
-    where: { id },
-    data,
-  });
-
-  await logAudit({
-    actor,
-    action: 'UPDATE',
-    entity: 'Profile',
-    entityId: id,
-    label: `${updated.username} — ${updated.name}`,
-    before,
-    after: { ...updated, passwordChanged: Boolean(data.password) },
-  });
-
-  revalidatePath('/admin/users');
-  return { success: true };
 }
 
 /**
@@ -147,27 +141,28 @@ export async function updateUser(id: string, formData: FormData) {
  */
 export async function toggleUserActive(id: string, isActive: boolean) {
   const actor = await requireRole('ADMIN', 'SUPER_ADMIN');
+  try {
+    const before = await prisma.profile.findUnique({ where: { id } });
+    if (!before) return { error: 'User tidak ditemukan' };
 
-  const before = await prisma.profile.findUnique({ where: { id } });
-  if (!before) return { error: 'User tidak ditemukan' };
+    await prisma.profile.update({ where: { id }, data: { isActive } });
 
-  await prisma.profile.update({
-    where: { id },
-    data: { isActive },
-  });
+    await logAudit({
+      actor,
+      action: 'UPDATE',
+      entity: 'Profile',
+      entityId: id,
+      label: `${before.username} — ${isActive ? 'aktif' : 'nonaktif'}`,
+      before: { isActive: before.isActive },
+      after: { isActive },
+    });
 
-  await logAudit({
-    actor,
-    action: 'UPDATE',
-    entity: 'Profile',
-    entityId: id,
-    label: `${before.username} — ${isActive ? 'aktif' : 'nonaktif'}`,
-    before: { isActive: before.isActive },
-    after: { isActive },
-  });
-
-  revalidatePath('/admin/users');
-  return { success: true };
+    revalidatePath('/admin/users');
+    return { success: true };
+  } catch (err) {
+    console.error('[toggleUserActive]', err);
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 export async function changeOwnPassword(formData: FormData) {

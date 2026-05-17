@@ -836,8 +836,8 @@ function useEntryRow(entry: EntryData, onSaved: () => void, isAdmin = false) {
 
       if (!isSalesOnApproved || itemChanges.length === 0) toast.success('Entry diperbarui');
       onSaved();
-    } catch {
-      toast.error('Terjadi kesalahan');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Terjadi kesalahan');
     }
     setLoading(false);
   }

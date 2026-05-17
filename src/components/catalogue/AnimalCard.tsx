@@ -46,9 +46,10 @@ const typeLabels: Record<string, { label: string; emoji: string }> = {
 interface AnimalCardProps {
   item: AvailableLivestock;
   priority?: boolean;
+  isSold?: boolean;
 }
 
-export function AnimalCard({ item, priority = false }: AnimalCardProps) {
+export function AnimalCard({ item, priority = false, isSold = false }: AnimalCardProps) {
   const grade = item.grade ?? 'C';
   const gradeStyle = gradeConfig[grade] ?? gradeConfig['C'];
   const typeInfo = typeLabels[item.type] ?? { label: item.type, emoji: '🐾' };
@@ -78,11 +79,27 @@ export function AnimalCard({ item, priority = false }: AnimalCardProps) {
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
             loading={priority ? 'eager' : 'lazy'}
             priority={priority}
-            className="object-cover lg:group-hover:scale-105 transition-transform duration-500 ease-out"
+            className={[
+              'object-cover transition-transform duration-500 ease-out',
+              isSold ? 'grayscale' : 'lg:group-hover:scale-105',
+            ].join(' ')}
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center">
+          <div className={['w-full h-full flex items-center justify-center', isSold ? 'grayscale' : ''].join(' ')}>
             <Beef className="size-14 text-muted-foreground" />
+          </div>
+        )}
+
+        {/* SOLD overlay */}
+        {isSold && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/30 pointer-events-none">
+            <span className={[
+              'rotate-[-12deg] border-4 border-white/90',
+              'text-white font-black text-2xl tracking-widest',
+              'px-4 py-1 bg-black/40 select-none',
+            ].join(' ')}>
+              SOLD
+            </span>
           </div>
         )}
 
@@ -128,7 +145,11 @@ export function AnimalCard({ item, priority = false }: AnimalCardProps) {
             {typeInfo.emoji} {typeInfo.label}
             {item.grade ? ` Grade ${item.grade}` : ''}
           </h3>
-          <StatusToken intent="success" dot size="sm">Tersedia</StatusToken>
+          {isSold ? (
+            <StatusToken intent="neutral" dot size="sm">Terjual</StatusToken>
+          ) : (
+            <StatusToken intent="success" dot size="sm">Tersedia</StatusToken>
+          )}
         </div>
 
         {/* Weight */}
@@ -161,29 +182,46 @@ export function AnimalCard({ item, priority = false }: AnimalCardProps) {
             </p>
           )}
 
-          <button
-            type="button"
-            onClick={() => {
-              const message = `Halo Millenials Farm!, Saya mau pesan ${typeInfo.label} dengan kode ${item.sku}`;
-              window.open(
-                `https://wa.me/+6287785925431?text=${encodeURIComponent(message)}`,
-                '_blank',
-                'noopener,noreferrer',
-              );
-            }}
-            className={[
-              'w-full flex items-center justify-center gap-2',
-              'min-h-[44px] px-4 py-2.5 rounded-xl',
-              'bg-primary',
-              'text-primary-foreground',
-              'text-sm font-semibold',
-              'active:scale-95 transition-all duration-150',
-              'lg:group-hover:gap-3',
-            ].join(' ')}
-          >
-            Hubungi Kami
-            <ArrowRight className="size-4 lg:transition-transform lg:duration-200 lg:group-hover:translate-x-0.5" />
-          </button>
+          {isSold ? (
+            <button
+              type="button"
+              disabled
+              className={[
+                'w-full flex items-center justify-center gap-2',
+                'min-h-[44px] px-4 py-2.5 rounded-xl',
+                'border border-border',
+                'text-muted-foreground',
+                'text-sm font-semibold',
+                'cursor-not-allowed opacity-60',
+              ].join(' ')}
+            >
+              Terjual
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                const message = `Halo Millenials Farm!, Saya mau pesan ${typeInfo.label} dengan kode ${item.sku}`;
+                window.open(
+                  `https://wa.me/+6287785925431?text=${encodeURIComponent(message)}`,
+                  '_blank',
+                  'noopener,noreferrer',
+                );
+              }}
+              className={[
+                'w-full flex items-center justify-center gap-2',
+                'min-h-[44px] px-4 py-2.5 rounded-xl',
+                'bg-primary',
+                'text-primary-foreground',
+                'text-sm font-semibold',
+                'active:scale-95 transition-all duration-150',
+                'lg:group-hover:gap-3',
+              ].join(' ')}
+            >
+              Hubungi Kami
+              <ArrowRight className="size-4 lg:transition-transform lg:duration-200 lg:group-hover:translate-x-0.5" />
+            </button>
+          )}
         </div>
       </div>
     </article>

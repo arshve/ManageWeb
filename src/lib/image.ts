@@ -65,7 +65,8 @@ export function addWatermark(file: File, lat?: number, lng?: number): Promise<Fi
 }
 
 export async function compressImage(file: File): Promise<File> {
-  if (!file.type.startsWith('image/')) return file;
+  const isImage = file.type.startsWith('image/') || /\.(heic|heif)$/i.test(file.name);
+  if (!isImage) return file;
   try {
     const { default: imageCompression } = await import('browser-image-compression');
     const compressed = await imageCompression(file, DEFAULT_OPTS);

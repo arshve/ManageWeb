@@ -115,7 +115,8 @@ export function LivestockForm({ livestock, trigger, pricingTemplate }: Livestock
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
+    const isImage = file.type.startsWith('image/') || /\.(heic|heif)$/i.test(file.name);
+    if (!isImage) {
       toast.error('Hanya file gambar yang diperbolehkan');
       return;
     }
@@ -226,8 +227,8 @@ export function LivestockForm({ livestock, trigger, pricingTemplate }: Livestock
         toast.success(isEdit ? 'Hewan diperbarui' : 'Hewan ditambahkan');
         setOpen(false);
       }
-    } catch {
-      toast.error('Terjadi kesalahan');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Terjadi kesalahan');
     }
 
     setLoading(false);
@@ -420,14 +421,14 @@ export function LivestockForm({ livestock, trigger, pricingTemplate }: Livestock
                   <span className="text-sm font-medium">
                     Klik untuk pilih foto
                   </span>
-                  <span className="text-xs">JPG, PNG, WEBP — maks. 25MB</span>
+                  <span className="text-xs">JPG, PNG, WEBP, HEIC — maks. 25MB</span>
                 </button>
               )}
 
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/*,.heic,.heif"
                 className="hidden"
                 onChange={handleFileChange}
               />

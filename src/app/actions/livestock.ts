@@ -31,47 +31,51 @@ import type {
  */
 export async function createLivestock(formData: FormData) {
   const actor = await requireRole('ADMIN', 'MANAGE', 'SUPER_ADMIN');
+  try {
+    const type = formData.get('type') as AnimalType;
+    const gradeRaw = formData.get('grade') as string | null;
 
-  const type = formData.get('type') as AnimalType;
-  const gradeRaw = formData.get('grade') as string | null;
+    const data = {
+      sku: formData.get('sku') as string,
+      type,
+      // Sapi doesn't have a grade; other types require it.
+      grade: type === 'SAPI' ? null : ((gradeRaw || null) as AnimalGrade | null),
+      condition: (formData.get('condition') as AnimalCondition) || 'SEHAT',
+      weightMin: formData.get('weightMin')
+        ? Number(formData.get('weightMin'))
+        : null,
+      weightMax: formData.get('weightMax')
+        ? Number(formData.get('weightMax'))
+        : null,
+      hargaJual: formData.get('hargaJual')
+        ? Number(formData.get('hargaJual'))
+        : null,
+      hargaModal: formData.get('hargaModal')
+        ? Number(formData.get('hargaModal'))
+        : null,
+      tag: (formData.get('tag') as string) || null,
+      photoUrl: (formData.get('photoUrl') as string) || null,
+      notes: (formData.get('notes') as string) || null,
+    };
 
-  const data = {
-    sku: formData.get('sku') as string,
-    type,
-    // Sapi doesn't have a grade; other types require it.
-    grade: type === 'SAPI' ? null : ((gradeRaw || null) as AnimalGrade | null),
-    condition: (formData.get('condition') as AnimalCondition) || 'SEHAT',
-    weightMin: formData.get('weightMin')
-      ? Number(formData.get('weightMin'))
-      : null,
-    weightMax: formData.get('weightMax')
-      ? Number(formData.get('weightMax'))
-      : null,
-    hargaJual: formData.get('hargaJual')
-      ? Number(formData.get('hargaJual'))
-      : null,
-    hargaModal: formData.get('hargaModal')
-      ? Number(formData.get('hargaModal'))
-      : null,
-    tag: (formData.get('tag') as string) || null,
-    photoUrl: (formData.get('photoUrl') as string) || null,
-    notes: (formData.get('notes') as string) || null,
-  };
+    const created = await prisma.livestock.create({ data });
 
-  const created = await prisma.livestock.create({ data });
+    await logAudit({
+      actor,
+      action: 'CREATE',
+      entity: 'Livestock',
+      entityId: created.id,
+      label: `${created.sku} — ${created.type}${created.grade ? ' ' + created.grade : ''}`,
+      after: created,
+    });
 
-  await logAudit({
-    actor,
-    action: 'CREATE',
-    entity: 'Livestock',
-    entityId: created.id,
-    label: `${created.sku} — ${created.type}${created.grade ? ' ' + created.grade : ''}`,
-    after: created,
-  });
-
-  revalidatePath('/admin/livestock');
-  revalidatePath('/manage');
-  return { success: true };
+    revalidatePath('/admin/livestock');
+    revalidatePath('/manage');
+    return { success: true };
+  } catch (err) {
+    console.error('[createLivestock]', err);
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 /**
@@ -84,50 +88,54 @@ export async function createLivestock(formData: FormData) {
  */
 export async function updateLivestock(id: string, formData: FormData) {
   const actor = await requireRole('ADMIN', 'MANAGE', 'SUPER_ADMIN');
+  try {
+    const before = await prisma.livestock.findUnique({ where: { id } });
+    if (!before) return { error: 'Hewan tidak ditemukan' };
 
-  const before = await prisma.livestock.findUnique({ where: { id } });
-  if (!before) return { error: 'Hewan tidak ditemukan' };
+    const type = formData.get('type') as AnimalType;
+    const gradeRaw = formData.get('grade') as string | null;
 
-  const type = formData.get('type') as AnimalType;
-  const gradeRaw = formData.get('grade') as string | null;
+    const data = {
+      sku: formData.get('sku') as string,
+      type,
+      grade: type === 'SAPI' ? null : ((gradeRaw || null) as AnimalGrade | null),
+      condition: formData.get('condition') as AnimalCondition,
+      weightMin: formData.get('weightMin')
+        ? Number(formData.get('weightMin'))
+        : null,
+      weightMax: formData.get('weightMax')
+        ? Number(formData.get('weightMax'))
+        : null,
+      hargaJual: formData.get('hargaJual')
+        ? Number(formData.get('hargaJual'))
+        : null,
+      hargaModal: formData.get('hargaModal')
+        ? Number(formData.get('hargaModal'))
+        : null,
+      tag: (formData.get('tag') as string) || null,
+      photoUrl: (formData.get('photoUrl') as string) || null,
+      notes: (formData.get('notes') as string) || null,
+    };
 
-  const data = {
-    sku: formData.get('sku') as string,
-    type,
-    grade: type === 'SAPI' ? null : ((gradeRaw || null) as AnimalGrade | null),
-    condition: formData.get('condition') as AnimalCondition,
-    weightMin: formData.get('weightMin')
-      ? Number(formData.get('weightMin'))
-      : null,
-    weightMax: formData.get('weightMax')
-      ? Number(formData.get('weightMax'))
-      : null,
-    hargaJual: formData.get('hargaJual')
-      ? Number(formData.get('hargaJual'))
-      : null,
-    hargaModal: formData.get('hargaModal')
-      ? Number(formData.get('hargaModal'))
-      : null,
-    tag: (formData.get('tag') as string) || null,
-    photoUrl: (formData.get('photoUrl') as string) || null,
-    notes: (formData.get('notes') as string) || null,
-  };
+    const updated = await prisma.livestock.update({ where: { id }, data });
 
-  const updated = await prisma.livestock.update({ where: { id }, data });
+    await logAudit({
+      actor,
+      action: 'UPDATE',
+      entity: 'Livestock',
+      entityId: id,
+      label: `${updated.sku} — ${updated.type}${updated.grade ? ' ' + updated.grade : ''}`,
+      before,
+      after: updated,
+    });
 
-  await logAudit({
-    actor,
-    action: 'UPDATE',
-    entity: 'Livestock',
-    entityId: id,
-    label: `${updated.sku} — ${updated.type}${updated.grade ? ' ' + updated.grade : ''}`,
-    before,
-    after: updated,
-  });
-
-  revalidatePath('/admin/livestock');
-  revalidatePath('/manage');
-  return { success: true };
+    revalidatePath('/admin/livestock');
+    revalidatePath('/manage');
+    return { success: true };
+  } catch (err) {
+    console.error('[updateLivestock]', err);
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 /**
@@ -140,24 +148,28 @@ export async function updateLivestock(id: string, formData: FormData) {
  */
 export async function deleteLivestock(id: string) {
   const actor = await requireRole('ADMIN', 'MANAGE', 'SUPER_ADMIN');
+  try {
+    const before = await prisma.livestock.findUnique({ where: { id } });
+    if (!before) return { error: 'Hewan tidak ditemukan' };
 
-  const before = await prisma.livestock.findUnique({ where: { id } });
-  if (!before) return { error: 'Hewan tidak ditemukan' };
+    await prisma.livestock.delete({ where: { id } });
 
-  await prisma.livestock.delete({ where: { id } });
+    await logAudit({
+      actor,
+      action: 'DELETE',
+      entity: 'Livestock',
+      entityId: id,
+      label: `${before.sku} — ${before.type}${before.grade ? ' ' + before.grade : ''}`,
+      before,
+    });
 
-  await logAudit({
-    actor,
-    action: 'DELETE',
-    entity: 'Livestock',
-    entityId: id,
-    label: `${before.sku} — ${before.type}${before.grade ? ' ' + before.grade : ''}`,
-    before,
-  });
-
-  revalidatePath('/admin/livestock');
-  revalidatePath('/manage');
-  return { success: true };
+    revalidatePath('/admin/livestock');
+    revalidatePath('/manage');
+    return { success: true };
+  } catch (err) {
+    console.error('[deleteLivestock]', err);
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -166,7 +178,7 @@ export async function deleteLivestock(id: string) {
 
 /**
  * Subset of Livestock fields exposed to the public catalogue.
- * Deliberately excludes internal fields: notes, hargaBeli, isSold, etc.
+ * Deliberately excludes internal fields: notes, hargaBeli, etc.
  */
 export type AvailableLivestock = Pick<
   Livestock,
@@ -181,18 +193,19 @@ export type AvailableLivestock = Pick<
   | 'photoUrl'
   | 'tag'
   | 'createdAt'
+  | 'isSold'
 >;
 
 /**
- * Returns all livestock that are unsold and in healthy condition,
- * ordered newest-first. Used by the public /catalogue page.
+ * Returns all healthy livestock (sold and unsold) for the public catalogue.
+ * Sold items sorted after available; within each group, newest first.
  *
  * No authentication is required — this is intentionally a public query.
  */
 export async function getAvailableLivestock(): Promise<AvailableLivestock[]> {
   return prisma.livestock.findMany({
-    where: { isSold: false, condition: 'SEHAT' },
-    orderBy: { createdAt: 'desc' },
+    where: { condition: 'SEHAT' },
+    orderBy: [{ isSold: 'asc' }, { createdAt: 'desc' }],
     select: {
       id: true,
       sku: true,
@@ -205,6 +218,7 @@ export async function getAvailableLivestock(): Promise<AvailableLivestock[]> {
       photoUrl: true,
       tag: true,
       createdAt: true,
+      isSold: true,
     },
   });
 }

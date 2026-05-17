@@ -88,8 +88,8 @@ export function UserForm({ user, trigger, isSuperAdmin = false }: UserFormProps)
           setOpen(false);
         }
       }
-    } catch {
-      toast.error('Terjadi kesalahan');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Terjadi kesalahan');
     }
     setLoading(false);
   }

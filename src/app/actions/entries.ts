@@ -227,7 +227,7 @@ export async function createEntry(formData: FormData) {
 
 export async function approveEntry(id: string) {
   const admin = await requireRole('ADMIN', 'SUPER_ADMIN');
-
+  try {
   const entry = await prisma.entry.findUnique({
     where: { id },
     include: { items: true },
@@ -261,34 +261,42 @@ export async function approveEntry(id: string) {
   revalidatePath('/sales');
   revalidatePath('/catalogue');
   return { success: true };
+  } catch (err) {
+    console.error('[approveEntry]', err);
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 export async function rejectEntry(id: string) {
   const admin = await requireRole('ADMIN', 'SUPER_ADMIN');
+  try {
+    const entry = await prisma.entry.findUnique({ where: { id } });
+    if (!entry) return { error: 'Entry tidak ditemukan' };
 
-  const entry = await prisma.entry.findUnique({ where: { id } });
-  if (!entry) return { error: 'Entry tidak ditemukan' };
+    await prisma.entry.update({ where: { id }, data: { status: 'REJECTED' } });
 
-  await prisma.entry.update({ where: { id }, data: { status: 'REJECTED' } });
+    await logAudit({
+      actor: admin,
+      action: 'UPDATE',
+      entity: 'Entry',
+      entityId: id,
+      label: `${entry.invoiceNo} — reject`,
+      before: { status: entry.status },
+      after: { status: 'REJECTED' },
+    });
 
-  await logAudit({
-    actor: admin,
-    action: 'UPDATE',
-    entity: 'Entry',
-    entityId: id,
-    label: `${entry.invoiceNo} — reject`,
-    before: { status: entry.status },
-    after: { status: 'REJECTED' },
-  });
-
-  revalidatePath('/admin');
-  revalidatePath('/sales');
-  return { success: true };
+    revalidatePath('/admin');
+    revalidatePath('/sales');
+    return { success: true };
+  } catch (err) {
+    console.error('[rejectEntry]', err);
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 export async function updateEntry(id: string, formData: FormData) {
   const profile = await requireAuth();
-
+  try {
   const entry = await prisma.entry.findUnique({
     where: { id },
     include: { items: { include: { livestock: true } } },
@@ -387,54 +395,62 @@ export async function updateEntry(id: string, formData: FormData) {
   revalidatePath('/admin');
   revalidatePath('/sales');
   return { success: true };
+  } catch (err) {
+    console.error('[updateEntry]', err);
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 export async function deleteEntry(id: string) {
   const profile = await requireAuth();
+  try {
+    const entry = await prisma.entry.findUnique({
+      where: { id },
+      include: { items: true },
+    });
+    if (!entry) return { error: 'Entry tidak ditemukan' };
 
-  const entry = await prisma.entry.findUnique({
-    where: { id },
-    include: { items: true },
-  });
-  if (!entry) return { error: 'Entry tidak ditemukan' };
+    if (
+      profile.role !== 'ADMIN' &&
+      profile.role !== 'SUPER_ADMIN' &&
+      entry.salesId !== profile.id
+    ) {
+      return { error: 'Anda tidak berhak mengubah entry ini' };
+    }
 
-  if (
-    profile.role !== 'ADMIN' &&
-    profile.role !== 'SUPER_ADMIN' &&
-    entry.salesId !== profile.id
-  ) {
-    return { error: 'Anda tidak berhak mengubah entry ini' };
+    const livestockIds = entry.items.map((i) => i.livestockId);
+
+    await prisma.$transaction([
+      prisma.entry.delete({ where: { id } }),
+      prisma.livestock.updateMany({
+        where: { id: { in: livestockIds } },
+        data: { isSold: false },
+      }),
+    ]);
+
+    await logAudit({
+      actor: profile,
+      action: 'DELETE',
+      entity: 'Entry',
+      entityId: id,
+      label: `${entry.invoiceNo} — ${entry.buyerName}`,
+      before: entry,
+    });
+
+    await deleteStorageFiles(entry.buktiTransfer);
+
+    revalidatePath('/admin');
+    revalidatePath('/sales');
+    return { success: true };
+  } catch (err) {
+    console.error('[deleteEntry]', err);
+    return { error: err instanceof Error ? err.message : String(err) };
   }
-
-  const livestockIds = entry.items.map((i) => i.livestockId);
-
-  await prisma.$transaction([
-    prisma.entry.delete({ where: { id } }),
-    prisma.livestock.updateMany({
-      where: { id: { in: livestockIds } },
-      data: { isSold: false },
-    }),
-  ]);
-
-  await logAudit({
-    actor: profile,
-    action: 'DELETE',
-    entity: 'Entry',
-    entityId: id,
-    label: `${entry.invoiceNo} — ${entry.buyerName}`,
-    before: entry,
-  });
-
-  await deleteStorageFiles(entry.buktiTransfer);
-
-  revalidatePath('/admin');
-  revalidatePath('/sales');
-  return { success: true };
 }
 
 export async function fulfillEntryRequest(requestId: string, livestockId: string, formData: FormData) {
   const admin = await requireRole('ADMIN', 'SUPER_ADMIN');
-
+  try {
   const [request, livestock] = await Promise.all([
     prisma.entryRequest.findUnique({ where: { id: requestId }, include: { entry: true } }),
     prisma.livestock.findUnique({ where: { id: livestockId } }),
@@ -484,6 +500,10 @@ export async function fulfillEntryRequest(requestId: string, livestockId: string
   revalidatePath('/sales');
   revalidatePath('/catalogue');
   return { success: true };
+  } catch (err) {
+    console.error('[fulfillEntryRequest]', err);
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 export async function updateEntryRequests(entryId: string, requestsJson: string) {
@@ -505,36 +525,41 @@ export async function updateEntryRequests(entryId: string, requestsJson: string)
     return { error: 'Minimal satu permintaan harus ada' };
   }
 
-  await prisma.$transaction([
-    prisma.entryRequest.deleteMany({ where: { entryId, isFulfilled: false } }),
-    prisma.entryRequest.createMany({
-      data: rawRequests.map((r) => ({
-        entryId,
-        type: r.type,
-        grade: r.grade ?? null,
-        weightMin: r.weightMin ?? null,
-        weightMax: r.weightMax ?? null,
-        hargaJual: r.hargaJual,
-        hargaModal: r.hargaModal ?? null,
-        resellerCut: r.resellerCut ?? null,
-        notes: r.notes ?? null,
-      })),
-    }),
-  ]);
+  try {
+    await prisma.$transaction([
+      prisma.entryRequest.deleteMany({ where: { entryId, isFulfilled: false } }),
+      prisma.entryRequest.createMany({
+        data: rawRequests.map((r) => ({
+          entryId,
+          type: r.type,
+          grade: r.grade ?? null,
+          weightMin: r.weightMin ?? null,
+          weightMax: r.weightMax ?? null,
+          hargaJual: r.hargaJual,
+          hargaModal: r.hargaModal ?? null,
+          resellerCut: r.resellerCut ?? null,
+          notes: r.notes ?? null,
+        })),
+      }),
+    ]);
 
-  await logAudit({
-    actor: profile,
-    action: 'UPDATE',
-    entity: 'Entry',
-    entityId: entryId,
-    label: `${entry.invoiceNo} — ${entry.buyerName} (Antrian)`,
-    after: { requests: rawRequests },
-  });
+    await logAudit({
+      actor: profile,
+      action: 'UPDATE',
+      entity: 'Entry',
+      entityId: entryId,
+      label: `${entry.invoiceNo} — ${entry.buyerName} (Antrian)`,
+      after: { requests: rawRequests },
+    });
 
-  revalidatePath('/admin');
-  revalidatePath('/sales');
-  revalidatePath('/admin/antrian');
-  return { success: true };
+    revalidatePath('/admin');
+    revalidatePath('/sales');
+    revalidatePath('/admin/antrian');
+    return { success: true };
+  } catch (err) {
+    console.error('[updateEntryRequests]', err);
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 export async function getAvailableLivestockForSwap(type: string) {

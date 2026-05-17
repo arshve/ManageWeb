@@ -5,17 +5,20 @@ import { SlidersHorizontal } from 'lucide-react';
 export type FilterType = 'ALL' | 'SAPI' | 'KAMBING' | 'DOMBA';
 export type GradeFilter = 'ALL' | 'SUPER' | 'A' | 'B' | 'C' | 'D';
 export type SortOrder = 'newest' | 'price_asc' | 'price_desc';
+export type Availability = 'AVAIL' | 'ALL';
 
 interface FilterBarProps {
   activeFilter: FilterType;
   activeSort: SortOrder;
   activeGrade: GradeFilter;
   activeWeight: string;
+  availability: Availability;
 
   onFilterChange: (f: FilterType) => void;
   onSortChange: (s: SortOrder) => void;
   onGradeChange: (g: GradeFilter) => void;
   onWeightChange: (w: string) => void;
+  onAvailabilityChange: (a: Availability) => void;
 
   onReset: () => void;
   counts: Record<string, number>;
@@ -51,10 +54,12 @@ export function FilterBar({
   activeSort,
   activeGrade,
   activeWeight,
+  availability,
   onFilterChange,
   onSortChange,
   onGradeChange,
   onWeightChange,
+  onAvailabilityChange,
   onReset,
   counts,
   weightOptions,
@@ -71,6 +76,37 @@ export function FilterBar({
       ].join(' ')}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col gap-2.5">
+        {/* Row 0: Availability pills */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground shrink-0">Status:</span>
+          {(['AVAIL', 'ALL'] as Availability[]).map((key) => {
+            const isActive = availability === key;
+            const label = key === 'AVAIL' ? 'Tersedia' : 'Semua';
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => onAvailabilityChange(key)}
+                className={[
+                  'inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap',
+                  'transition-all duration-200',
+                  isActive
+                    ? 'bg-primary text-primary-foreground'
+                    : [
+                        'bg-card',
+                        'text-muted-foreground',
+                        'border border-border',
+                        'hover:border-border',
+                        'active:scale-95',
+                      ].join(' '),
+                ].join(' ')}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+
         {/* Row 1: Type pills + Sort */}
         <div className="flex items-center gap-2 overflow-x-auto scrollbar-none scroll-smooth snap-x snap-mandatory">
           {/* Filter pills */}

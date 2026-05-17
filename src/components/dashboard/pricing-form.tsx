@@ -69,8 +69,8 @@ export function PricingForm({ pricing, trigger }: PricingFormProps) {
         toast.success("Harga disimpan");
         setOpen(false);
       }
-    } catch {
-      toast.error("Terjadi kesalahan");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Terjadi kesalahan');
     }
     setLoading(false);
   }

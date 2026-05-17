@@ -838,7 +838,7 @@ function StopCard({
                 </span>
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/*,.heic,.heif"
                   capture="environment"
                   className="sr-only"
                   onChange={handlePhotoChange}

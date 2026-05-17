@@ -50,7 +50,8 @@ export function BuktiTransferUpload({
     if (!file) return;
     e.target.value = '';
 
-    if (!file.type.startsWith('image/')) {
+    const isImage = file.type.startsWith('image/') || /\.(heic|heif)$/i.test(file.name);
+    if (!isImage) {
       toast.error('Hanya file gambar yang diperbolehkan');
       return;
     }
@@ -109,7 +110,7 @@ export function BuktiTransferUpload({
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-xs text-muted-foreground">JPG, PNG, WEBP — maks. 25MB · Maks. {MAX_PHOTOS} foto</p>
+      <p className="text-xs text-muted-foreground">JPG, PNG, WEBP, HEIC — maks. 25MB · Maks. {MAX_PHOTOS} foto</p>
       <div className="flex flex-wrap items-center gap-3">
       {photos.map((photo, index) => (
         <div key={photo.url} className="relative">
@@ -164,7 +165,7 @@ export function BuktiTransferUpload({
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,.heic,.heif"
         className="hidden"
         onChange={handleFileChange}
       />

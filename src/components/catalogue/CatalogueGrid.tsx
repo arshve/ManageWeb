@@ -27,6 +27,7 @@ export function CatalogueGrid({ livestock }: CatalogueGridProps) {
   const [activeGrade, setActiveGrade] = useState<GradeFilter>('ALL');
   const [activeWeight, setActiveWeight] = useState('ALL');
   const [availability, setAvailability] = useState<Availability>('AVAIL');
+  const [tagSearch, setTagSearch] = useState('');
 
   const [page, setPage] = useState(0);
 
@@ -73,6 +74,10 @@ export function CatalogueGrid({ livestock }: CatalogueGridProps) {
     if (activeWeight !== 'ALL') {
       result = result.filter((item) => formatWeight(item.weightMin, item.weightMax) === activeWeight);
     }
+    if (tagSearch.trim()) {
+      const q = tagSearch.trim().toLowerCase();
+      result = result.filter((item) => item.tag?.toLowerCase().includes(q));
+    }
     switch (activeSort) {
       case 'price_asc':
         result = [...result].sort(
@@ -89,7 +94,7 @@ export function CatalogueGrid({ livestock }: CatalogueGridProps) {
     }
 
     return result;
-  }, [availFiltered, activeFilter, activeGrade, activeWeight, activeSort]);
+  }, [availFiltered, activeFilter, activeGrade, activeWeight, tagSearch, activeSort]);
 
   /* ── Pagination ────────────────────────────────────────────────────────── */
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -101,7 +106,8 @@ export function CatalogueGrid({ livestock }: CatalogueGridProps) {
     activeFilter !== 'ALL' ||
     activeGrade !== 'ALL' ||
     activeWeight !== 'ALL' ||
-    activeSort !== 'newest';
+    activeSort !== 'newest' ||
+    tagSearch.trim() !== '';
 
   /* ── Handlers (reset page on any change) ──────────────────────────────── */
   function handleFilterChange(f: FilterType) {
@@ -126,12 +132,17 @@ export function CatalogueGrid({ livestock }: CatalogueGridProps) {
     setAvailability(a);
     setPage(0);
   }
+  function handleTagSearchChange(v: string) {
+    setTagSearch(v);
+    setPage(0);
+  }
   function handleReset() {
     setAvailability('AVAIL');
     setActiveFilter('ALL');
     setActiveSort('newest');
     setActiveGrade('ALL');
     setActiveWeight('ALL');
+    setTagSearch('');
     setPage(0);
   }
 
@@ -149,12 +160,14 @@ export function CatalogueGrid({ livestock }: CatalogueGridProps) {
         activeGrade={activeGrade}
         activeWeight={activeWeight}
         availability={availability}
+        tagSearch={tagSearch}
 
         onFilterChange={handleFilterChange}
         onSortChange={handleSortChange}
         onGradeChange={handleGradeChange}
         onWeightChange={handleWeightChange}
         onAvailabilityChange={handleAvailabilityChange}
+        onTagSearchChange={handleTagSearchChange}
 
         onReset={handleReset}
         counts={counts}

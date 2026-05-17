@@ -1,6 +1,7 @@
 'use client';
 
-import { SlidersHorizontal } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { SlidersHorizontal, Search, X } from 'lucide-react';
 
 export type FilterType = 'ALL' | 'SAPI' | 'KAMBING' | 'DOMBA';
 export type GradeFilter = 'ALL' | 'SUPER' | 'A' | 'B' | 'C' | 'D';
@@ -13,12 +14,14 @@ interface FilterBarProps {
   activeGrade: GradeFilter;
   activeWeight: string;
   availability: Availability;
+  tagSearch: string;
 
   onFilterChange: (f: FilterType) => void;
   onSortChange: (s: SortOrder) => void;
   onGradeChange: (g: GradeFilter) => void;
   onWeightChange: (w: string) => void;
   onAvailabilityChange: (a: Availability) => void;
+  onTagSearchChange: (v: string) => void;
 
   onReset: () => void;
   counts: Record<string, number>;
@@ -55,17 +58,32 @@ export function FilterBar({
   activeGrade,
   activeWeight,
   availability,
+  tagSearch,
   onFilterChange,
   onSortChange,
   onGradeChange,
   onWeightChange,
   onAvailabilityChange,
+  onTagSearchChange,
   onReset,
   counts,
   weightOptions,
   showGrades,
   hasActiveFilters,
 }: FilterBarProps) {
+  const [searchOpen, setSearchOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  function openSearch() {
+    setSearchOpen(true);
+    setTimeout(() => inputRef.current?.focus(), 0);
+  }
+
+  function closeSearch() {
+    setSearchOpen(false);
+    onTagSearchChange('');
+  }
+
   return (
     <div
       className={[
@@ -190,6 +208,49 @@ export function FilterBar({
                 </button>
               );
             })}
+          </div>
+
+          {/* Divider */}
+          <div className="w-px h-6 bg-border shrink-0 mx-1" />
+
+          {/* Search */}
+          <div className="flex items-center shrink-0">
+            {searchOpen ? (
+              <div className="flex items-center gap-1 border border-border rounded-full px-3 bg-card min-h-[44px]">
+                <Search className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={tagSearch}
+                  onChange={(e) => onTagSearchChange(e.target.value)}
+                  placeholder="Cari tag..."
+                  className="w-36 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={closeSearch}
+                  className="text-muted-foreground hover:text-foreground transition-colors ml-1"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={openSearch}
+                className={[
+                  'snap-start inline-flex items-center justify-center',
+                  'size-11 rounded-full',
+                  'transition-all duration-200',
+                  tagSearch
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted active:scale-95',
+                ].join(' ')}
+                title="Cari berdasarkan tag"
+              >
+                <Search className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
 

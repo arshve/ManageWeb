@@ -120,8 +120,8 @@ export function LivestockForm({ livestock, trigger, pricingTemplate }: Livestock
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Ukuran foto maksimal 5MB');
+    if (file.size > 25 * 1024 * 1024) {
+      toast.error('Ukuran foto maksimal 25MB');
       return;
     }
 
@@ -420,7 +420,7 @@ export function LivestockForm({ livestock, trigger, pricingTemplate }: Livestock
                   <span className="text-sm font-medium">
                     Klik untuk pilih foto
                   </span>
-                  <span className="text-xs">JPG, PNG, WEBP — maks. 5MB</span>
+                  <span className="text-xs">JPG, PNG, WEBP — maks. 25MB</span>
                 </button>
               )}
 

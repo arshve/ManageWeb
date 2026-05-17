@@ -54,8 +54,8 @@ export function BuktiTransferUpload({
       toast.error('Hanya file gambar yang diperbolehkan');
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Ukuran foto maksimal 5MB');
+    if (file.size > 25 * 1024 * 1024) {
+      toast.error('Ukuran foto maksimal 25MB');
       return;
     }
     if (photos.length >= MAX_PHOTOS) {
@@ -108,7 +108,9 @@ export function BuktiTransferUpload({
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-3">
+    <div className="flex flex-col gap-2">
+      <p className="text-xs text-muted-foreground">JPG, PNG, WEBP — maks. 25MB · Maks. {MAX_PHOTOS} foto</p>
+      <div className="flex flex-wrap items-center gap-3">
       {photos.map((photo, index) => (
         <div key={photo.url} className="relative">
           <div className="size-14 rounded-md overflow-hidden border bg-muted">
@@ -175,6 +177,7 @@ export function BuktiTransferUpload({
           onClose={() => setPreviewUrl(null)}
         />
       )}
+    </div>
     </div>
   );
 }

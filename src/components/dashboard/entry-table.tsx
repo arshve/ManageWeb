@@ -225,12 +225,13 @@ export function EntryTable({
   const [paymentFilter, setPaymentFilter] = useState('ALL');
   const [sentFilter, setSentFilter] = useState('ALL');
   const [pengirimanFilter, setPengirimanFilter] = useState('ALL');
+  const [dataFilter, setDataFilter] = useState('ALL');
   const [sortField, setSortField] = useState<SortField>('createdAt');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 20;
 
-  useEffect(() => { setPage(1); }, [search, statusFilter, paymentFilter, sentFilter, pengirimanFilter]);
+  useEffect(() => { setPage(1); }, [search, statusFilter, paymentFilter, sentFilter, pengirimanFilter, dataFilter]);
 
   function toggleSort(field: SortField) {
     if (sortField === field) {
@@ -282,6 +283,12 @@ export function EntryTable({
         pengirimanFilter === 'NONE' ? !e.pengiriman : e.pengiriman === pengirimanFilter,
       );
     }
+    if (dataFilter === 'NO_ALAMAT') {
+      result = result.filter((e) => !e.buyerAddress?.trim());
+    }
+    if (dataFilter === 'NO_MAPS') {
+      result = result.filter((e) => !e.buyerMaps?.trim());
+    }
 
     result = [...result].sort((a, b) => {
       const aPending = a.editRequests.length > 0 ? 1 : 0;
@@ -324,6 +331,7 @@ export function EntryTable({
     paymentFilter,
     sentFilter,
     pengirimanFilter,
+    dataFilter,
     sortField,
     sortDir,
   ]);
@@ -431,11 +439,31 @@ export function EntryTable({
               <SelectItem value="TITIP_POTONG">Titip Potong</SelectItem>
             </SelectContent>
           </Select>
+          <Select
+            value={dataFilter}
+            onValueChange={(val) => setDataFilter(val ?? 'ALL')}
+          >
+            <SelectTrigger className="h-8 w-[150px] text-xs">
+              <SelectValue>
+                {{
+                  ALL: 'Semua Data',
+                  NO_ALAMAT: 'Tanpa Alamat',
+                  NO_MAPS: 'Tanpa Maps',
+                }[dataFilter] ?? dataFilter}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">Semua Data</SelectItem>
+              <SelectItem value="NO_ALAMAT">Tanpa Alamat</SelectItem>
+              <SelectItem value="NO_MAPS">Tanpa Maps</SelectItem>
+            </SelectContent>
+          </Select>
           {(search ||
             statusFilter !== 'ALL' ||
             paymentFilter !== 'ALL' ||
             sentFilter !== 'ALL' ||
-            pengirimanFilter !== 'ALL') && (
+            pengirimanFilter !== 'ALL' ||
+            dataFilter !== 'ALL') && (
             <Button
               variant="ghost"
               size="sm"
@@ -446,6 +474,7 @@ export function EntryTable({
                 setPaymentFilter('ALL');
                 setSentFilter('ALL');
                 setPengirimanFilter('ALL');
+                setDataFilter('ALL');
               }}
             >
               <X className="size-3 mr-1" />

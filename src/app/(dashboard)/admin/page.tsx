@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { StatCard } from '@/components/ui/stat-card';
+import { Phone, MapPin, Map, Receipt, Route, Truck, PackageCheck, Banknote, CheckCircle2 } from 'lucide-react';
 
 const SERIF = "var(--font-dm-serif), 'DM Serif Display', serif";
 
@@ -22,6 +23,15 @@ export default async function AdminDashboardPage() {
     pendingEntries,
     totalSales,
     revenueAgg,
+    noPhone,
+    noAddress,
+    noMaps,
+    noBuktiTransfer,
+    noRoute,
+    dikirim,
+    belumDikirim,
+    countDp,
+    countLunas,
     allEntries,
     salesUsers,
   ] = await Promise.all([
@@ -34,6 +44,15 @@ export default async function AdminDashboardPage() {
       _sum: { hargaJual: true, hargaModal: true },
       where: { entry: { status: 'APPROVED' } },
     }),
+    prisma.entry.count({ where: { buyerPhone: null } }),
+    prisma.entry.count({ where: { OR: [{ buyerAddress: null }, { buyerAddress: '' }] } }),
+    prisma.entry.count({ where: { OR: [{ buyerMaps: null }, { buyerMaps: '' }] } }),
+    prisma.entry.count({ where: { buktiTransfer: { equals: [] } } }),
+    prisma.entry.count({ where: { pengiriman: null } }),
+    prisma.entry.count({ where: { isSent: true } }),
+    prisma.entry.count({ where: { isSent: false } }),
+    prisma.entry.count({ where: { paymentStatus: 'DP' } }),
+    prisma.entry.count({ where: { paymentStatus: 'LUNAS' } }),
     prisma.entry.findMany({
       where: { requests: { none: { isFulfilled: false } } },
       orderBy: { sortAt: 'desc' },
@@ -175,6 +194,75 @@ export default async function AdminDashboardPage() {
         <StatCard accent="info"    label="Entry Penjualan"  value={totalEntries}              sub={`${pendingEntries} menunggu approval`} />
         {superAdmin && <StatCard accent="success" label="Total Revenue" value={formatRupiah(totalRevenue)} sub={`Modal: ${formatRupiah(totalModal)}`} />}
         <StatCard accent="primary" label="Sales Aktif"      value={totalSales}                sub={superAdmin ? 'Keuangan di menu terpisah' : ''} />
+      </div>
+
+      {/* Data completeness */}
+      <div className="rounded-xl border bg-card px-4 py-3 mb-6 flex flex-col gap-3">
+        {/* Row 1: missing data */}
+        {(noPhone > 0 || noAddress > 0 || noMaps > 0 || noBuktiTransfer > 0 || noRoute > 0) && (
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground mb-2">
+              Data Belum Lengkap
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {noPhone > 0 && (
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-warning-bg text-warning-fg text-xs font-medium">
+                  <Phone className="size-3.5 shrink-0" />
+                  <span>{noPhone} tanpa telepon</span>
+                </div>
+              )}
+              {noAddress > 0 && (
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-warning-bg text-warning-fg text-xs font-medium">
+                  <MapPin className="size-3.5 shrink-0" />
+                  <span>{noAddress} tanpa alamat</span>
+                </div>
+              )}
+              {noMaps > 0 && (
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-warning-bg text-warning-fg text-xs font-medium">
+                  <Map className="size-3.5 shrink-0" />
+                  <span>{noMaps} tanpa maps</span>
+                </div>
+              )}
+              {noRoute > 0 && (
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-warning-bg text-warning-fg text-xs font-medium">
+                  <Route className="size-3.5 shrink-0" />
+                  <span>{noRoute} tanpa rute</span>
+                </div>
+              )}
+              {noBuktiTransfer > 0 && (
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-neutral-bg text-neutral-fg text-xs font-medium">
+                  <Receipt className="size-3.5 shrink-0" />
+                  <span>{noBuktiTransfer} tanpa bukti transfer</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Row 2: delivery & payment status */}
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground mb-2">
+            Status Pengiriman &amp; Pembayaran
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-success-bg text-success-fg text-xs font-medium">
+              <Truck className="size-3.5 shrink-0" />
+              <span>{dikirim} dikirim</span>
+            </div>
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-neutral-bg text-neutral-fg text-xs font-medium">
+              <PackageCheck className="size-3.5 shrink-0" />
+              <span>{belumDikirim} belum dikirim</span>
+            </div>
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-warning-bg text-warning-fg text-xs font-medium">
+              <Banknote className="size-3.5 shrink-0" />
+              <span>{countDp} DP</span>
+            </div>
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-success-bg text-success-fg text-xs font-medium">
+              <CheckCircle2 className="size-3.5 shrink-0" />
+              <span>{countLunas} lunas</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="rounded-xl border bg-card overflow-hidden">

@@ -18,7 +18,8 @@ import { DashboardShell } from '@/components/dashboard/dashboard-shell';
 import { createEntry } from '@/app/actions/entries';
 import { getActiveSales } from '@/app/actions/users';
 import { toast } from 'sonner';
-import { Search, X } from 'lucide-react';
+import { Search, X, Check, User } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import {
   LivestockPicker,
   type PickerLivestock,
@@ -252,50 +253,115 @@ export function AdminNewEntryForm({ canViewFinancials }: { canViewFinancials: bo
 
         {/* ── Penanggung Jawab ── */}
         <SectionCard title="Penanggung Jawab (Sales)">
-          <Select
-            value={selectedSalesId || 'admin'}
-            onValueChange={(val) => {
-              const v = val ?? '';
-              setSelectedSalesId(v === 'admin' ? '' : v);
-              if (val) setSalesSearch('');
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Diri Sendiri (Admin)">
-                {selectedUser ? selectedUser.name : undefined}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent className="min-w-max w-auto max-h-[350px]">
-              <div className="sticky top-0 z-20 -mx-1 -mt-1 mb-1 border-b bg-popover p-2 rounded-t-md">
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                  <Input
-                    placeholder="Cari sales..."
-                    value={salesSearch}
-                    onChange={(e) => setSalesSearch(e.target.value)}
-                    onKeyDown={(e) => {
-                      e.stopPropagation();
-                      e.nativeEvent.stopImmediatePropagation();
-                    }}
-                    className="h-8 pl-8 text-xs"
-                  />
-                </div>
+          <div className="flex flex-col gap-2">
+            {/* Selected badge */}
+            <div className={cn(
+              'flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors',
+              selectedSalesId
+                ? 'border-primary/30 bg-primary/5'
+                : 'border-dashed bg-muted/30',
+            )}>
+              <div className={cn(
+                'size-8 rounded-full flex items-center justify-center shrink-0 text-sm font-bold',
+                selectedSalesId
+                  ? 'bg-primary/15 text-primary'
+                  : 'bg-muted text-muted-foreground',
+              )}>
+                {selectedUser
+                  ? selectedUser.name.charAt(0).toUpperCase()
+                  : <User className="size-4" />}
               </div>
-              <SelectItem value="admin" label="Diri Sendiri (Admin)">
-                Diri Sendiri (Admin)
-              </SelectItem>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">
+                  {selectedUser ? selectedUser.name : 'Diri Sendiri (Admin)'}
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  {selectedSalesId ? 'Sales dipilih' : 'Default — tanpa sales'}
+                </p>
+              </div>
+              {selectedSalesId && (
+                <button
+                  type="button"
+                  onClick={() => { setSelectedSalesId(''); setSalesSearch(''); }}
+                  className="text-muted-foreground hover:text-destructive transition-colors shrink-0"
+                  title="Reset ke admin"
+                >
+                  <X className="size-4" />
+                </button>
+              )}
+            </div>
+
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+              <Input
+                placeholder="Cari sales..."
+                value={salesSearch}
+                onChange={(e) => setSalesSearch(e.target.value)}
+                className="pl-8 pr-8 h-9 text-sm"
+                autoComplete="off"
+              />
+              {salesSearch && (
+                <button
+                  type="button"
+                  onClick={() => setSalesSearch('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* List */}
+            <div className="rounded-lg border overflow-hidden divide-y max-h-52 overflow-y-auto">
+              {/* Admin option — only shown when no search or search matches */}
+              {('diri sendiri admin'.includes(salesSearch.toLowerCase()) || !salesSearch) && (
+                <button
+                  type="button"
+                  onClick={() => { setSelectedSalesId(''); setSalesSearch(''); }}
+                  className={cn(
+                    'flex items-center gap-3 w-full px-3 py-2.5 text-left transition-colors hover:bg-muted/50',
+                    !selectedSalesId && 'bg-primary/5',
+                  )}
+                >
+                  <div className="size-7 rounded-full bg-muted flex items-center justify-center shrink-0">
+                    <User className="size-3.5 text-muted-foreground" />
+                  </div>
+                  <span className="text-sm flex-1">Diri Sendiri (Admin)</span>
+                  {!selectedSalesId && <Check className="size-4 text-primary shrink-0" />}
+                </button>
+              )}
+
               {filteredSales.map((s) => (
-                <SelectItem key={s.id} value={s.id} label={s.name}>
-                  {s.name}
-                </SelectItem>
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => { setSelectedSalesId(s.id); setSalesSearch(''); }}
+                  className={cn(
+                    'flex items-center gap-3 w-full px-3 py-2.5 text-left transition-colors hover:bg-muted/50',
+                    selectedSalesId === s.id && 'bg-primary/5',
+                  )}
+                >
+                  <div className={cn(
+                    'size-7 rounded-full flex items-center justify-center shrink-0 text-xs font-bold',
+                    selectedSalesId === s.id
+                      ? 'bg-primary/15 text-primary'
+                      : 'bg-muted text-muted-foreground',
+                  )}>
+                    {s.name.charAt(0).toUpperCase()}
+                  </div>
+                  <span className="text-sm flex-1 truncate">{s.name}</span>
+                  {selectedSalesId === s.id && <Check className="size-4 text-primary shrink-0" />}
+                </button>
               ))}
-              {filteredSales.length === 0 && (
-                <div className="py-4 text-center text-xs text-muted-foreground">
-                  Tidak ditemukan
+
+              {filteredSales.length === 0 && salesSearch && (
+                <div className="py-6 text-center text-xs text-muted-foreground">
+                  Sales &quot;{salesSearch}&quot; tidak ditemukan
                 </div>
               )}
-            </SelectContent>
-          </Select>
+            </div>
+          </div>
         </SectionCard>
 
         {/* ── Pilih Hewan (Langsung) ── */}

@@ -1674,9 +1674,22 @@ const MobileEntryCard = memo(function MobileEntryCard({
         }}
         className="w-full flex items-center gap-2 p-3 text-left hover:bg-muted/30 transition-colors cursor-pointer"
       >
+        {/* Photo thumbnail or count badge */}
+        {entry.items.length > 1 ? (
+          <div className="shrink-0 size-10 rounded-md border bg-muted flex items-center justify-center">
+            <span className="text-sm font-bold text-muted-foreground">{entry.items.length}</span>
+          </div>
+        ) : firstLv?.photoUrl ? (
+          <PhotoThumb photoUrl={firstLv.photoUrl} alt={`${firstLv.type} ${firstLv.grade ?? ''}`} />
+        ) : null}
         <div className="flex-1 min-w-0">
           <div className="text-sm font-medium truncate">{entry.buyerName}</div>
-          <div className="text-xs text-muted-foreground truncate mt-0.5">{livestockSummary}</div>
+          <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1.5 flex-wrap">
+            <span className="truncate">{livestockSummary}</span>
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-muted text-[10px] font-medium whitespace-nowrap shrink-0">
+              {entry.sales.name}
+            </span>
+          </div>
         </div>
         <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
           {pendingRequest && (
@@ -1878,6 +1891,24 @@ const MobileEntryCard = memo(function MobileEntryCard({
     </div>
   );
 });
+
+function PhotoThumb({ photoUrl, alt }: { photoUrl: string; alt: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); setOpen(true); }}
+        className="shrink-0 size-10 rounded-md overflow-hidden border bg-muted cursor-zoom-in hover:opacity-90 transition-opacity"
+        title="Lihat foto"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={photoUrl} alt={alt} className="size-10 object-cover" />
+      </button>
+      <Lightbox src={photoUrl} alt={alt} open={open} onClose={() => setOpen(false)} />
+    </>
+  );
+}
 
 function BandLabel({ children }: { children: React.ReactNode }) {
   return (

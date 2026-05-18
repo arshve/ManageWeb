@@ -33,7 +33,7 @@ export function StatCard({
           {label}
         </p>
         <p
-          className="text-2xl font-bold leading-none mb-1"
+          className="text-lg sm:text-2xl font-bold leading-none mb-1 truncate"
           style={{ fontFamily: SERIF, color }}
         >
           {value}

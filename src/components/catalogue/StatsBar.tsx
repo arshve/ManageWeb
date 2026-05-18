@@ -20,7 +20,7 @@ export function StatsBar({ livestock }: StatsBarProps) {
   const stats: StatCard[] = [
     {
       emoji: '✨',
-      label: 'Total Tersedia',
+      label: 'Total Hewan',
       count: livestock.length,
       bg: 'bg-muted',
     },

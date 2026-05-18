@@ -526,7 +526,7 @@ export function EntryTable({
                   Harga Jual <SortIcon field="hargaJual" />
                 </span>
               </th>
-              {isAdmin && <th className="text-center p-3 font-medium">Sales Cut</th>}
+              <th className="text-center p-3 font-medium">{isAdmin ? 'Sales Cut' : 'Komisi'}</th>
               {canViewFinancials && (
                 <>
                   <th className="text-center p-3 font-medium">Modal</th>
@@ -1464,11 +1464,9 @@ const EntryRow = memo(function EntryRow({
         </td>
         {isAdmin && <td className="p-3">{entry.sales.name}</td>}
         <td className="p-3 text-center">{formatRupiah(entry.hargaJual)}</td>
-        {isAdmin && (
-          <td className="p-3 text-center">
-            {entry.resellerCut ? formatRupiah(entry.resellerCut) : '-'}
-          </td>
-        )}
+        <td className="p-3 text-center">
+          {entry.resellerCut ? formatRupiah(entry.resellerCut) : '-'}
+        </td>
         {canViewFinancials && (
           <>
             <td className="p-3 text-center">
@@ -1845,11 +1843,12 @@ const MobileEntryCard = memo(function MobileEntryCard({
             </div>
 
             {/* Financial */}
-            {(isAdmin || canViewFinancials) && (
+            {(isAdmin || canViewFinancials || entry.resellerCut != null) && (
               <div className="flex gap-5 px-3 py-2.5 bg-muted/20">
-                {isAdmin && (
-                  <FinCol label="Sales Cut" value={entry.resellerCut ? formatRupiah(entry.resellerCut) : '–'} />
-                )}
+                <FinCol
+                  label={isAdmin ? 'Sales Cut' : 'Komisi'}
+                  value={entry.resellerCut ? formatRupiah(entry.resellerCut) : '–'}
+                />
                 {canViewFinancials && (
                   <>
                     <FinCol label="Modal" value={entry.hargaModal ? formatRupiah(entry.hargaModal) : '–'} />

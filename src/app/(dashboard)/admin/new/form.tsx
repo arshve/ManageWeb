@@ -39,6 +39,7 @@ interface SelectedItem {
   livestock: PickerLivestock;
   hargaJual: string;
   hargaModal: string;
+  resellerCut: string;
   tag: string;
 }
 
@@ -142,13 +143,14 @@ export function AdminNewEntryForm({ canViewFinancials }: { canViewFinancials: bo
           livestock: lv,
           hargaJual: lv.hargaJual?.toString() ?? '',
           hargaModal: (lv as { hargaModal?: number | null }).hargaModal?.toString() ?? '',
+          resellerCut: '',
           tag: lv.tag ?? '',
         },
       ]);
     }
   }
 
-  function updateItem(id: string, field: 'hargaJual' | 'hargaModal' | 'tag', value: string) {
+  function updateItem(id: string, field: 'hargaJual' | 'hargaModal' | 'resellerCut' | 'tag', value: string) {
     setSelectedItems((prev) =>
       prev.map((i) => (i.livestock.id === id ? { ...i, [field]: value } : i)),
     );
@@ -184,6 +186,7 @@ export function AdminNewEntryForm({ canViewFinancials }: { canViewFinancials: bo
             livestockId: i.livestock.id,
             hargaJual: Number(i.hargaJual) || 0,
             hargaModal: Number(i.hargaModal) || null,
+            resellerCut: Number(i.resellerCut) || null,
             tag: i.tag || null,
           })),
         ),
@@ -398,7 +401,7 @@ export function AdminNewEntryForm({ canViewFinancials }: { canViewFinancials: bo
                         </p>
                         <div
                           className={`grid gap-2 ${
-                            canViewFinancials ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2'
+                            canViewFinancials ? 'grid-cols-2 sm:grid-cols-5' : 'grid-cols-3'
                           }`}
                         >
                           <Field>
@@ -416,6 +419,15 @@ export function AdminNewEntryForm({ canViewFinancials }: { canViewFinancials: bo
                               onValueChange={(v) => updateItem(lv.id, 'hargaJual', v)}
                               className="h-7 text-xs"
                               placeholder="3500000"
+                            />
+                          </Field>
+                          <Field>
+                            <FieldLabel className="text-[10px]">Komisi Sales</FieldLabel>
+                            <RupiahInput
+                              value={item.resellerCut}
+                              onValueChange={(v) => updateItem(lv.id, 'resellerCut', v)}
+                              className="h-7 text-xs"
+                              placeholder="0"
                             />
                           </Field>
                           {canViewFinancials && (

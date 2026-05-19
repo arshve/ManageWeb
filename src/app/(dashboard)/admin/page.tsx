@@ -92,7 +92,18 @@ export default async function AdminDashboardPage() {
   const totalRevenue = revenueAgg._sum.hargaJual ?? 0;
   const totalModal = revenueAgg._sum.hargaModal ?? 0;
 
-  const serialized = allEntries.map((entry) => {
+  const sortedEntries = [...allEntries].sort((a, b) => {
+    const priority = (e: typeof a) =>
+      e.deleteRequestedAt ? 0
+      : e.status === 'PENDING' ? 1
+      : e.editRequests.length > 0 ? 2
+      : 3;
+    const diff = priority(a) - priority(b);
+    if (diff !== 0) return diff;
+    return b.sortAt.getTime() - a.sortAt.getTime();
+  });
+
+  const serialized = sortedEntries.map((entry) => {
     const first = entry.items[0]?.livestock;
     return {
       id: entry.id,
@@ -118,6 +129,8 @@ export default async function AdminDashboardPage() {
       isSent: entry.isSent,
       createdAt: entry.createdAt.toISOString(),
       updatedAt: entry.updatedAt.toISOString(),
+      deleteRequestedAt: entry.deleteRequestedAt?.toISOString() ?? null,
+      deleteRequestedById: entry.deleteRequestedById ?? null,
       delivery: entry.delivery
         ? { status: entry.delivery.status, driverName: entry.delivery.driver?.name ?? null }
         : null,

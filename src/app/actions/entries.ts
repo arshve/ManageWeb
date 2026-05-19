@@ -448,6 +448,64 @@ export async function deleteEntry(id: string) {
   }
 }
 
+export async function requestDeleteEntry(id: string) {
+  const profile = await requireAuth();
+  if (profile.role === 'ADMIN' || profile.role === 'SUPER_ADMIN') {
+    return { error: 'Admin langsung hapus entry' };
+  }
+  try {
+    const entry = await prisma.entry.findUnique({ where: { id } });
+    if (!entry) return { error: 'Entry tidak ditemukan' };
+    if (entry.salesId !== profile.id) return { error: 'Anda tidak berhak mengubah entry ini' };
+    if (entry.deleteRequestedAt) return { error: 'Permintaan hapus sudah dikirim' };
+
+    await prisma.entry.update({
+      where: { id },
+      data: { deleteRequestedAt: new Date(), deleteRequestedById: profile.id },
+    });
+
+    await logAudit({
+      actor: profile,
+      action: 'UPDATE',
+      entity: 'Entry',
+      entityId: id,
+      label: `${entry.invoiceNo} — ${entry.buyerName} [permintaan hapus]`,
+    });
+
+    revalidatePath('/sales');
+    revalidatePath('/admin');
+    return { success: true };
+  } catch (err) {
+    console.error('[requestDeleteEntry]', err);
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export async function cancelDeleteRequest(id: string) {
+  const profile = await requireAuth();
+  try {
+    const entry = await prisma.entry.findUnique({ where: { id } });
+    if (!entry) return { error: 'Entry tidak ditemukan' };
+    if (
+      profile.role !== 'ADMIN' &&
+      profile.role !== 'SUPER_ADMIN' &&
+      entry.salesId !== profile.id
+    ) return { error: 'Anda tidak berhak mengubah entry ini' };
+
+    await prisma.entry.update({
+      where: { id },
+      data: { deleteRequestedAt: null, deleteRequestedById: null },
+    });
+
+    revalidatePath('/sales');
+    revalidatePath('/admin');
+    return { success: true };
+  } catch (err) {
+    console.error('[cancelDeleteRequest]', err);
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 export async function fulfillEntryRequest(requestId: string, livestockId: string, formData: FormData) {
   const admin = await requireRole('ADMIN', 'SUPER_ADMIN');
   try {

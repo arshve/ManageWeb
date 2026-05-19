@@ -69,6 +69,8 @@ import {
   approveEntry,
   rejectEntry,
   deleteEntry,
+  requestDeleteEntry,
+  cancelDeleteRequest,
   proposeEntryEdit,
   directEditEntryItems,
   approveEntryEdit,
@@ -155,6 +157,8 @@ export interface EntryData {
     condition: string;
   } | null;
   sales: { id: string; name: string };
+  deleteRequestedAt: string | null;
+  deleteRequestedById: string | null;
   requests: {
     id: string;
     type: string;
@@ -885,10 +889,36 @@ function useEntryRow(entry: EntryData, onSaved: () => void, isAdmin = false) {
   }
 
   async function handleDelete() {
-    if (!confirm('Yakin ingin menghapus entry ini?')) return;
+    if (isAdmin) {
+      if (!confirm('Yakin ingin menghapus entry ini?')) return;
+      const result = await deleteEntry(entry.id);
+      if ('error' in result) toast.error(String(result.error));
+      else toast.success('Entry dihapus');
+    } else {
+      if (!confirm('Kirim permintaan hapus ke admin?')) return;
+      const result = await requestDeleteEntry(entry.id);
+      if ('error' in result) toast.error(String(result.error));
+      else toast.success('Permintaan hapus dikirim ke admin');
+    }
+  }
+
+  async function handleCancelDelete() {
+    const result = await cancelDeleteRequest(entry.id);
+    if ('error' in result) toast.error(String(result.error));
+    else toast.success('Permintaan hapus dibatalkan');
+  }
+
+  async function handleApproveDelete() {
+    if (!confirm('Setujui dan hapus entry ini?')) return;
     const result = await deleteEntry(entry.id);
     if ('error' in result) toast.error(String(result.error));
     else toast.success('Entry dihapus');
+  }
+
+  async function handleRejectDelete() {
+    const result = await cancelDeleteRequest(entry.id);
+    if ('error' in result) toast.error(String(result.error));
+    else toast.success('Permintaan hapus ditolak');
   }
 
   async function handleApproveEdit() {
@@ -959,6 +989,9 @@ function useEntryRow(entry: EntryData, onSaved: () => void, isAdmin = false) {
     handleApprove,
     handleReject,
     handleDelete,
+    handleCancelDelete,
+    handleApproveDelete,
+    handleRejectDelete,
     handleApproveEdit,
     handleRejectEdit,
     handleCancelEdit,
@@ -1402,6 +1435,9 @@ const EntryRow = memo(function EntryRow({
     handleApprove,
     handleReject,
     handleDelete,
+    handleCancelDelete,
+    handleApproveDelete,
+    handleRejectDelete,
     handleApproveEdit,
     handleRejectEdit,
     handleCancelEdit,
@@ -1504,6 +1540,11 @@ const EntryRow = memo(function EntryRow({
               Perubahan Diajukan
             </span>
           )}
+          {entry.deleteRequestedAt && (
+            <span className="mt-1 inline-block text-[9px] font-medium text-destructive bg-destructive/10 px-1.5 py-0.5 rounded-full">
+              Minta Hapus
+            </span>
+          )}
         </td>
         <td className="p-3 text-xs text-muted-foreground whitespace-nowrap text-center">
           <div>{formatDateTime(new Date(entry.createdAt))}</div>
@@ -1572,15 +1613,30 @@ const EntryRow = memo(function EntryRow({
                   entry.buktiTransfer.length > 0 && (
                     <PdfMenu entryId={entry.id} />
                   )}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-8 text-destructive"
-                  onClick={handleDelete}
-                  title="Hapus"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
+                {isAdmin && entry.deleteRequestedAt ? (
+                  <>
+                    <Button variant="ghost" size="icon" className="size-8 text-destructive" onClick={handleApproveDelete} title="Setujui Hapus">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="size-8 text-muted-foreground" onClick={handleRejectDelete} title="Tolak Hapus">
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  </>
+                ) : !isAdmin && entry.deleteRequestedAt ? (
+                  <Button variant="ghost" size="icon" className="size-8 text-warning-fg" onClick={handleCancelDelete} title="Batalkan permintaan hapus">
+                    <Trash2 className="h-3.5 w-3.5 opacity-50" />
+                  </Button>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-8 text-destructive"
+                    onClick={handleDelete}
+                    title={isAdmin ? 'Hapus' : 'Minta Hapus'}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                )}
               </>
             )}
           </div>
@@ -1666,6 +1722,9 @@ const MobileEntryCard = memo(function MobileEntryCard({
     handleApprove,
     handleReject,
     handleDelete,
+    handleCancelDelete,
+    handleApproveDelete,
+    handleRejectDelete,
     handleApproveEdit,
     handleRejectEdit,
     handleCancelEdit,
@@ -1908,9 +1967,24 @@ const MobileEntryCard = memo(function MobileEntryCard({
                 <Button variant="ghost" size="icon" className="size-8" onClick={() => onEdit(entry.id)} title="Edit">
                   <Pencil className="h-3.5 w-3.5" />
                 </Button>
-                <Button variant="ghost" size="icon" className="size-8 text-destructive" onClick={handleDelete} title="Hapus">
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
+                {isAdmin && entry.deleteRequestedAt ? (
+                  <>
+                    <Button variant="ghost" size="icon" className="size-8 text-destructive" onClick={handleApproveDelete} title="Setujui Hapus">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="size-8 text-muted-foreground" onClick={handleRejectDelete} title="Tolak Hapus">
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  </>
+                ) : !isAdmin && entry.deleteRequestedAt ? (
+                  <Button variant="ghost" size="icon" className="size-8 text-warning-fg" onClick={handleCancelDelete} title="Batalkan permintaan hapus">
+                    <Trash2 className="h-3.5 w-3.5 opacity-50" />
+                  </Button>
+                ) : (
+                  <Button variant="ghost" size="icon" className="size-8 text-destructive" onClick={handleDelete} title={isAdmin ? 'Hapus' : 'Minta Hapus'}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                )}
               </div>
             </div>
           </div>

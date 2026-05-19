@@ -72,6 +72,8 @@ export default async function AdminEntriesPage() {
       isSent: entry.isSent,
       createdAt: entry.createdAt.toISOString(),
       updatedAt: entry.updatedAt.toISOString(),
+      deleteRequestedAt: entry.deleteRequestedAt?.toISOString() ?? null,
+      deleteRequestedById: entry.deleteRequestedById ?? null,
       delivery: entry.delivery
         ? { status: entry.delivery.status, driverName: entry.delivery.driver?.name ?? null }
         : null,

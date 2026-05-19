@@ -158,8 +158,10 @@ model Entry {
   approvedBy    String?
   deliveryDate  DateTime?     @db.Date
   delivery      Delivery?
-  editRequests  EntryEditRequest[]
-  sortAt        DateTime      @default(now())
+  editRequests          EntryEditRequest[]
+  deleteRequestedAt     DateTime?
+  deleteRequestedById   String?
+  sortAt                DateTime      @default(now())
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 

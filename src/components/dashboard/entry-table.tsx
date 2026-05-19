@@ -1240,7 +1240,7 @@ function EntryEditFields({
                     />
                   </Field>
                 )}
-                {isAdmin && (
+                {canViewFinancials && (
                   <Field>
                     <FieldLabel className="text-[10px]">Reseller Cut</FieldLabel>
                     <RupiahInput

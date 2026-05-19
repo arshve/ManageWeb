@@ -37,6 +37,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { StatusToken, intentVars, DELIVERY_STATUS } from '@/components/ui/status-token';
 import { StatCard } from '@/components/ui/stat-card';
+import { Printer } from 'lucide-react';
 
 
 const SERIF = "var(--font-dm-serif), 'DM Serif Display', serif";
@@ -937,12 +938,24 @@ export function DeliveriesAdminView({
                               )}
                             </td>
                             <td className={cn(td, 'pr-4 text-right')}>
-                              {href && (
-                                <a href={href} target="_blank" rel="noreferrer" title="Buka di Maps"
-                                  className="inline-flex items-center justify-center size-7 rounded-lg border text-muted-foreground hover:bg-muted/40 hover:text-foreground transition-colors text-sm">
-                                  ↗
-                                </a>
-                              )}
+                              <div className="flex items-center justify-end gap-1">
+                                {s.delivery?.id && (s.delivery.status === 'ASSIGNED' || s.delivery.status === 'ON_DELIVERY') && (
+                                  <button
+                                    type="button"
+                                    title="Surat Jalan"
+                                    onClick={() => window.open(`/api/deliveries/${s.delivery!.id}/surat-jalan`, '_blank')}
+                                    className="inline-flex items-center justify-center size-7 rounded-lg border text-muted-foreground hover:bg-muted/40 hover:text-foreground transition-colors"
+                                  >
+                                    <Printer className="size-3.5" />
+                                  </button>
+                                )}
+                                {href && (
+                                  <a href={href} target="_blank" rel="noreferrer" title="Buka di Maps"
+                                    className="inline-flex items-center justify-center size-7 rounded-lg border text-muted-foreground hover:bg-muted/40 hover:text-foreground transition-colors text-sm">
+                                    ↗
+                                  </a>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         );
@@ -989,6 +1002,16 @@ export function DeliveriesAdminView({
                           <div className="flex items-center gap-1.5 shrink-0">
                             {s.pengiriman && <StatusToken intent="info" outlined size="sm">{formatPengiriman(s.pengiriman)}</StatusToken>}
                             <StatusToken intent={dsMob.intent}>{dsMob.label}</StatusToken>
+                            {s.delivery?.id && (s.delivery.status === 'ASSIGNED' || s.delivery.status === 'ON_DELIVERY') && (
+                              <button
+                                type="button"
+                                title="Surat Jalan"
+                                onClick={() => window.open(`/api/deliveries/${s.delivery!.id}/surat-jalan`, '_blank')}
+                                className="inline-flex items-center justify-center size-7 rounded-lg border text-muted-foreground hover:bg-muted/40 transition-colors shrink-0"
+                              >
+                                <Printer className="size-3.5" />
+                              </button>
+                            )}
                             {href && (
                               <a href={href} target="_blank" rel="noreferrer"
                                 className="inline-flex items-center justify-center size-7 rounded-lg border text-muted-foreground hover:bg-muted/40 transition-colors text-sm shrink-0">

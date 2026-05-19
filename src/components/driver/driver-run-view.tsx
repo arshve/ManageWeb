@@ -49,6 +49,7 @@ import {
   CalendarDays,
   Camera,
   X,
+  Printer,
 } from 'lucide-react';
 
 type Stop = {
@@ -673,6 +674,16 @@ function StopCard({
               <Phone className="size-4" />
               No. HP (N/A)
             </Button>
+          )}
+          {(stop.status === 'ASSIGNED' || stop.status === 'ON_DELIVERY') && (
+            <button
+              type="button"
+              onClick={() => window.open(`/api/deliveries/${stop.id}/surat-jalan`, '_blank')}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md border bg-muted hover:bg-accent text-xs font-medium transition-colors shrink-0"
+            >
+              <Printer className="size-3.5" />
+              Surat Jalan
+            </button>
           )}
         </div>
 

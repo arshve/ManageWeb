@@ -64,6 +64,13 @@ export function addWatermark(file: File, lat?: number, lng?: number): Promise<Fi
   });
 }
 
+export function toThumbnailUrl(url: string, size = 80): string {
+  if (!url.includes('/storage/v1/object/public/')) return url;
+  return url
+    .replace('/storage/v1/object/public/', '/storage/v1/render/image/public/')
+    + `?width=${size}&height=${size}&resize=cover&quality=70`;
+}
+
 export async function compressImage(file: File): Promise<File> {
   const isImage = file.type.startsWith('image/') || /\.(heic|heif)$/i.test(file.name);
   if (!isImage) return file;

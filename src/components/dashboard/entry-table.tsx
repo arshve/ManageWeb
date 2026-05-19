@@ -21,6 +21,7 @@
 import { memo, useCallback, useState, useMemo, useRef, useEffect } from 'react';
 import { Pagination } from '@/components/ui/pagination';
 import { Lightbox } from '@/components/ui/lightbox';
+import { toThumbnailUrl } from '@/lib/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { RupiahInput } from '@/components/ui/rupiah-input';
@@ -2015,7 +2016,15 @@ function PhotoThumb({ photoUrl, alt }: { photoUrl: string; alt: string }) {
         title="Lihat foto"
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={photoUrl} alt={alt} className="size-10 object-cover" />
+        <img
+          src={toThumbnailUrl(photoUrl)}
+          alt={alt}
+          width={40}
+          height={40}
+          loading="lazy"
+          decoding="async"
+          className="size-10 object-cover"
+        />
       </button>
       <Lightbox src={photoUrl} alt={alt} open={open} onClose={() => setOpen(false)} />
     </>

@@ -295,9 +295,15 @@ export function EntryTable({
     }
 
     result = [...result].sort((a, b) => {
-      const aPending = a.editRequests.length > 0 ? 1 : 0;
-      const bPending = b.editRequests.length > 0 ? 1 : 0;
-      if (bPending !== aPending) return bPending - aPending;
+      if (isAdmin) {
+        const priority = (e: EntryData) =>
+          e.deleteRequestedAt ? 0
+          : e.status === 'PENDING' ? 1
+          : e.editRequests.length > 0 ? 2
+          : 3;
+        const diff = priority(a) - priority(b);
+        if (diff !== 0) return diff;
+      }
       let cmp = 0;
       switch (sortField) {
         case 'invoiceNo':

@@ -1314,26 +1314,26 @@ function EntryEditFields({
           <Input value={form.buyerName} onChange={(e) => update('buyerName', e.target.value)} className="h-8 text-sm" />
         </Field>
         <Field>
-          <FieldLabel className="text-xs">Telepon</FieldLabel>
-          <Input value={form.buyerPhone} onChange={(e) => update('buyerPhone', e.target.value)} className="h-8 text-sm" />
+          <FieldLabel className={`text-xs${!isAdmin && !form.buyerPhone ? ' text-destructive font-semibold' : ''}`}>Telepon</FieldLabel>
+          <Input value={form.buyerPhone} onChange={(e) => update('buyerPhone', e.target.value)} className={`h-8 text-sm${!isAdmin && !form.buyerPhone ? ' border-destructive/60 ring-1 ring-destructive/20' : ''}`} />
         </Field>
         <Field>
-          <FieldLabel className="text-xs">Alamat</FieldLabel>
-          <Input value={form.buyerAddress} onChange={(e) => update('buyerAddress', e.target.value)} className="h-8 text-sm" />
+          <FieldLabel className={`text-xs${!isAdmin && !form.buyerAddress ? ' text-destructive font-semibold' : ''}`}>Alamat</FieldLabel>
+          <Input value={form.buyerAddress} onChange={(e) => update('buyerAddress', e.target.value)} className={`h-8 text-sm${!isAdmin && !form.buyerAddress ? ' border-destructive/60 ring-1 ring-destructive/20' : ''}`} />
         </Field>
         <Field>
-          <FieldLabel className="text-xs">Google Maps</FieldLabel>
-          <Input value={form.buyerMaps} onChange={(e) => update('buyerMaps', e.target.value)} className="h-8 text-sm" />
+          <FieldLabel className={`text-xs${!isAdmin && !form.buyerMaps ? ' text-destructive font-semibold' : ''}`}>Google Maps</FieldLabel>
+          <Input value={form.buyerMaps} onChange={(e) => update('buyerMaps', e.target.value)} className={`h-8 text-sm${!isAdmin && !form.buyerMaps ? ' border-destructive/60 ring-1 ring-destructive/20' : ''}`} />
         </Field>
 
         {/* Pengiriman */}
         <Field>
-          <FieldLabel className="text-xs">Pengiriman</FieldLabel>
+          <FieldLabel className={`text-xs${!isAdmin && !form.pengiriman ? ' text-destructive font-semibold' : ''}`}>Pengiriman</FieldLabel>
           <Select
             value={form.pengiriman || '__none__'}
             onValueChange={(val) => update('pengiriman', !val || val === '__none__' ? '' : val)}
           >
-            <SelectTrigger className="h-8 text-sm">
+            <SelectTrigger className={`h-8 text-sm${!isAdmin && !form.pengiriman ? ' border-destructive/60 ring-1 ring-destructive/20' : ''}`}>
               <SelectValue>
                 {form.pengiriman ? (PENGIRIMAN_LABEL[form.pengiriman] ?? form.pengiriman) : '— Tidak ada —'}
               </SelectValue>
@@ -1552,6 +1552,11 @@ const EntryRow = memo(function EntryRow({
           {entry.deleteRequestedAt && (
             <span className="mt-1 inline-block text-[9px] font-medium text-destructive bg-destructive/10 px-1.5 py-0.5 rounded-full">
               Minta Hapus
+            </span>
+          )}
+          {!isAdmin && entry.status !== 'REJECTED' && (!entry.buyerPhone || !entry.buyerAddress?.trim() || !entry.buyerMaps?.trim() || !entry.pengiriman) && (
+            <span className="mt-1 inline-block text-[9px] font-medium text-destructive bg-destructive/10 px-1.5 py-0.5 rounded-full">
+              Data kurang
             </span>
           )}
         </td>
@@ -1790,6 +1795,11 @@ const MobileEntryCard = memo(function MobileEntryCard({
           {pendingRequest && (
             <span className="text-[9px] font-medium text-warning-fg bg-warning-bg px-1.5 py-0.5 rounded-full">
               Perubahan Diajukan
+            </span>
+          )}
+          {!isAdmin && entry.status !== 'REJECTED' && (!entry.buyerPhone || !entry.buyerAddress?.trim() || !entry.buyerMaps?.trim() || !entry.pengiriman) && (
+            <span className="text-[9px] font-medium text-destructive bg-destructive/10 px-1.5 py-0.5 rounded-full">
+              Data kurang
             </span>
           )}
           <StatusIcon status={entry.status} />

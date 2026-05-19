@@ -3,7 +3,7 @@ import { requireAuth } from '@/lib/auth';
 import { formatRupiah } from '@/lib/format';
 import { DashboardShell } from '@/components/dashboard/dashboard-shell';
 import { buttonVariants } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
+import { Plus, Phone, MapPin, Map, Route } from 'lucide-react';
 import Link from 'next/link';
 import { EntryTable } from '@/components/dashboard/entry-table';
 import { StatCard } from '@/components/ui/stat-card';
@@ -47,6 +47,14 @@ export default async function SalesPage() {
 
   const approved = entries.filter((e) => e.status === 'APPROVED');
   const pending = entries.filter((e) => e.status === 'PENDING');
+
+  const noPhone      = entries.filter((e) => !e.buyerPhone).length;
+  const noAddress    = entries.filter((e) => !e.buyerAddress?.trim()).length;
+  const noMaps       = entries.filter((e) => !e.buyerMaps?.trim()).length;
+  const noPengiriman = entries.filter((e) => !e.pengiriman).length;
+  const incompleteCount = entries.filter(
+    (e) => !e.buyerPhone || !e.buyerAddress?.trim() || !e.buyerMaps?.trim() || !e.pengiriman,
+  ).length;
   const totalEarnings = approved.reduce(
     (sum, e) => sum + e.items.reduce((s, i) => s + (i.resellerCut ?? 0), 0),
     0,
@@ -155,11 +163,49 @@ export default async function SalesPage() {
         </Link>
       }
     >
-      <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 mb-6 [&>*:last-child:nth-child(odd)]:col-span-2 [&>*:last-child:nth-child(odd)]:sm:col-span-1">
+      <div className="grid gap-3 grid-cols-2 sm:grid-cols-4 mb-6">
         <StatCard accent="success" label="Total Komisi"        value={formatRupiah(totalEarnings)}   sub={`Dari ${approved.length} penjualan disetujui`} />
         <StatCard accent="info"    label="Total Penjualan"     value={formatRupiah(totalSalesAmount)} sub={`${entries.length} entry total`} />
         <StatCard accent={pending.length > 0 ? 'warning' : 'neutral'} label="Menunggu Approval" value={pending.length} sub="Entry belum disetujui" />
+        <StatCard accent={incompleteCount > 0 ? 'danger' : 'neutral'} label="Data Belum Lengkap" value={incompleteCount} sub={incompleteCount > 0 ? 'entry perlu dilengkapi' : 'semua data lengkap'} />
       </div>
+
+      {incompleteCount > 0 && (
+        <div className="rounded-xl border border-danger-ring/40 bg-danger-bg/20 px-4 py-3 mb-6">
+          <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-danger-fg mb-2">
+            Segera Lengkapi Data Pembeli
+          </p>
+          <p className="text-xs text-muted-foreground mb-2.5">
+            Data berikut wajib diisi agar pengiriman bisa dijadwalkan oleh admin.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {noPhone > 0 && (
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-danger-bg text-danger-fg text-xs font-medium">
+                <Phone className="size-3.5 shrink-0" />
+                <span>{noPhone} tanpa telepon</span>
+              </div>
+            )}
+            {noAddress > 0 && (
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-warning-bg text-warning-fg text-xs font-medium">
+                <MapPin className="size-3.5 shrink-0" />
+                <span>{noAddress} tanpa alamat</span>
+              </div>
+            )}
+            {noMaps > 0 && (
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-warning-bg text-warning-fg text-xs font-medium">
+                <Map className="size-3.5 shrink-0" />
+                <span>{noMaps} tanpa link maps</span>
+              </div>
+            )}
+            {noPengiriman > 0 && (
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-warning-bg text-warning-fg text-xs font-medium">
+                <Route className="size-3.5 shrink-0" />
+                <span>{noPengiriman} tanpa rute pengiriman</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="rounded-xl border bg-card overflow-hidden">
         <div className="px-6 py-4 border-b">

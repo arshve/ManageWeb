@@ -1,4 +1,4 @@
-import path from 'node:path';
+import path from 'node:path'
 import {
   Document,
   Page,
@@ -6,37 +6,47 @@ import {
   Text,
   Image,
   StyleSheet,
-} from '@react-pdf/renderer';
-import { COMPANY } from './company';
+} from '@react-pdf/renderer'
+import { COMPANY } from './company'
 
-const logoSrc = path.join(process.cwd(), 'public', 'logo.png');
+const logoSrc = path.join(process.cwd(), 'public', 'logo.png')
 
 export interface SuratJalanData {
-  noSuratJalan: string;
-  tanggal: Date;
-  driverName: string | null;
-  vehiclePlate: string | null;
-  buyerName: string;
-  buyerPhone: string | null;
-  buyerAddress: string | null;
+  noSuratJalan: string
+  tanggal: Date
+  driverName: string | null
+  vehiclePlate: string | null
+  buyerName: string
+  buyerPhone: string | null
+  buyerAddress: string | null
   items: {
-    type: string;
-    grade: string | null;
-    tag: string | null;
-    sku: string;
-    weightMin: number | null;
-    weightMax: number | null;
-    condition: string;
-  }[];
-  notes: string | null;
+    type: string
+    grade: string | null
+    tag: string | null
+    sku: string
+    weightMin: number | null
+    weightMax: number | null
+    condition: string
+  }[]
+  notes: string | null
 }
 
 function formatDateID(date: Date): string {
   const months = [
-    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
-  ];
-  return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
+    'Januari',
+    'Februari',
+    'Maret',
+    'April',
+    'Mei',
+    'Juni',
+    'Juli',
+    'Agustus',
+    'September',
+    'Oktober',
+    'November',
+    'Desember',
+  ]
+  return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`
 }
 
 const styles = StyleSheet.create({
@@ -55,12 +65,26 @@ const styles = StyleSheet.create({
   companyTagline: { fontSize: 7.5, marginTop: 1, color: '#555' },
   companyAddress: { fontSize: 7, marginTop: 1, color: '#555', maxWidth: 200 },
 
-  title: { fontSize: 28, fontWeight: 'bold', color: '#e65100', letterSpacing: 2 },
+  title: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#e65100',
+    letterSpacing: 2,
+  },
 
   rule1: { borderBottomWidth: 3, borderBottomColor: '#1a1a1a', marginTop: 6 },
-  rule2: { borderBottomWidth: 1, borderBottomColor: '#1a1a1a', marginTop: 2, marginBottom: 12 },
+  rule2: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#1a1a1a',
+    marginTop: 2,
+    marginBottom: 12,
+  },
 
-  infoGrid: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 14 },
+  infoGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
   infoLeft: { flexDirection: 'column', flex: 1 },
   infoRight: { flexDirection: 'column', width: 220 },
   infoLabel: { fontSize: 9, fontWeight: 'bold', width: 70 },
@@ -83,12 +107,25 @@ const styles = StyleSheet.create({
     minHeight: 22,
   },
   tableRowLast: { borderBottomWidth: 0 },
-  th: { padding: 5, fontSize: 8.5, fontWeight: 'bold', borderRightWidth: 0.75, borderRightColor: '#333', textAlign: 'center' },
-  td: { padding: 5, fontSize: 8.5, borderRightWidth: 0.5, borderRightColor: '#bbb', textAlign: 'center' },
-  colNo:    { width: '7%' },
-  colNama:  { width: '40%' },
-  colQty:   { width: '10%' },
-  colKet:   { width: '43%', borderRightWidth: 0 },
+  th: {
+    padding: 5,
+    fontSize: 8.5,
+    fontWeight: 'bold',
+    borderRightWidth: 0.75,
+    borderRightColor: '#333',
+    textAlign: 'center',
+  },
+  td: {
+    padding: 5,
+    fontSize: 8.5,
+    borderRightWidth: 0.5,
+    borderRightColor: '#bbb',
+    textAlign: 'center',
+  },
+  colNo: { width: '7%' },
+  colNama: { width: '40%' },
+  colQty: { width: '10%' },
+  colKet: { width: '43%', borderRightWidth: 0 },
 
   emptyRows: { height: 80 },
 
@@ -112,15 +149,30 @@ const styles = StyleSheet.create({
 
   sigRow: { flexDirection: 'row', marginTop: 28 },
   sigBlock: { flex: 1, alignItems: 'center' },
-  sigLabel: { fontSize: 8.5, fontWeight: 'bold', textAlign: 'center', marginBottom: 36 },
-  sigLine: { borderTopWidth: 0.75, borderTopColor: '#333', width: '80%', marginTop: 4 },
-  sigNameHint: { fontSize: 7.5, color: '#888', marginTop: 3, textAlign: 'center' },
-});
+  sigLabel: {
+    fontSize: 8.5,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 36,
+  },
+  sigLine: {
+    borderTopWidth: 0.75,
+    borderTopColor: '#333',
+    width: '80%',
+    marginTop: 4,
+  },
+  sigNameHint: {
+    fontSize: 7.5,
+    color: '#888',
+    marginTop: 3,
+    textAlign: 'center',
+  },
+})
 
 export function SuratJalanDocument({ data }: { data: SuratJalanData }) {
   return (
     <Document>
-      <Page size="A4" style={styles.page}>
+      <Page size='A4' style={styles.page}>
         {/* ── Header ── */}
         <View style={styles.headerRow}>
           <View style={styles.logoBlock}>
@@ -190,25 +242,34 @@ export function SuratJalanDocument({ data }: { data: SuratJalanData }) {
             <Text style={[styles.th, styles.colKet]}>Keterangan</Text>
           </View>
           {data.items.map((item, idx) => {
-            const namaBarang = [item.type, item.grade].filter(Boolean).join(' ');
+            const namaBarang = [item.type, item.grade].filter(Boolean).join(' ')
             const keterangan = [
               item.tag ?? item.sku,
               item.weightMin != null && item.weightMax != null
                 ? `${item.weightMin}–${item.weightMax} kg`
                 : null,
-            ].filter(Boolean).join(' · ');
-            const isLast = idx === data.items.length - 1;
+            ]
+              .filter(Boolean)
+              .join(' · ')
+            const isLast = idx === data.items.length - 1
             return (
-              <View key={idx} style={[styles.tableRow, isLast ? styles.tableRowLast : {}]}>
+              <View
+                key={idx}
+                style={[styles.tableRow, isLast ? styles.tableRowLast : {}]}
+              >
                 <Text style={[styles.td, styles.colNo]}>{idx + 1}</Text>
                 <Text style={[styles.td, styles.colNama]}>{namaBarang}</Text>
                 <Text style={[styles.td, styles.colQty]}>1</Text>
-                <Text style={[styles.td, styles.colKet]}>{keterangan || '-'}</Text>
+                <Text style={[styles.td, styles.colKet]}>
+                  {keterangan || '-'}
+                </Text>
               </View>
-            );
+            )
           })}
           {data.items.length === 0 && (
-            <View style={[styles.tableRow, styles.emptyRows, styles.tableRowLast]}>
+            <View
+              style={[styles.tableRow, styles.emptyRows, styles.tableRowLast]}
+            >
               <Text style={[styles.td, { flex: 1, borderRightWidth: 0 }]} />
             </View>
           )}
@@ -224,20 +285,37 @@ export function SuratJalanDocument({ data }: { data: SuratJalanData }) {
           </View>
           <View style={styles.perhatianBlock}>
             <Text style={styles.footerLabel}>PERHATIAN:</Text>
-            <Text style={styles.perhatianItem}>1. Surat jalan ini merupakan bukti resmi penerimaan barang</Text>
-            <Text style={styles.perhatianItem}>2. Surat jalan ini bukan bukti penjualan</Text>
+            <Text style={styles.perhatianItem}>
+              1. Surat jalan ini merupakan bukti resmi penerimaan barang
+            </Text>
+            <Text style={styles.perhatianItem}>
+              2. Surat jalan ini bukan bukti penjualan
+            </Text>
           </View>
         </View>
 
         {/* ── Signature Row ── */}
-        <Text style={{ fontSize: 7.5, color: '#555', marginTop: 6, marginBottom: 2 }}>
+        <Text
+          style={{
+            fontSize: 7.5,
+            color: '#555',
+            marginTop: 6,
+            marginBottom: 2,
+          }}
+        >
           BARANG SUDAH DITERIMA DALAM KEADAAN BAIK DAN CUKUP OLEH:
         </Text>
         <Text style={{ fontSize: 7, color: '#888', marginBottom: 4 }}>
           (tanda tangan dan cap / stempel perusahaan)
         </Text>
         <View style={styles.sigRow}>
-          {(['Petugas Gudang', 'Bagian Pengiriman', 'Pembeli / Penerima'] as const).map((label) => (
+          {(
+            [
+              'Admin Kandang',
+              'Bagian Pengiriman',
+              'Pembeli / Penerima',
+            ] as const
+          ).map((label) => (
             <View key={label} style={styles.sigBlock}>
               <Text style={styles.sigLabel}>{label}</Text>
               <View style={styles.sigLine} />
@@ -247,5 +325,5 @@ export function SuratJalanDocument({ data }: { data: SuratJalanData }) {
         </View>
       </Page>
     </Document>
-  );
+  )
 }

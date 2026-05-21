@@ -16,9 +16,18 @@
 import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 
-const SECRET = new TextEncoder().encode(
-  process.env.SESSION_SECRET || 'millenials-farm-dev-secret-change-in-prod',
-);
+function getSessionSecret(): Uint8Array {
+  const raw = process.env.SESSION_SECRET;
+  if (!raw) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('SESSION_SECRET is required in production — set it in your environment variables');
+    }
+    console.warn('[session] Using fallback SESSION_SECRET in dev; set SESSION_SECRET env var for production');
+  }
+  return new TextEncoder().encode(raw || 'millenials-farm-dev-secret-change-in-prod');
+}
+
+const SECRET = getSessionSecret();
 
 // Name of the cookie that stores the JWT token
 const COOKIE_NAME = 'mf-session-v2';

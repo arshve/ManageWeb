@@ -130,6 +130,9 @@ const PENGIRIMAN_LABELS: Record<string, string> = {
   H_1: 'H-1',
   H_2: 'H-2',
   H_3: 'H-3',
+  H_PLUS_1: 'H+1',
+  H_PLUS_2: 'H+2',
+  H_PLUS_3: 'H+3',
   TITIP_POTONG: 'Titip Potong',
 };
 

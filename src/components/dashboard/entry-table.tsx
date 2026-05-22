@@ -195,6 +195,9 @@ const PENGIRIMAN_LABEL: Record<string, string> = {
   H_1: 'H-1',
   H_2: 'H-2',
   H_3: 'H-3',
+  H_PLUS_1: 'H+1',
+  H_PLUS_2: 'H+2',
+  H_PLUS_3: 'H+3',
   TITIP_POTONG: 'Titip Potong',
 };
 
@@ -517,6 +520,9 @@ export function EntryTable({
                   H_1: 'H-1',
                   H_2: 'H-2',
                   H_3: 'H-3',
+                  H_PLUS_1: 'H+1',
+                  H_PLUS_2: 'H+2',
+                  H_PLUS_3: 'H+3',
                   TITIP_POTONG: 'Titip Potong',
                 }[pengirimanFilter] ?? pengirimanFilter}
               </SelectValue>
@@ -528,6 +534,9 @@ export function EntryTable({
               <SelectItem value="H_1">H-1</SelectItem>
               <SelectItem value="H_2">H-2</SelectItem>
               <SelectItem value="H_3">H-3</SelectItem>
+              <SelectItem value="H_PLUS_1">H+1</SelectItem>
+              <SelectItem value="H_PLUS_2">H+2</SelectItem>
+              <SelectItem value="H_PLUS_3">H+3</SelectItem>
               <SelectItem value="TITIP_POTONG">Titip Potong</SelectItem>
             </SelectContent>
           </Select>
@@ -1535,6 +1544,9 @@ function EntryEditFields({
               <SelectItem value="H_1">H-1</SelectItem>
               <SelectItem value="H_2">H-2</SelectItem>
               <SelectItem value="H_3">H-3</SelectItem>
+              <SelectItem value="H_PLUS_1">H+1</SelectItem>
+              <SelectItem value="H_PLUS_2">H+2</SelectItem>
+              <SelectItem value="H_PLUS_3">H+3</SelectItem>
               <SelectItem value="TITIP_POTONG">Titip Potong</SelectItem>
             </SelectContent>
           </Select>

@@ -53,7 +53,7 @@ function buildEntryBaseData(formData: FormData, salesId: string, status: 'PENDIN
     buyerPhone: (formData.get('buyerPhone') as string) || null,
     buyerAddress: (formData.get('buyerAddress') as string) || null,
     buyerMaps: (formData.get('buyerMaps') as string) || null,
-    pengiriman: (formData.get('pengiriman') as 'HARI_H' | 'H_1' | 'H_2' | 'H_3' | 'TITIP_POTONG') || null,
+    pengiriman: (formData.get('pengiriman') as 'HARI_H' | 'H_1' | 'H_2' | 'H_3' | 'H_PLUS_1' | 'H_PLUS_2' | 'H_PLUS_3' | 'TITIP_POTONG') || null,
     notes: (formData.get('notes') as string) || null,
     buktiTransfer: formData.getAll('buktiTransfer') as string[],
     approvedAt,
@@ -345,7 +345,7 @@ export async function updateEntry(id: string, formData: FormData) {
         buyerAddress: (formData.get('buyerAddress') as string) || null,
         buyerMaps: (formData.get('buyerMaps') as string) || null,
         pengiriman:
-          (formData.get('pengiriman') as 'HARI_H' | 'H_1' | 'H_2' | 'H_3' | 'TITIP_POTONG') || null,
+          (formData.get('pengiriman') as 'HARI_H' | 'H_1' | 'H_2' | 'H_3' | 'H_PLUS_1' | 'H_PLUS_2' | 'H_PLUS_3' | 'TITIP_POTONG') || null,
         notes: (formData.get('notes') as string) || null,
         isSent: formData.get('isSent') === 'true',
         buktiTransfer,

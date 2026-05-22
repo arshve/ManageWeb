@@ -547,6 +547,9 @@ export function DeliveriesAdminView({
             <option value="H_1">{formatPengiriman('H_1')}</option>
             <option value="H_2">{formatPengiriman('H_2')}</option>
             <option value="H_3">{formatPengiriman('H_3')}</option>
+            <option value="H_PLUS_1">{formatPengiriman('H_PLUS_1')}</option>
+            <option value="H_PLUS_2">{formatPengiriman('H_PLUS_2')}</option>
+            <option value="H_PLUS_3">{formatPengiriman('H_PLUS_3')}</option>
             <option value="TITIP_POTONG">{formatPengiriman('TITIP_POTONG')}</option>
           </select>
           <div ref={jenisDropdownRef} className="relative">

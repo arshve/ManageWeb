@@ -85,6 +85,9 @@ enum Pengiriman {
   H_1
   H_2
   H_3
+  H_PLUS_1
+  H_PLUS_2
+  H_PLUS_3
   TITIP_POTONG
 }
 

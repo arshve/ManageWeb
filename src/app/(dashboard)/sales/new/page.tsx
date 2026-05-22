@@ -43,6 +43,9 @@ const PENGIRIMAN_OPTIONS = [
   { value: 'H_1', label: 'H-1' },
   { value: 'H_2', label: 'H-2' },
   { value: 'H_3', label: 'H-3' },
+  { value: 'H_PLUS_1', label: 'H+1' },
+  { value: 'H_PLUS_2', label: 'H+2' },
+  { value: 'H_PLUS_3', label: 'H+3' },
   { value: 'TITIP_POTONG', label: 'Titip Potong' },
 ] as const;
 

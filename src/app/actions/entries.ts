@@ -518,9 +518,17 @@ export async function fulfillEntryRequest(requestId: string, livestockId: string
   if (!livestock) return { error: 'Hewan tidak ditemukan' };
   if (livestock.isSold) return { error: 'Hewan sudah terjual' };
   if (livestock.type !== request.type) return { error: `Jenis hewan tidak sesuai (diminta: ${request.type})` };
+  if (request.grade && livestock.grade !== request.grade) {
+    return { error: `Grade hewan tidak sesuai (diminta: ${request.grade})` };
+  }
 
-  const hargaModal = formData.get('hargaModal') ? Number(formData.get('hargaModal')) : (livestock.hargaModal ?? 0);
-  const resellerCut = formData.get('resellerCut') ? Number(formData.get('resellerCut')) : (request.resellerCut ?? 0);
+  const rawHargaModal = formData.get('hargaModal');
+  const rawResellerCut = formData.get('resellerCut');
+  const hargaModal = rawHargaModal && rawHargaModal !== '' ? Number(rawHargaModal) : (livestock.hargaModal ?? 0);
+  const resellerCut = rawResellerCut && rawResellerCut !== '' ? Number(rawResellerCut) : (request.resellerCut ?? 0);
+  if (!isFinite(hargaModal) || !isFinite(resellerCut)) {
+    return { error: 'Harga modal atau potongan reseller tidak valid' };
+  }
   const hpp = hargaModal + resellerCut;
   const profit = request.hargaJual - hpp;
 

@@ -10,7 +10,6 @@ import { cn } from '@/lib/utils';
 import { StatCard } from '@/components/ui/stat-card';
 import { Phone, MapPin, Map, Receipt, Route, Truck, PackageCheck, Banknote, CheckCircle2 } from 'lucide-react';
 
-const SERIF = "var(--font-dm-serif), 'DM Serif Display', serif";
 
 export default async function AdminDashboardPage() {
   const profile = await requireAuth();
@@ -279,16 +278,12 @@ export default async function AdminDashboardPage() {
       </div>
 
       <div className="rounded-xl border bg-card overflow-hidden">
-        <div className="px-6 py-4 border-b">
-          <h2 className="text-base font-semibold" style={{ fontFamily: SERIF }}>
-            Entry Penjualan
-          </h2>
-        </div>
         <EntryTable
           entries={serialized}
           isAdmin={true}
           canViewFinancials={superAdmin}
           salesUsers={salesUsers}
+          title="Entry Penjualan"
         />
       </div>
     </DashboardShell>

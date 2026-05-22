@@ -90,7 +90,7 @@ function StatusBadge({ status }: { status: string }) {
 export function FinanceView({ entries, salesUsers, cashflows }: FinanceViewProps) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [salesPage, setSalesPage] = useState(0);
-  const SALES_PAGE_SIZE = 5;
+  const SALES_PAGE_SIZE = 10;
   const [cashflow, setCashflow] = useState<CashflowItem[]>(cashflows);
   const [cfType, setCfType] = useState<'PENGELUARAN' | 'PEMASUKAN'>('PENGELUARAN');
   const [cfName, setCfName] = useState('');
@@ -507,55 +507,94 @@ function SalesCard({
   return (
     <div className="rounded-xl border bg-card overflow-hidden">
       <div
-        className="flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors cursor-pointer select-none"
+        className="hover:bg-muted/30 transition-colors cursor-pointer select-none"
         onClick={onToggle}
       >
-        {/* Avatar */}
-        <div
-          className="size-9 rounded-full flex items-center justify-center shrink-0 text-[13px] font-bold"
-          style={{ background: hex + '20', color: hex, border: `1.5px solid ${hex}50` }}
-        >
-          {record.user.name.charAt(0).toUpperCase()}
+        {/* Identity row */}
+        <div className="flex items-center gap-3 px-4 py-3">
+          {/* Avatar */}
+          <div
+            className="size-9 rounded-full flex items-center justify-center shrink-0 text-[13px] font-bold"
+            style={{ background: hex + '20', color: hex, border: `1.5px solid ${hex}50` }}
+          >
+            {record.user.name.charAt(0).toUpperCase()}
+          </div>
+
+          {/* Info */}
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-sm leading-tight truncate">{record.user.name}</p>
+            <div className="flex flex-wrap items-center mt-0.5 gap-x-2 gap-y-0 text-[10px] text-muted-foreground">
+              {record.user.phone && (
+                <span className="inline-flex items-center gap-1">
+                  <Phone className="h-2.5 w-2.5" /> {record.user.phone}
+                </span>
+              )}
+              {record.user.rekBank && (
+                <span className="inline-flex items-center gap-1">
+                  <CreditCard className="h-2.5 w-2.5" /> {record.user.rekBank}
+                </span>
+              )}
+              <span>{record.entries.length} transaksi</span>
+            </div>
+          </div>
+
+          {/* Desktop stats — inline */}
+          <div className="hidden sm:flex sm:items-center sm:gap-4 mr-1">
+            <div className="text-right shrink-0">
+              <p className="text-[9px] uppercase tracking-[0.05em] text-muted-foreground mb-0.5">Penjualan</p>
+              <p className="tabular-nums" style={{ fontFamily: SERIF, fontSize: 14, color: 'var(--success-ring)' }}>
+                {formatRupiah(record.totalPenjualan)}
+              </p>
+            </div>
+            <div className="text-right shrink-0">
+              <p className="text-[9px] uppercase tracking-[0.05em] text-muted-foreground mb-0.5">Modal</p>
+              <p className="tabular-nums" style={{ fontFamily: SERIF, fontSize: 14, color: 'var(--muted-foreground)' }}>
+                {formatRupiah(record.totalModal)}
+              </p>
+            </div>
+            <div className="text-right shrink-0">
+              <p className="text-[9px] uppercase tracking-[0.05em] text-muted-foreground mb-0.5">Fee</p>
+              <p className="tabular-nums" style={{ fontFamily: SERIF, fontSize: 14, color: record.totalFee > 0 ? 'var(--warning-ring)' : 'var(--muted-foreground)' }}>
+                {record.totalFee > 0 ? formatRupiah(record.totalFee) : '—'}
+              </p>
+            </div>
+          </div>
+
+          {/* Payslip */}
+          <button
+            onClick={(e) => { e.stopPropagation(); window.open(`/api/payslip/${record.user.id}`, '_blank'); }}
+            title="Generate payslip"
+            className="size-8 rounded-lg border border-border bg-muted flex items-center justify-center shrink-0 cursor-pointer transition-colors hover:bg-accent text-muted-foreground"
+          >
+            <FileText className="h-3.5 w-3.5" />
+          </button>
+
+          <ChevronDown
+            className={cn('h-3.5 w-3.5 shrink-0 transition-transform duration-200 text-muted-foreground', isOpen && 'rotate-180')}
+          />
         </div>
 
-        {/* Info */}
-        <div className="flex-1 min-w-0">
-          <p className="font-semibold text-sm leading-tight truncate">{record.user.name}</p>
-          <div className="flex flex-wrap items-center mt-0.5 gap-x-2 gap-y-0 text-[10px] text-muted-foreground">
-            {record.user.phone && (
-              <span className="inline-flex items-center gap-1">
-                <Phone className="h-2.5 w-2.5" /> {record.user.phone}
-              </span>
-            )}
-            {record.user.rekBank && (
-              <span className="inline-flex items-center gap-1">
-                <CreditCard className="h-2.5 w-2.5" /> {record.user.rekBank}
-              </span>
-            )}
-            <span>{record.entries.length} transaksi</span>
+        {/* Mobile stat strip */}
+        <div className="grid grid-cols-3 sm:hidden border-t divide-x divide-border/70 bg-muted/20">
+          <div className="px-2 py-2.5 text-center">
+            <p className="text-[8.5px] uppercase tracking-[0.06em] text-muted-foreground mb-0.5">Penjualan</p>
+            <p className="tabular-nums leading-tight break-words" style={{ fontFamily: SERIF, fontSize: 13, color: 'var(--success-ring)' }}>
+              {formatRupiah(record.totalPenjualan)}
+            </p>
+          </div>
+          <div className="px-2 py-2.5 text-center">
+            <p className="text-[8.5px] uppercase tracking-[0.06em] text-muted-foreground mb-0.5">Modal</p>
+            <p className="tabular-nums leading-tight break-words" style={{ fontFamily: SERIF, fontSize: 13, color: 'var(--foreground)' }}>
+              {formatRupiah(record.totalModal)}
+            </p>
+          </div>
+          <div className="px-2 py-2.5 text-center">
+            <p className="text-[8.5px] uppercase tracking-[0.06em] text-muted-foreground mb-0.5">Fee</p>
+            <p className="tabular-nums leading-tight break-words" style={{ fontFamily: SERIF, fontSize: 13, color: record.totalFee > 0 ? 'var(--warning-ring)' : 'var(--muted-foreground)' }}>
+              {record.totalFee > 0 ? formatRupiah(record.totalFee) : '—'}
+            </p>
           </div>
         </div>
-
-        {/* Fee */}
-        <div className="text-right shrink-0 mr-1">
-          <p className="text-[9px] uppercase tracking-[0.05em] text-muted-foreground mb-0.5">Fee</p>
-          <p style={{ fontFamily: SERIF, fontSize: 14, color: record.totalFee > 0 ? 'var(--warning-ring)' : 'var(--muted-foreground)' }}>
-            {record.totalFee > 0 ? formatRupiah(record.totalFee) : '—'}
-          </p>
-        </div>
-
-        {/* Payslip */}
-        <button
-          onClick={(e) => { e.stopPropagation(); window.open(`/api/payslip/${record.user.id}`, '_blank'); }}
-          title="Generate payslip"
-          className="size-8 rounded-lg border border-border bg-muted flex items-center justify-center shrink-0 cursor-pointer transition-colors hover:bg-accent text-muted-foreground"
-        >
-          <FileText className="h-3.5 w-3.5" />
-        </button>
-
-        <ChevronDown
-          className={cn('h-3.5 w-3.5 shrink-0 transition-transform duration-200 text-muted-foreground', isOpen && 'rotate-180')}
-        />
       </div>
 
       {isOpen && (

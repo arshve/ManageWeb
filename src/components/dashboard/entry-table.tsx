@@ -79,7 +79,9 @@ import {
   cancelEntryEdit,
   getAvailableLivestockForSwap,
   updateEntryRequests,
+  batchUpdateEntryItems,
 } from '@/app/actions/entries';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   AntrianRequestRows,
   rowsToJson,
@@ -217,11 +219,13 @@ export function EntryTable({
   isAdmin = false,
   canViewFinancials = false,
   salesUsers = [],
+  title,
 }: {
   entries: EntryData[];
   isAdmin?: boolean;
   canViewFinancials?: boolean;
   salesUsers?: SalesUser[];
+  title?: string;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const handleClearEditing = useCallback(() => setEditingId(null), []);
@@ -231,12 +235,36 @@ export function EntryTable({
   const [sentFilter, setSentFilter] = useState('ALL');
   const [pengirimanFilter, setPengirimanFilter] = useState('ALL');
   const [dataFilter, setDataFilter] = useState('ALL');
+  const [hewanFilter, setHewanFilter] = useState('ALL');
+  const [gradeFilter, setGradeFilter] = useState('ALL');
+  const [weightFilter, setWeightFilter] = useState('ALL');
+  const changeHewan = useCallback((val: string) => {
+    setHewanFilter(val);
+    setGradeFilter('ALL');
+    setWeightFilter('ALL');
+  }, []);
   const [sortField, setSortField] = useState<SortField>('createdAt');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 20;
 
-  useEffect(() => { setPage(1); }, [search, statusFilter, paymentFilter, sentFilter, pengirimanFilter, dataFilter]);
+  // Batch selection — superAdmin only (canViewFinancials)
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [batchEditOpen, setBatchEditOpen] = useState(false);
+  useEffect(() => {
+    if (!selectMode) { setSelectedIds(new Set()); setBatchEditOpen(false); }
+  }, [selectMode]);
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }, []);
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
+
+  useEffect(() => { setPage(1); }, [search, statusFilter, paymentFilter, sentFilter, pengirimanFilter, dataFilter, hewanFilter, gradeFilter, weightFilter]);
 
   function toggleSort(field: SortField) {
     if (sortField === field) {
@@ -256,6 +284,23 @@ export function EntryTable({
       <ArrowDown className="size-3" />
     );
   }
+
+  const weightOptions = useMemo(() => {
+    const seen: Record<string, { key: string; label: string; min: number; max: number }> = {};
+    for (const e of entries) {
+      for (const i of e.items) {
+        const lv = i.livestock;
+        if (lv.type !== 'SAPI' || (lv.weightMin == null && lv.weightMax == null)) continue;
+        const lo = lv.weightMin ?? lv.weightMax!;
+        const hi = lv.weightMax ?? lv.weightMin!;
+        const key = `${lo}-${hi}`;
+        if (!seen[key]) {
+          seen[key] = { key, label: formatWeight(lv.weightMin, lv.weightMax) ?? key, min: lo, max: hi };
+        }
+      }
+    }
+    return Object.values(seen).sort((a, b) => a.min - b.min || a.max - b.max);
+  }, [entries]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -293,6 +338,22 @@ export function EntryTable({
     }
     if (dataFilter === 'NO_MAPS') {
       result = result.filter((e) => !e.buyerMaps?.trim());
+    }
+    if (hewanFilter !== 'ALL') {
+      result = result.filter((e) =>
+        e.items.some((i) => {
+          if (i.livestock.type !== hewanFilter) return false;
+          if ((hewanFilter === 'KAMBING' || hewanFilter === 'DOMBA') && gradeFilter !== 'ALL') {
+            return i.livestock.grade === gradeFilter;
+          }
+          if (hewanFilter === 'SAPI' && weightFilter !== 'ALL') {
+            const lo = i.livestock.weightMin ?? i.livestock.weightMax;
+            const hi = i.livestock.weightMax ?? i.livestock.weightMin;
+            return `${lo}-${hi}` === weightFilter;
+          }
+          return true;
+        }),
+      );
     }
 
     result = [...result].sort((a, b) => {
@@ -343,6 +404,9 @@ export function EntryTable({
     sentFilter,
     pengirimanFilter,
     dataFilter,
+    hewanFilter,
+    gradeFilter,
+    weightFilter,
     sortField,
     sortDir,
   ]);
@@ -352,6 +416,23 @@ export function EntryTable({
 
   return (
     <div>
+      {title && (
+        <div className="px-6 py-4 border-b flex items-center justify-between">
+          <h2 className="text-base font-semibold" style={{ fontFamily: "var(--font-dm-serif), 'DM Serif Display', serif" }}>
+            {title}
+          </h2>
+          {canViewFinancials && (
+            <Button
+              variant={selectMode ? 'secondary' : 'outline'}
+              size="sm"
+              className="h-8 text-xs"
+              onClick={() => setSelectMode((v) => !v)}
+            >
+              {selectMode ? 'Batal Pilih' : 'Pilih Entry'}
+            </Button>
+          )}
+        </div>
+      )}
       {/* Toolbar: Search + Filters */}
       <div className="p-3 border-b flex flex-col gap-3">
         <div className="relative">
@@ -469,12 +550,83 @@ export function EntryTable({
               <SelectItem value="NO_MAPS">Tanpa Maps</SelectItem>
             </SelectContent>
           </Select>
+          <Select
+            value={hewanFilter}
+            onValueChange={(val) => changeHewan(val ?? 'ALL')}
+          >
+            <SelectTrigger className="h-8 w-[140px] text-xs">
+              <SelectValue>
+                {{
+                  ALL: 'Semua Hewan',
+                  KAMBING: 'Kambing',
+                  DOMBA: 'Domba',
+                  SAPI: 'Sapi',
+                }[hewanFilter] ?? hewanFilter}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">Semua Hewan</SelectItem>
+              <SelectItem value="KAMBING">Kambing</SelectItem>
+              <SelectItem value="DOMBA">Domba</SelectItem>
+              <SelectItem value="SAPI">Sapi</SelectItem>
+            </SelectContent>
+          </Select>
+          {(hewanFilter === 'KAMBING' || hewanFilter === 'DOMBA') && (
+            <Select
+              value={gradeFilter}
+              onValueChange={(val) => setGradeFilter(val ?? 'ALL')}
+            >
+              <SelectTrigger className="h-8 w-[130px] text-xs">
+                <SelectValue>
+                  {{
+                    ALL: 'Semua Grade',
+                    SUPER: 'Super',
+                    A: 'Grade A',
+                    B: 'Grade B',
+                    C: 'Grade C',
+                    D: 'Grade D',
+                  }[gradeFilter] ?? gradeFilter}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Semua Grade</SelectItem>
+                <SelectItem value="SUPER">Super</SelectItem>
+                <SelectItem value="A">Grade A</SelectItem>
+                <SelectItem value="B">Grade B</SelectItem>
+                <SelectItem value="C">Grade C</SelectItem>
+                <SelectItem value="D">Grade D</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+          {hewanFilter === 'SAPI' && weightOptions.length > 0 && (
+            <Select
+              value={weightFilter}
+              onValueChange={(val) => setWeightFilter(val ?? 'ALL')}
+            >
+              <SelectTrigger className="h-8 w-[140px] text-xs">
+                <SelectValue>
+                  {weightFilter === 'ALL'
+                    ? 'Semua Berat'
+                    : weightOptions.find((w) => w.key === weightFilter)?.label ?? weightFilter}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Semua Berat</SelectItem>
+                {weightOptions.map((w) => (
+                  <SelectItem key={w.key} value={w.key}>{w.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           {(search ||
             statusFilter !== 'ALL' ||
             paymentFilter !== 'ALL' ||
             sentFilter !== 'ALL' ||
             pengirimanFilter !== 'ALL' ||
-            dataFilter !== 'ALL') && (
+            dataFilter !== 'ALL' ||
+            hewanFilter !== 'ALL' ||
+            gradeFilter !== 'ALL' ||
+            weightFilter !== 'ALL') && (
             <Button
               variant="ghost"
               size="sm"
@@ -486,6 +638,9 @@ export function EntryTable({
                 setSentFilter('ALL');
                 setPengirimanFilter('ALL');
                 setDataFilter('ALL');
+                setHewanFilter('ALL');
+                setGradeFilter('ALL');
+                setWeightFilter('ALL');
               }}
             >
               <X className="size-3 mr-1" />
@@ -502,6 +657,17 @@ export function EntryTable({
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b bg-muted/50">
+              {canViewFinancials && selectMode && (
+                <th className="p-3 w-8">
+                  <Checkbox
+                    checked={filtered.length > 0 && filtered.every((e) => selectedIds.has(e.id))}
+                    onCheckedChange={(checked) => {
+                      if (checked) setSelectedIds(new Set(filtered.map((e) => e.id)));
+                      else clearSelection();
+                    }}
+                  />
+                </th>
+              )}
               <th
                 className="text-center p-3 font-medium cursor-pointer select-none hover:bg-muted/80"
                 onClick={() => toggleSort('invoiceNo')}
@@ -578,12 +744,14 @@ export function EntryTable({
                 onCancel={handleClearEditing}
                 onSaved={handleClearEditing}
                 salesUsers={salesUsers}
+                isSelected={selectedIds.has(entry.id)}
+                onToggleSelect={canViewFinancials && selectMode ? toggleSelect : undefined}
               />
             ))}
             {filtered.length === 0 && (
               <tr>
                 <td
-                  colSpan={isAdmin ? (canViewFinancials ? 12 : 10) : 8}
+                  colSpan={(isAdmin ? (canViewFinancials ? 12 : 10) : 8) + (canViewFinancials && selectMode ? 1 : 0)}
                   className="p-8 text-center text-muted-foreground"
                 >
                   {entries.length === 0
@@ -609,6 +777,8 @@ export function EntryTable({
             onCancel={handleClearEditing}
             onSaved={handleClearEditing}
             salesUsers={salesUsers}
+            isSelected={selectedIds.has(entry.id)}
+            onToggleSelect={canViewFinancials && selectMode ? toggleSelect : undefined}
           />
         ))}
         {filtered.length === 0 && (
@@ -621,6 +791,27 @@ export function EntryTable({
       </div>
 
       <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+
+      {/* Selection toolbar */}
+      {canViewFinancials && selectedIds.size > 0 && (
+        <div className="sticky bottom-0 z-20 flex items-center justify-between gap-3 border-t bg-card/95 backdrop-blur px-4 py-3 shadow-lg">
+          <span className="text-sm font-medium">{selectedIds.size} entry dipilih</span>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => setSelectMode(false)}>Batal</Button>
+            <Button size="sm" onClick={() => setBatchEditOpen(true)}>Edit Batch</Button>
+          </div>
+        </div>
+      )}
+
+      {/* Batch edit dialog */}
+      {canViewFinancials && batchEditOpen && (
+        <BatchEditDialog
+          entries={entries.filter((e) => selectedIds.has(e.id))}
+          open={batchEditOpen}
+          onClose={() => setBatchEditOpen(false)}
+          onSaved={() => { setBatchEditOpen(false); clearSelection(); }}
+        />
+      )}
     </div>
   );
 }
@@ -1414,6 +1605,8 @@ const EntryRow = memo(function EntryRow({
   onCancel,
   onSaved,
   salesUsers,
+  isSelected,
+  onToggleSelect,
 }: {
   entry: EntryData;
   isAdmin: boolean;
@@ -1423,6 +1616,8 @@ const EntryRow = memo(function EntryRow({
   onCancel: () => void;
   onSaved: () => void;
   salesUsers: SalesUser[];
+  isSelected?: boolean;
+  onToggleSelect?: (id: string) => void;
 }) {
   const {
     form,
@@ -1461,6 +1656,11 @@ const EntryRow = memo(function EntryRow({
     <>
       {/* Main row */}
       <tr className={`border-b last:border-0 transition-colors ${rowClass}`}>
+        {onToggleSelect && (
+          <td className="p-3 w-8" onClick={(e) => e.stopPropagation()}>
+            <Checkbox checked={isSelected ?? false} onCheckedChange={() => onToggleSelect(entry.id)} />
+          </td>
+        )}
         <td className="p-3 font-mono text-xs">{entry.invoiceNo}</td>
         <td className="p-3">
           <div className="flex flex-col gap-1">
@@ -1660,7 +1860,7 @@ const EntryRow = memo(function EntryRow({
       {/* Inline edit row */}
       {isEditing && (
         <tr className="border-b bg-muted/20">
-          <td colSpan={isAdmin ? 12 : 8} className="p-4">
+          <td colSpan={(isAdmin ? 12 : 8) + (onToggleSelect ? 1 : 0)} className="p-4">
             <div className="flex flex-col gap-3">
               <EntryEditFields
                 entry={entry}
@@ -1707,6 +1907,8 @@ const MobileEntryCard = memo(function MobileEntryCard({
   onCancel,
   onSaved,
   salesUsers,
+  isSelected,
+  onToggleSelect,
 }: {
   entry: EntryData;
   isAdmin: boolean;
@@ -1716,6 +1918,8 @@ const MobileEntryCard = memo(function MobileEntryCard({
   onCancel: () => void;
   onSaved: () => void;
   salesUsers: SalesUser[];
+  isSelected?: boolean;
+  onToggleSelect?: (id: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const {
@@ -1774,6 +1978,15 @@ const MobileEntryCard = memo(function MobileEntryCard({
         }}
         className="w-full flex items-center gap-2 p-3 text-left hover:bg-muted/30 transition-colors cursor-pointer"
       >
+        {/* Batch select checkbox */}
+        {onToggleSelect && (
+          <div
+            className="shrink-0"
+            onClick={(e) => { e.stopPropagation(); onToggleSelect(entry.id); }}
+          >
+            <Checkbox checked={isSelected ?? false} onCheckedChange={() => onToggleSelect(entry.id)} />
+          </div>
+        )}
         {/* Photo thumbnail or count badge */}
         {entry.items.length > 1 ? (
           <div className="shrink-0 size-10 rounded-md border bg-muted flex items-center justify-center">
@@ -2014,6 +2227,225 @@ const MobileEntryCard = memo(function MobileEntryCard({
     </div>
   );
 });
+
+// ── Batch Edit Dialog ─────────────────────────────────────────────────────────
+
+type BatchItemRow = {
+  entryId: string;
+  entryInvoice: string;
+  buyerName: string;
+  salesName: string;
+  itemId: string;
+  livestock: EntryItemData['livestock'];
+  hargaJual: string;
+  hargaModal: string;
+  resellerCut: string;
+  pendingLivestockId?: string;
+  pendingLivestockSku?: string;
+};
+
+function BatchEditDialog({
+  entries,
+  open,
+  onClose,
+  onSaved,
+}: {
+  entries: EntryData[];
+  open: boolean;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [rows, setRows] = useState<BatchItemRow[]>(() =>
+    entries.flatMap((e) =>
+      e.items.map((item) => ({
+        entryId: e.id,
+        entryInvoice: e.invoiceNo,
+        buyerName: e.buyerName,
+        salesName: e.sales.name,
+        itemId: item.id,
+        livestock: item.livestock,
+        hargaJual: item.hargaJual > 0 ? String(item.hargaJual) : '',
+        hargaModal: item.hargaModal != null ? String(item.hargaModal) : '',
+        resellerCut: item.resellerCut != null ? String(item.resellerCut) : '',
+      })),
+    ),
+  );
+  const [loading, setLoading] = useState(false);
+  const [fillModal, setFillModal] = useState('');
+  const [fillCut, setFillCut] = useState('');
+
+  function updateRow(itemId: string, field: 'hargaJual' | 'hargaModal' | 'resellerCut', val: string) {
+    setRows((prev) => prev.map((r) => r.itemId === itemId ? { ...r, [field]: val } : r));
+  }
+
+  function updateRowSwap(itemId: string, livestockId: string, sku: string) {
+    setRows((prev) => prev.map((r) =>
+      r.itemId === itemId ? { ...r, pendingLivestockId: livestockId, pendingLivestockSku: sku } : r,
+    ));
+  }
+
+  function applyFillModal() {
+    if (!fillModal) return;
+    setRows((prev) => prev.map((r) => ({ ...r, hargaModal: fillModal })));
+  }
+
+  function applyFillCut() {
+    if (!fillCut) return;
+    setRows((prev) => prev.map((r) => ({ ...r, resellerCut: fillCut })));
+  }
+
+  const totalProfit = rows.reduce((sum, r) => {
+    const hj = Number(r.hargaJual) || 0;
+    const hm = r.hargaModal !== '' ? Number(r.hargaModal) : null;
+    const rc = r.resellerCut !== '' ? Number(r.resellerCut) : 0;
+    const hpp = hm != null ? hm + rc : null;
+    return sum + (hpp != null ? hj - hpp : 0);
+  }, 0);
+
+  async function handleSave() {
+    setLoading(true);
+    try {
+      const updates = entries.map((e) => ({
+        entryId: e.id,
+        items: rows
+          .filter((r) => r.entryId === e.id)
+          .map((r) => ({
+            itemId: r.itemId,
+            hargaJual: r.hargaJual !== '' ? Number(r.hargaJual) : undefined,
+            hargaModal: r.hargaModal !== '' ? Number(r.hargaModal) : (r.hargaModal === '' ? null : undefined),
+            resellerCut: r.resellerCut !== '' ? Number(r.resellerCut) : (r.resellerCut === '' ? null : undefined),
+            newLivestockId: r.pendingLivestockId,
+          })),
+      }));
+      const res = await batchUpdateEntryItems(updates);
+      if (res && 'error' in res) { toast.error(String(res.error)); return; }
+      toast.success(`${entries.length} entry berhasil diperbarui`);
+      onSaved();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Terjadi kesalahan');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Group rows by entry
+  const grouped = entries.map((e) => ({
+    entry: e,
+    rows: rows.filter((r) => r.entryId === e.id),
+  }));
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-2xl w-[95vw] max-h-[90dvh] overflow-hidden flex flex-col p-0">
+        <DialogHeader className="px-6 pt-6 pb-0 shrink-0">
+          <DialogTitle>Edit Batch — {entries.length} Entry</DialogTitle>
+          <DialogDescription>
+            Ubah Modal, Sales Cut, dan Harga Jual untuk semua item yang dipilih.
+          </DialogDescription>
+        </DialogHeader>
+
+        {/* Quick-fill strip */}
+        <div className="px-4 py-2.5 border-b bg-muted/30 shrink-0 flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground w-28 shrink-0">Isi semua Modal</span>
+            <RupiahInput value={fillModal} onValueChange={setFillModal} className="h-7 text-xs flex-1" />
+            <Button size="sm" variant="outline" className="h-7 text-xs shrink-0 px-3" onClick={applyFillModal} disabled={!fillModal}>Terapkan</Button>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground w-28 shrink-0">Isi semua Sales Cut</span>
+            <RupiahInput value={fillCut} onValueChange={setFillCut} className="h-7 text-xs flex-1" />
+            <Button size="sm" variant="outline" className="h-7 text-xs shrink-0 px-3" onClick={applyFillCut} disabled={!fillCut}>Terapkan</Button>
+          </div>
+        </div>
+
+        {/* Scrollable item list */}
+        <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-3">
+          {grouped.map(({ entry, rows: entryRows }) => (
+            <div key={entry.id} className="rounded-md border overflow-hidden">
+              {/* Entry header */}
+              <div className="px-3 py-2 bg-muted/40 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs font-medium border-b">
+                <span className="font-mono">{entry.invoiceNo}</span>
+                <span className="text-muted-foreground">·</span>
+                <span className="truncate">{entry.buyerName}</span>
+                <span className="text-muted-foreground">·</span>
+                <span className="text-muted-foreground">{entry.sales.name}</span>
+              </div>
+              {/* Item rows — 2-line layout */}
+              {entryRows.map((row) => {
+                const lv = row.livestock;
+                const hj = Number(row.hargaJual) || 0;
+                const hm = row.hargaModal !== '' ? Number(row.hargaModal) : null;
+                const rc = row.resellerCut !== '' ? Number(row.resellerCut) : 0;
+                const hpp = hm != null ? hm + rc : null;
+                const profit = hpp != null ? hj - hpp : null;
+                return (
+                  <div key={row.itemId} className="px-3 py-2.5 border-b last:border-0">
+                    {/* Line 1: livestock info + profit chip + swap */}
+                    <div className="flex items-center gap-2 mb-2">
+                      {lv.photoUrl && (
+                        <img src={toThumbnailUrl(lv.photoUrl)} alt={lv.sku} width={28} height={28} className="size-7 rounded object-cover border shrink-0" loading="lazy" />
+                      )}
+                      <div className="flex-1 min-w-0 text-xs">
+                        <span className="font-medium">{lv.tag ?? lv.sku}</span>
+                        <span className="text-muted-foreground ml-1.5">{lv.type}{lv.grade ? ' ' + lv.grade : ''}</span>
+                        {row.pendingLivestockSku && (
+                          <span className="ml-1.5 text-[10px] text-warning-fg bg-warning-bg px-1 rounded">→ {row.pendingLivestockSku}</span>
+                        )}
+                      </div>
+                      <div className="text-xs text-right shrink-0">
+                        <span className="text-[10px] text-muted-foreground">Profit </span>
+                        <span className={profit != null ? (profit >= 0 ? 'text-success-fg font-medium' : 'text-destructive font-medium') : 'text-muted-foreground'}>
+                          {profit != null ? formatRupiah(profit) : '—'}
+                        </span>
+                      </div>
+                      <LivestockSwapDialog
+                        currentLivestock={lv}
+                        pendingLivestockSku={row.pendingLivestockSku ?? null}
+                        onSwap={(livestockId, sku) => updateRowSwap(row.itemId, livestockId, sku)}
+                        onReset={() => setRows((prev) => prev.map((r) => r.itemId === row.itemId ? { ...r, pendingLivestockId: undefined, pendingLivestockSku: undefined } : r))}
+                      />
+                    </div>
+                    {/* Line 2: 3 inputs full-width */}
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <p className="text-[10px] text-muted-foreground mb-1">Harga Jual</p>
+                        <RupiahInput value={row.hargaJual} onValueChange={(v) => updateRow(row.itemId, 'hargaJual', v)} className="h-7 text-xs w-full" />
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-muted-foreground mb-1">Modal</p>
+                        <RupiahInput value={row.hargaModal} onValueChange={(v) => updateRow(row.itemId, 'hargaModal', v)} className="h-7 text-xs w-full" />
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-muted-foreground mb-1">Sales Cut</p>
+                        <RupiahInput value={row.resellerCut} onValueChange={(v) => updateRow(row.itemId, 'resellerCut', v)} className="h-7 text-xs w-full" />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t bg-muted/20 shrink-0 flex items-center justify-between gap-3">
+          <div className="text-sm">
+            <span className="text-muted-foreground text-xs">Total profit preview: </span>
+            <span className={`font-semibold ${totalProfit >= 0 ? 'text-success-fg' : 'text-destructive'}`}>
+              {formatRupiah(totalProfit)}
+            </span>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={onClose} disabled={loading}>Batal</Button>
+            <Button onClick={handleSave} disabled={loading}>
+              {loading ? 'Menyimpan...' : `Simpan ${entries.length} Entry`}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function PhotoThumb({ photoUrl, alt }: { photoUrl: string; alt: string }) {
   const [open, setOpen] = useState(false);

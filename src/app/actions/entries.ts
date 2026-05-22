@@ -944,3 +944,73 @@ export async function cancelEntryEdit(requestId: string) {
   revalidatePath('/admin/entries');
   return { success: true };
 }
+
+// ── Batch edit ────────────────────────────────────────────────────────────────
+
+type BatchItemUpdate = {
+  itemId: string;
+  hargaModal?: number | null;
+  resellerCut?: number | null;
+  hargaJual?: number | null;
+  newLivestockId?: string;
+};
+
+type BatchEntryUpdate = {
+  entryId: string;
+  items: BatchItemUpdate[];
+};
+
+export async function batchUpdateEntryItems(updates: BatchEntryUpdate[]) {
+  const profile = await requireRole('SUPER_ADMIN');
+  if (!updates.length) return { success: true };
+
+  await prisma.$transaction(async (tx) => {
+    for (const { entryId, items } of updates) {
+      for (const { itemId, hargaModal, resellerCut, hargaJual, newLivestockId } of items) {
+        const item = await tx.entryItem.findUniqueOrThrow({ where: { id: itemId } });
+
+        if (newLivestockId && newLivestockId !== item.livestockId) {
+          const newLv = await tx.livestock.findUniqueOrThrow({ where: { id: newLivestockId } });
+          if (newLv.isSold) throw new Error(`Hewan ${newLv.sku} sudah terjual`);
+          await tx.livestock.update({ where: { id: item.livestockId }, data: { isSold: false } });
+          await tx.livestock.update({ where: { id: newLivestockId }, data: { isSold: true } });
+        }
+
+        const finalLivestockId = newLivestockId ?? item.livestockId;
+        const finalHargaJual   = hargaJual   !== undefined && hargaJual   !== null ? hargaJual   : item.hargaJual;
+        const finalHargaModal  = hargaModal  !== undefined ? hargaModal  : item.hargaModal;
+        const finalResellerCut = resellerCut !== undefined ? resellerCut : item.resellerCut;
+        const finalHpp    = finalHargaModal != null ? finalHargaModal + (finalResellerCut ?? 0) : null;
+        const finalProfit = finalHpp        != null ? finalHargaJual  - finalHpp                : null;
+
+        await tx.entryItem.update({
+          where: { id: itemId },
+          data: {
+            livestockId: finalLivestockId,
+            hargaJual:   finalHargaJual,
+            hargaModal:  finalHargaModal,
+            resellerCut: finalResellerCut,
+            hpp:    finalHpp,
+            profit: finalProfit,
+          },
+        });
+      }
+
+      await tx.entry.update({ where: { id: entryId }, data: { sortAt: new Date() } });
+    }
+  });
+
+  await logAudit({
+    actor: profile,
+    action: 'UPDATE',
+    entity: 'Entry',
+    entityId: updates[0].entryId,
+    label: `Batch edit ${updates.length} entry oleh ${profile.name}`,
+    after: { entryCount: updates.length },
+  });
+
+  revalidatePath('/admin');
+  revalidatePath('/admin/entries');
+  revalidatePath('/sales');
+  return { success: true };
+}

@@ -177,6 +177,7 @@ export async function clearSchedule(deliveryDate: string) {
 
 export async function generateRoutes(
   deliveryDate: string,
+  entryIds: string[],
   driverCount: number,
   startInput?: string,
   maxPerDriver = 30,
@@ -184,6 +185,7 @@ export async function generateRoutes(
   const admin = await requireRole('ADMIN', 'SUPER_ADMIN');
   const date = parseDateOnly(deliveryDate);
   if (!date) return { error: 'Tanggal tidak valid' };
+  if (!entryIds.length) return { error: 'Pilih entry untuk dirutekan' };
   if (driverCount <= 0) return { error: 'driverCount harus > 0' };
 
   let depot = { ...DEFAULT_DEPOT };
@@ -217,6 +219,7 @@ export async function generateRoutes(
 
   const entries = await prisma.entry.findMany({
     where: {
+      id: { in: entryIds },
       deliveryDate: date,
       status: 'APPROVED',
       buyerLat: { not: null },
@@ -262,7 +265,7 @@ export async function generateRoutes(
     action: 'UPDATE',
     entity: 'Delivery',
     entityId: deliveryDate,
-    label: `Generate routes ${deliveryDate} (${routes.length} buckets, ${entries.length} stops)`,
+    label: `Generate routes batch ${deliveryDate} (${routes.length} buckets, ${entries.length} stops)`,
     after: { buckets: routes.map((r) => r.length) },
   });
 
@@ -283,6 +286,20 @@ export async function assignDriversToBuckets(
   if (!date) return { error: 'Tanggal tidak valid' };
 
   // FIX: DriverAvailability query removed because drivers are available by default
+
+  // One batch per driver per day: reject drivers who already hold an active route today
+  const driverIds = buckets.map((b) => b.driverId);
+  const clash = await prisma.delivery.findMany({
+    where: {
+      entry: { deliveryDate: date },
+      driverId: { in: driverIds },
+      status: { notIn: ['DELIVERED', 'FAILED'] },
+    },
+    select: { driverId: true },
+  });
+  if (clash.length) {
+    return { error: 'Driver sudah punya rute hari ini — pilih driver lain' };
+  }
 
   await prisma.$transaction(async (tx) => {
     await Promise.all(

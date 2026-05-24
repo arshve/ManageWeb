@@ -174,6 +174,7 @@ export function DeliveriesAdminView({
     });
   }
   const [selectedUnscheduled, setSelectedUnscheduled] = useState<Set<string>>(new Set());
+  const [selectedScheduled, setSelectedScheduled] = useState<Set<string>>(new Set());
   const [buckets, setBuckets] = useState<string[][] | null>(null);
   const [bucketDrivers, setBucketDrivers] = useState<Record<number, string>>({});
   const [startInput, setStartInput] = useState(defaultStart);
@@ -285,6 +286,21 @@ export function DeliveriesAdminView({
     return map;
   }, [scheduled]);
 
+  // Batch selection pool: scheduled-but-unassigned entries with coords
+  const unassignedStops = groupedByDriver.get('__unassigned__') ?? [];
+  const selectableScheduledIds = unassignedStops
+    .filter((s) => s.buyerLat != null && s.buyerLng != null)
+    .map((s) => s.id);
+  const allScheduledSelected = selectableScheduledIds.length > 0 && selectableScheduledIds.every((id) => selectedScheduled.has(id));
+
+  function toggleScheduled(id: string) {
+    setSelectedScheduled((prev) => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
+  }
+  function selectAllUnassigned() {
+    setSelectedScheduled(allScheduledSelected ? new Set() : new Set(selectableScheduledIds));
+  }
+  function clearScheduled() { setSelectedScheduled(new Set()); }
+
   function refresh() { router.refresh(); }
   function gotoDate(d: string) { router.push(`/admin/deliveries?date=${d}`); }
   function dateOffset(days: number) {
@@ -317,8 +333,10 @@ export function DeliveriesAdminView({
   }
   function handleGenerate() {
     if (activeRouteCount < 1) { toast.error('Jumlah rute minimal 1'); return; }
+    const ids = Array.from(selectedScheduled);
+    if (!ids.length) { toast.error('Pilih entry untuk batch ini'); return; }
     startTransition(async () => {
-      const r = await generateRoutes(dateStr, activeRouteCount, startInput, maxPerDriver);
+      const r = await generateRoutes(dateStr, ids, activeRouteCount, startInput, maxPerDriver);
       if ('error' in r) { toast.error(r.error); return; }
       setBuckets(r.buckets); setBucketDrivers({});
       if (r.depot) setMapDepot(r.depot);
@@ -336,7 +354,7 @@ export function DeliveriesAdminView({
     startTransition(async () => {
       const r = await assignDriversToBuckets(dateStr, payload);
       if ('error' in r) toast.error(r.error);
-      else { toast.success('Driver di-assign'); setBuckets(null); setBucketDrivers({}); refresh(); }
+      else { toast.success('Driver di-assign'); setBuckets(null); setBucketDrivers({}); clearScheduled(); refresh(); }
     });
   }
   function handleUnassign(ids: string[]) {
@@ -739,6 +757,19 @@ export function DeliveriesAdminView({
                 Generate
               </button>
             </div>
+            <button
+              type="button"
+              onClick={selectAllUnassigned}
+              disabled={selectableScheduledIds.length === 0}
+              className="h-8 px-3 rounded-lg border text-xs text-muted-foreground hover:bg-muted/40 disabled:opacity-40 transition-colors"
+            >
+              {allScheduledSelected ? 'Batal pilih' : 'Pilih semua belum di-assign'}
+            </button>
+            {selectedScheduled.size > 0 && (
+              <span className="text-[11px] font-medium text-info-fg bg-info-bg rounded-full px-2.5 py-1">
+                {selectedScheduled.size} dipilih untuk batch
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <label className="text-[11px] text-muted-foreground whitespace-nowrap font-medium">Titik awal:</label>
@@ -832,6 +863,16 @@ export function DeliveriesAdminView({
                   <table className="w-full">
                     <thead>
                       <tr className="border-b bg-muted/10">
+                        {isUnassigned && (
+                          <th className={cn(th, 'pl-4 w-10')}>
+                            <Checkbox
+                              checked={allScheduledSelected}
+                              disabled={selectableScheduledIds.length === 0}
+                              onCheckedChange={selectAllUnassigned}
+                              className="size-3.5"
+                            />
+                          </th>
+                        )}
                         <th className={cn(th, 'pl-4 w-10')}>#</th>
                         <th className={cn(th, 'w-36')}>Hewan / SKU</th>
                         <th className={th}>Pembeli</th>
@@ -849,6 +890,19 @@ export function DeliveriesAdminView({
                         const ds = DELIVERY_STATUS[s.delivery?.status ?? 'PENDING'] ?? DELIVERY_STATUS.PENDING;
                         return (
                           <tr key={s.id} className="hover:bg-muted/20 transition-colors">
+                            {isUnassigned && (
+                              <td className={cn(td, 'pl-4')}>
+                                {s.buyerLat != null && s.buyerLng != null ? (
+                                  <Checkbox
+                                    checked={selectedScheduled.has(s.id)}
+                                    onCheckedChange={() => toggleScheduled(s.id)}
+                                    className="size-3.5"
+                                  />
+                                ) : (
+                                  <span className="text-[9px] text-muted-foreground" title="Tanpa koordinat — tidak bisa dirutekan">⚠</span>
+                                )}
+                              </td>
+                            )}
                             <td className={cn(td, 'pl-4')}>
                               <span
                                 className="inline-flex size-5 items-center justify-center rounded-full text-[10px] font-bold text-white"
@@ -976,6 +1030,17 @@ export function DeliveriesAdminView({
                       <div key={s.id} className="px-4 py-3 flex flex-col gap-1.5">
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-2 min-w-0">
+                            {isUnassigned && (
+                              s.buyerLat != null && s.buyerLng != null ? (
+                                <Checkbox
+                                  checked={selectedScheduled.has(s.id)}
+                                  onCheckedChange={() => toggleScheduled(s.id)}
+                                  className="size-4 shrink-0"
+                                />
+                              ) : (
+                                <span className="text-[10px] text-muted-foreground shrink-0" title="Tanpa koordinat">⚠</span>
+                              )
+                            )}
                             <span
                               className="size-5 shrink-0 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
                               style={{ background: `var(--${dsMob.intent}-ring)` }}

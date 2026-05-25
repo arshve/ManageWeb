@@ -731,7 +731,7 @@ export function DeliveriesAdminView({
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-2 rounded-lg border bg-background px-3 py-1.5">
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-background px-3 py-1.5">
               <label className="text-[11px] text-muted-foreground font-medium whitespace-nowrap">Bagi ke</label>
               <input
                 type="number" min={1}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { compressImage } from '@/lib/image';
 import { X, Plus, Loader2 } from 'lucide-react';
 import Image from 'next/image';

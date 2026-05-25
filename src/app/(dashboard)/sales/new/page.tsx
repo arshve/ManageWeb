@@ -29,7 +29,7 @@ import {
   type RequestRow,
   type PricingMap,
 } from '@/components/dashboard/antrian-request-rows';
-import { formatRupiah, formatWeight } from '@/lib/format';
+import { formatRupiah, formatWeight, PENGIRIMAN_OPTIONS, PENGIRIMAN_LABELS } from '@/lib/format';
 import { X } from 'lucide-react';
 
 interface SelectedItem {
@@ -37,21 +37,6 @@ interface SelectedItem {
   hargaJual: string;
   tag: string;
 }
-
-const PENGIRIMAN_OPTIONS = [
-  { value: 'HARI_H', label: 'Hari H' },
-  { value: 'H_1', label: 'H-1' },
-  { value: 'H_2', label: 'H-2' },
-  { value: 'H_3', label: 'H-3' },
-  { value: 'H_PLUS_1', label: 'H+1' },
-  { value: 'H_PLUS_2', label: 'H+2' },
-  { value: 'H_PLUS_3', label: 'H+3' },
-  { value: 'TITIP_POTONG', label: 'Titip Potong' },
-] as const;
-
-const PENGIRIMAN_LABEL: Record<string, string> = Object.fromEntries(
-  PENGIRIMAN_OPTIONS.map((o) => [o.value, o.label]),
-);
 
 const PAYMENT_LABEL: Record<string, string> = {
   BELUM_BAYAR: 'Belum Bayar',
@@ -337,7 +322,7 @@ export default function NewEntryPage() {
             >
               <SelectTrigger>
                 <SelectValue>
-                  {PENGIRIMAN_LABEL[pengiriman] ?? pengiriman}
+                  {PENGIRIMAN_LABELS[pengiriman] ?? pengiriman}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>

@@ -94,6 +94,7 @@ import {
   formatPaymentStatus,
   formatWeight,
   formatPengiriman,
+  PENGIRIMAN_OPTIONS,
 } from '@/lib/format';
 import { BuktiTransferUpload } from '@/components/dashboard/bukti-transfer-upload';
 import { PdfMenu } from '@/components/dashboard/pdf-menu';
@@ -190,17 +191,6 @@ export interface SalesUser {
   name: string;
 }
 
-const PENGIRIMAN_LABEL: Record<string, string> = {
-  HARI_H: 'Hari H',
-  H_1: 'H-1',
-  H_2: 'H-2',
-  H_3: 'H-3',
-  H_PLUS_1: 'H+1',
-  H_PLUS_2: 'H+2',
-  H_PLUS_3: 'H+3',
-  TITIP_POTONG: 'Titip Potong',
-};
-
 const PAYMENT_LABEL: Record<string, string> = {
   BELUM_BAYAR: 'Belum Bayar',
   DP: 'DP',
@@ -216,6 +206,11 @@ type SortField =
   | 'createdAt'
   | 'updatedAt';
 type SortDir = 'asc' | 'desc';
+
+function SortIcon({ field, sortField, sortDir }: { field: SortField; sortField: SortField; sortDir: SortDir }) {
+  if (sortField !== field) return <ArrowUpDown className="size-3 opacity-40" />;
+  return sortDir === 'asc' ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />;
+}
 
 export function EntryTable({
   entries,
@@ -276,16 +271,6 @@ export function EntryTable({
       setSortField(field);
       setSortDir('asc');
     }
-  }
-
-  function SortIcon({ field }: { field: SortField }) {
-    if (sortField !== field)
-      return <ArrowUpDown className="size-3 opacity-40" />;
-    return sortDir === 'asc' ? (
-      <ArrowUp className="size-3" />
-    ) : (
-      <ArrowDown className="size-3" />
-    );
   }
 
   const weightOptions = useMemo(() => {
@@ -513,31 +498,19 @@ export function EntryTable({
           >
             <SelectTrigger className="h-8 w-[140px] text-xs">
               <SelectValue>
-                {{
-                  ALL: 'Semua Kirim',
-                  NONE: 'Belum Diset',
-                  HARI_H: 'Hari H',
-                  H_1: 'H-1',
-                  H_2: 'H-2',
-                  H_3: 'H-3',
-                  H_PLUS_1: 'H+1',
-                  H_PLUS_2: 'H+2',
-                  H_PLUS_3: 'H+3',
-                  TITIP_POTONG: 'Titip Potong',
-                }[pengirimanFilter] ?? pengirimanFilter}
+                {pengirimanFilter === 'ALL'
+                  ? 'Semua Kirim'
+                  : pengirimanFilter === 'NONE'
+                    ? 'Belum Diset'
+                    : formatPengiriman(pengirimanFilter)}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="ALL">Semua Pengiriman</SelectItem>
               <SelectItem value="NONE">Belum Diset</SelectItem>
-              <SelectItem value="HARI_H">Hari H</SelectItem>
-              <SelectItem value="H_1">H-1</SelectItem>
-              <SelectItem value="H_2">H-2</SelectItem>
-              <SelectItem value="H_3">H-3</SelectItem>
-              <SelectItem value="H_PLUS_1">H+1</SelectItem>
-              <SelectItem value="H_PLUS_2">H+2</SelectItem>
-              <SelectItem value="H_PLUS_3">H+3</SelectItem>
-              <SelectItem value="TITIP_POTONG">Titip Potong</SelectItem>
+              {PENGIRIMAN_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <Select
@@ -682,7 +655,7 @@ export function EntryTable({
                 onClick={() => toggleSort('invoiceNo')}
               >
                 <span className="inline-flex items-center gap-1">
-                  Invoice <SortIcon field="invoiceNo" />
+                  Invoice <SortIcon field="invoiceNo" sortField={sortField} sortDir={sortDir} />
                 </span>
               </th>
               <th className="text-center p-3 font-medium">Hewan</th>
@@ -691,7 +664,7 @@ export function EntryTable({
                 onClick={() => toggleSort('buyerName')}
               >
                 <span className="inline-flex items-center gap-1">
-                  Pembeli <SortIcon field="buyerName" />
+                  Pembeli <SortIcon field="buyerName" sortField={sortField} sortDir={sortDir} />
                 </span>
               </th>
               {isAdmin && (
@@ -700,7 +673,7 @@ export function EntryTable({
                   onClick={() => toggleSort('sales')}
                 >
                   <span className="inline-flex items-center gap-1">
-                    Sales <SortIcon field="sales" />
+                    Sales <SortIcon field="sales" sortField={sortField} sortDir={sortDir} />
                   </span>
                 </th>
               )}
@@ -709,7 +682,7 @@ export function EntryTable({
                 onClick={() => toggleSort('hargaJual')}
               >
                 <span className="inline-flex items-center gap-1">
-                  Harga Jual <SortIcon field="hargaJual" />
+                  Harga Jual <SortIcon field="hargaJual" sortField={sortField} sortDir={sortDir} />
                 </span>
               </th>
               {(!isAdmin || canViewFinancials) && <th className="text-center p-3 font-medium">{isAdmin ? 'Sales Cut' : 'Komisi'}</th>}
@@ -721,7 +694,7 @@ export function EntryTable({
                     onClick={() => toggleSort('profit')}
                   >
                     <span className="inline-flex items-center gap-1">
-                      Profit <SortIcon field="profit" />
+                      Profit <SortIcon field="profit" sortField={sortField} sortDir={sortDir} />
                     </span>
                   </th>
                 </>
@@ -731,10 +704,10 @@ export function EntryTable({
               <th className="text-center p-3 font-medium">
                 <div className="inline-flex flex-col items-center gap-0.5">
                   <button className="inline-flex items-center gap-1 hover:text-foreground cursor-pointer select-none" onClick={() => toggleSort('createdAt')}>
-                    Dibuat <SortIcon field="createdAt" />
+                    Dibuat <SortIcon field="createdAt" sortField={sortField} sortDir={sortDir} />
                   </button>
                   <button className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground cursor-pointer select-none" onClick={() => toggleSort('updatedAt')}>
-                    Diperbarui <SortIcon field="updatedAt" />
+                    Diperbarui <SortIcon field="updatedAt" sortField={sortField} sortDir={sortDir} />
                   </button>
                 </div>
               </th>
@@ -1535,19 +1508,14 @@ function EntryEditFields({
           >
             <SelectTrigger className={`h-8 text-sm${!isAdmin && !form.pengiriman ? ' border-destructive/60 ring-1 ring-destructive/20' : ''}`}>
               <SelectValue>
-                {form.pengiriman ? (PENGIRIMAN_LABEL[form.pengiriman] ?? form.pengiriman) : '— Tidak ada —'}
+                {form.pengiriman ? formatPengiriman(form.pengiriman) : '— Tidak ada —'}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="__none__">— Tidak ada —</SelectItem>
-              <SelectItem value="HARI_H">Hari H</SelectItem>
-              <SelectItem value="H_1">H-1</SelectItem>
-              <SelectItem value="H_2">H-2</SelectItem>
-              <SelectItem value="H_3">H-3</SelectItem>
-              <SelectItem value="H_PLUS_1">H+1</SelectItem>
-              <SelectItem value="H_PLUS_2">H+2</SelectItem>
-              <SelectItem value="H_PLUS_3">H+3</SelectItem>
-              <SelectItem value="TITIP_POTONG">Titip Potong</SelectItem>
+              {PENGIRIMAN_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </Field>

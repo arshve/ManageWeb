@@ -24,7 +24,6 @@ const TYPES = ['KAMBING', 'DOMBA', 'SAPI'] as const;
 const TYPE_LABEL: Record<string, string> = { KAMBING: 'Kambing', DOMBA: 'Domba', SAPI: 'Sapi' };
 const GRADES = ['SUPER', 'A', 'B', 'C', 'D'] as const;
 
-const ITEMS_PER_ROW_MOBILE = 3;
 const ITEMS_PER_ROW_DESKTOP = 5;
 const ROWS_PER_PAGE = 3;
 const PAGE_SIZE = ITEMS_PER_ROW_DESKTOP * ROWS_PER_PAGE; // 15 items per page

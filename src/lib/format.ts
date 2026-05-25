@@ -125,16 +125,25 @@ export function generateSku(
  *
  * @returns Formatted invoice number string
  */
-const PENGIRIMAN_LABELS: Record<string, string> = {
-  HARI_H: 'Hari H',
-  H_1: 'H-1',
-  H_2: 'H-2',
-  H_3: 'H-3',
-  H_PLUS_1: 'H+1',
-  H_PLUS_2: 'H+2',
-  H_PLUS_3: 'H+3',
-  TITIP_POTONG: 'Titip Potong',
-};
+/**
+ * Canonical pengiriman options — single source of truth for value→label and
+ * dropdown ordering. Consumed by entry forms (sales/new, admin/new), the entry
+ * table filter/edit selects, and `formatPengiriman`. Add new options here only.
+ */
+export const PENGIRIMAN_OPTIONS = [
+  { value: 'HARI_H', label: 'Hari H' },
+  { value: 'H_1', label: 'H-1' },
+  { value: 'H_2', label: 'H-2' },
+  { value: 'H_3', label: 'H-3' },
+  { value: 'H_PLUS_1', label: 'H+1' },
+  { value: 'H_PLUS_2', label: 'H+2' },
+  { value: 'H_PLUS_3', label: 'H+3' },
+  { value: 'TITIP_POTONG', label: 'Titip Potong' },
+] as const;
+
+export const PENGIRIMAN_LABELS: Record<string, string> = Object.fromEntries(
+  PENGIRIMAN_OPTIONS.map((o) => [o.value, o.label]),
+);
 
 const PAYMENT_LABELS: Record<string, string> = {
   BELUM_BAYAR: 'Belum Bayar',

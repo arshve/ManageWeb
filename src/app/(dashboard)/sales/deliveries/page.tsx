@@ -4,7 +4,6 @@ import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/auth';
 import { DashboardShell } from '@/components/dashboard/dashboard-shell';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
 import { StatusToken, DELIVERY_STATUS } from '@/components/ui/status-token';
 import { cn } from '@/lib/utils';

@@ -31,11 +31,11 @@ import {
   type MapStop,
   type MapDriver,
 } from '@/components/admin/delivery-map-loader';
-import { formatPengiriman } from '@/lib/format';
+import { formatPengiriman, PENGIRIMAN_OPTIONS } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { StatusToken, intentVars, DELIVERY_STATUS } from '@/components/ui/status-token';
+import { StatusToken, DELIVERY_STATUS } from '@/components/ui/status-token';
 import { StatCard } from '@/components/ui/stat-card';
 import { Printer } from 'lucide-react';
 
@@ -269,9 +269,8 @@ export function DeliveriesAdminView({
   const unscheduledSafePage = Math.min(unscheduledPage, unscheduledTotalPages - 1);
   const pagedUnscheduled = filteredUnscheduled.slice(unscheduledSafePage * UNSCHEDULED_PAGE_SIZE, (unscheduledSafePage + 1) * UNSCHEDULED_PAGE_SIZE);
 
-  const { deliveredCount, failedCount } = useMemo(() => ({
+  const { deliveredCount } = useMemo(() => ({
     deliveredCount: scheduled.filter((e) => e.delivery?.status === 'DELIVERED').length,
-    failedCount: scheduled.filter((e) => e.delivery?.status === 'FAILED').length,
   }), [scheduled]);
 
   const groupedByDriver = useMemo(() => {
@@ -561,14 +560,9 @@ export function DeliveriesAdminView({
             className="h-8 rounded-md border bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1"
           >
             <option value="ALL">Semua Pengiriman</option>
-            <option value="HARI_H">{formatPengiriman('HARI_H')}</option>
-            <option value="H_1">{formatPengiriman('H_1')}</option>
-            <option value="H_2">{formatPengiriman('H_2')}</option>
-            <option value="H_3">{formatPengiriman('H_3')}</option>
-            <option value="H_PLUS_1">{formatPengiriman('H_PLUS_1')}</option>
-            <option value="H_PLUS_2">{formatPengiriman('H_PLUS_2')}</option>
-            <option value="H_PLUS_3">{formatPengiriman('H_PLUS_3')}</option>
-            <option value="TITIP_POTONG">{formatPengiriman('TITIP_POTONG')}</option>
+            {PENGIRIMAN_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
           </select>
           <div ref={jenisDropdownRef} className="relative">
             <button

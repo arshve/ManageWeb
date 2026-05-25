@@ -139,11 +139,8 @@ export function DriverRunView({
   }, []);
 
   const {
-    assignedStops,
     totalAssignedItems,
     totalLoaded,
-    hasPartial,
-    hasSkipped,
     needsConfirm,
     partialOrSkippedEntries,
   } = useMemo(() => {

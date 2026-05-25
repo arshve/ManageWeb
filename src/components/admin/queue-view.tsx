@@ -322,7 +322,6 @@ export function QueueView({
   const [page, setPage] = useState(0);
 
   const PAGE_SIZE = 10;
-  const GRADES = ['SUPER', 'A', 'B', 'C', 'D'] as const;
 
   function handleJenisChange(v: string) {
     setJenisFilter(v);

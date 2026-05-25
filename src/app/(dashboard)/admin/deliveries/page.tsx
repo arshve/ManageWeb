@@ -1,7 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { DashboardShell } from '@/components/dashboard/dashboard-shell';
 import { DeliveriesAdminView } from '@/components/admin/deliveries-admin-view';
-import { DriverTracker } from '@/components/admin/driver-tracker';
 import type {
   MapStop,
   MapDriver,
@@ -33,7 +32,6 @@ export default async function AdminDeliveriesPage({
     scheduledRaw,
     unscheduledRaw,
     drivers,
-    availability,
     assignedDeliveries,
   ] = await Promise.all([
     prisma.entry.findMany({
@@ -112,10 +110,6 @@ export default async function AdminDeliveriesPage({
       },
       orderBy: { name: 'asc' },
     }),
-    prisma.driverAvailability.findMany({
-      where: { date, isActive: true },
-      select: { driverId: true },
-    }),
     // Drivers who are actively assigned to a delivery on this date
     prisma.delivery.findMany({
       where: {
@@ -127,7 +121,6 @@ export default async function AdminDeliveriesPage({
     }),
   ]);
 
-  const availableIds = new Set(availability.map((a) => a.driverId));
   const assignedIds = new Set(assignedDeliveries.map((d) => d.driverId!));
 
   const scheduled = scheduledRaw.map((e) => ({

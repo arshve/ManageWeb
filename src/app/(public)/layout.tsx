@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import Image from 'next/image';
 import { DM_Sans, DM_Serif_Display } from 'next/font/google';
 import { getProfile, dashboardUrlForRole } from '@/lib/auth';

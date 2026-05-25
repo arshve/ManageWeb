@@ -31,7 +31,7 @@ import {
   rowsToJson,
   type RequestRow,
 } from '@/components/dashboard/antrian-request-rows';
-import { formatRupiah, formatWeight } from '@/lib/format';
+import { formatRupiah, formatWeight, PENGIRIMAN_OPTIONS, PENGIRIMAN_LABELS } from '@/lib/format';
 
 const SERIF = "var(--font-dm-serif), 'DM Serif Display', serif";
 
@@ -48,20 +48,6 @@ interface SalesUser {
   name: string;
 }
 
-const PENGIRIMAN_OPTIONS = [
-  { value: 'HARI_H', label: 'Hari H' },
-  { value: 'H_1', label: 'H-1' },
-  { value: 'H_2', label: 'H-2' },
-  { value: 'H_3', label: 'H-3' },
-  { value: 'H_PLUS_1', label: 'H+1' },
-  { value: 'H_PLUS_2', label: 'H+2' },
-  { value: 'H_PLUS_3', label: 'H+3' },
-  { value: 'TITIP_POTONG', label: 'Titip Potong' },
-] as const;
-
-const PENGIRIMAN_LABEL: Record<string, string> = Object.fromEntries(
-  PENGIRIMAN_OPTIONS.map((o) => [o.value, o.label]),
-);
 
 const PAYMENT_LABEL: Record<string, string> = {
   BELUM_BAYAR: 'Belum Bayar',
@@ -543,7 +529,7 @@ export function AdminNewEntryForm({ canViewFinancials }: { canViewFinancials: bo
               onValueChange={(val) => setPengiriman(val ?? 'HARI_H')}
             >
               <SelectTrigger>
-                <SelectValue>{PENGIRIMAN_LABEL[pengiriman] ?? pengiriman}</SelectValue>
+                <SelectValue>{PENGIRIMAN_LABELS[pengiriman] ?? pengiriman}</SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {PENGIRIMAN_OPTIONS.map((o) => (

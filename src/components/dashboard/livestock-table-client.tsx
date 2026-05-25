@@ -482,7 +482,6 @@ function MobileLivestockCard({
   item,
   readOnly,
   canViewFinancials,
-  pricingTemplate,
 }: {
   item: LivestockItem;
   readOnly: boolean;

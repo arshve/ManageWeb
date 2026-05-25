@@ -28,7 +28,6 @@ import {
   LogOut,
   Menu,
   X,
-  ChevronLeft,
   History,
   Truck,
   Wallet,

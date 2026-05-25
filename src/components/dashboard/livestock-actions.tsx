@@ -12,13 +12,7 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { Pencil, Trash2 } from 'lucide-react';
 import { deleteLivestock } from '@/app/actions/livestock';
 import { LivestockForm, type PricingMap } from './livestock-form';
 import { toast } from 'sonner';

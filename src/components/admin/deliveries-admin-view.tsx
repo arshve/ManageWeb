@@ -388,7 +388,7 @@ export function DeliveriesAdminView({
   const td = 'px-3 py-3 text-sm';
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 min-w-0 overflow-x-hidden">
       <Lightbox src={lightboxUrl ?? ''} alt="Bukti kirim" open={!!lightboxUrl} onClose={() => setLightboxUrl(null)} />
 
       {/* ── Date nav ── */}
@@ -772,7 +772,7 @@ export function DeliveriesAdminView({
               placeholder="lat,lng atau Google Maps URL"
               value={startInput}
               onChange={(e) => updateStartInput(e.target.value)}
-              className="h-8 w-full rounded-lg border bg-background px-3 text-xs text-foreground focus:outline-none focus:ring-1"
+              className="h-8 flex-1 min-w-0 rounded-lg border bg-background px-3 text-xs text-foreground focus:outline-none focus:ring-1"
             />
           </div>
         </div>

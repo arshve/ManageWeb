@@ -55,3 +55,4 @@ AGENT.md
 # Ignore AI tool directories
 .claude/
 .agents/
+skill-lock.json

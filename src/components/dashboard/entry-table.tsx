@@ -233,13 +233,25 @@ export function EntryTable({
   const [sentFilter, setSentFilter] = useState('ALL');
   const [pengirimanFilter, setPengirimanFilter] = useState('ALL');
   const [dataFilter, setDataFilter] = useState('ALL');
-  const [hewanFilter, setHewanFilter] = useState('ALL');
+  const [hewanFilter, setHewanFilter] = useState<Set<string>>(new Set());
+  const [conditionFilter, setConditionFilter] = useState<Set<string>>(new Set());
   const [gradeFilter, setGradeFilter] = useState('ALL');
   const [weightFilter, setWeightFilter] = useState('ALL');
-  const changeHewan = useCallback((val: string) => {
-    setHewanFilter(val);
+  const toggleHewan = useCallback((val: string) => {
+    setHewanFilter((prev) => {
+      const next = new Set(prev);
+      next.has(val) ? next.delete(val) : next.add(val);
+      return next;
+    });
     setGradeFilter('ALL');
     setWeightFilter('ALL');
+  }, []);
+  const toggleCondition = useCallback((val: string) => {
+    setConditionFilter((prev) => {
+      const next = new Set(prev);
+      next.has(val) ? next.delete(val) : next.add(val);
+      return next;
+    });
   }, []);
   const [sortField, setSortField] = useState<SortField>('createdAt');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
@@ -262,7 +274,7 @@ export function EntryTable({
   }, []);
   const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
 
-  useEffect(() => { setPage(1); }, [search, statusFilter, paymentFilter, sentFilter, pengirimanFilter, dataFilter, hewanFilter, gradeFilter, weightFilter]);
+  useEffect(() => { setPage(1); }, [search, statusFilter, paymentFilter, sentFilter, pengirimanFilter, dataFilter, hewanFilter, conditionFilter, gradeFilter, weightFilter]);
 
   function toggleSort(field: SortField) {
     if (sortField === field) {
@@ -327,17 +339,30 @@ export function EntryTable({
     if (dataFilter === 'NO_MAPS') {
       result = result.filter((e) => !e.buyerMaps?.trim());
     }
-    if (hewanFilter !== 'ALL') {
+    if (
+      hewanFilter.size > 0 ||
+      conditionFilter.size > 0 ||
+      gradeFilter !== 'ALL' ||
+      weightFilter !== 'ALL'
+    ) {
       result = result.filter((e) =>
         e.items.some((i) => {
-          if (i.livestock.type !== hewanFilter) return false;
-          if ((hewanFilter === 'KAMBING' || hewanFilter === 'DOMBA') && gradeFilter !== 'ALL') {
-            return i.livestock.grade === gradeFilter;
+          const lv = i.livestock;
+          if (hewanFilter.size > 0 && !hewanFilter.has(lv.type)) return false;
+          if (conditionFilter.size > 0) {
+            const sehat = lv.condition === 'SEHAT';
+            const ok =
+              (conditionFilter.has('SEHAT') && sehat) ||
+              (conditionFilter.has('NOT_SEHAT') && !sehat);
+            if (!ok) return false;
           }
-          if (hewanFilter === 'SAPI' && weightFilter !== 'ALL') {
-            const lo = i.livestock.weightMin ?? i.livestock.weightMax;
-            const hi = i.livestock.weightMax ?? i.livestock.weightMin;
-            return `${lo}-${hi}` === weightFilter;
+          if (gradeFilter !== 'ALL' && (lv.type === 'KAMBING' || lv.type === 'DOMBA')) {
+            if (lv.grade !== gradeFilter) return false;
+          }
+          if (weightFilter !== 'ALL' && lv.type === 'SAPI') {
+            const lo = lv.weightMin ?? lv.weightMax;
+            const hi = lv.weightMax ?? lv.weightMin;
+            if (`${lo}-${hi}` !== weightFilter) return false;
           }
           return true;
         }),
@@ -393,6 +418,7 @@ export function EntryTable({
     pengirimanFilter,
     dataFilter,
     hewanFilter,
+    conditionFilter,
     gradeFilter,
     weightFilter,
     sortField,
@@ -532,28 +558,40 @@ export function EntryTable({
               <SelectItem value="NO_MAPS">Tanpa Maps</SelectItem>
             </SelectContent>
           </Select>
-          <Select
-            value={hewanFilter}
-            onValueChange={(val) => changeHewan(val ?? 'ALL')}
-          >
-            <SelectTrigger className="h-8 w-[140px] text-xs">
-              <SelectValue>
-                {{
-                  ALL: 'Semua Hewan',
-                  KAMBING: 'Kambing',
-                  DOMBA: 'Domba',
-                  SAPI: 'Sapi',
-                }[hewanFilter] ?? hewanFilter}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">Semua Hewan</SelectItem>
-              <SelectItem value="KAMBING">Kambing</SelectItem>
-              <SelectItem value="DOMBA">Domba</SelectItem>
-              <SelectItem value="SAPI">Sapi</SelectItem>
-            </SelectContent>
-          </Select>
-          {(hewanFilter === 'KAMBING' || hewanFilter === 'DOMBA') && (
+          <div className="flex items-center gap-2.5 h-8 px-2.5 border rounded-md text-xs">
+            <span className="text-muted-foreground">Hewan</span>
+            {[
+              { value: 'KAMBING', label: 'Kambing' },
+              { value: 'DOMBA', label: 'Domba' },
+              { value: 'SAPI', label: 'Sapi' },
+            ].map((o) => (
+              <label key={o.value} htmlFor={`hewan-${o.value}`} className="flex items-center gap-1 cursor-pointer select-none">
+                <Checkbox
+                  id={`hewan-${o.value}`}
+                  checked={hewanFilter.has(o.value)}
+                  onCheckedChange={() => toggleHewan(o.value)}
+                />
+                {o.label}
+              </label>
+            ))}
+          </div>
+          <div className="flex items-center gap-2.5 h-8 px-2.5 border rounded-md text-xs">
+            <span className="text-muted-foreground">Kondisi</span>
+            {[
+              { value: 'SEHAT', label: 'Sehat' },
+              { value: 'NOT_SEHAT', label: 'Tidak Sehat' },
+            ].map((o) => (
+              <label key={o.value} htmlFor={`kondisi-${o.value}`} className="flex items-center gap-1 cursor-pointer select-none">
+                <Checkbox
+                  id={`kondisi-${o.value}`}
+                  checked={conditionFilter.has(o.value)}
+                  onCheckedChange={() => toggleCondition(o.value)}
+                />
+                {o.label}
+              </label>
+            ))}
+          </div>
+          {hewanFilter.size > 0 && !hewanFilter.has('SAPI') && (hewanFilter.has('KAMBING') || hewanFilter.has('DOMBA')) && (
             <Select
               value={gradeFilter}
               onValueChange={(val) => setGradeFilter(val ?? 'ALL')}
@@ -580,7 +618,7 @@ export function EntryTable({
               </SelectContent>
             </Select>
           )}
-          {hewanFilter === 'SAPI' && weightOptions.length > 0 && (
+          {hewanFilter.has('SAPI') && !hewanFilter.has('KAMBING') && !hewanFilter.has('DOMBA') && weightOptions.length > 0 && (
             <Select
               value={weightFilter}
               onValueChange={(val) => setWeightFilter(val ?? 'ALL')}
@@ -606,7 +644,8 @@ export function EntryTable({
             sentFilter !== 'ALL' ||
             pengirimanFilter !== 'ALL' ||
             dataFilter !== 'ALL' ||
-            hewanFilter !== 'ALL' ||
+            hewanFilter.size > 0 ||
+            conditionFilter.size > 0 ||
             gradeFilter !== 'ALL' ||
             weightFilter !== 'ALL') && (
             <Button
@@ -620,7 +659,8 @@ export function EntryTable({
                 setSentFilter('ALL');
                 setPengirimanFilter('ALL');
                 setDataFilter('ALL');
-                setHewanFilter('ALL');
+                setHewanFilter(new Set());
+                setConditionFilter(new Set());
                 setGradeFilter('ALL');
                 setWeightFilter('ALL');
               }}
@@ -1369,14 +1409,22 @@ function EntryEditFields({
           const lv = ip.livestock;
           const typeLabel = lv.type.charAt(0) + lv.type.slice(1).toLowerCase();
           const isMatiItem = lv.condition === 'MATI';
+          const isSakitItem = lv.condition === 'SAKIT';
           return (
             <div
               key={ip.id}
-              className={`rounded-md border p-2 flex flex-col gap-1.5 ${isMatiItem ? 'border-destructive/40 bg-destructive/5' : 'bg-muted/20'}`}
+              className={`rounded-md border p-2 flex flex-col gap-1.5 ${
+                isMatiItem
+                  ? 'border-destructive/40 bg-destructive/5'
+                  : isSakitItem
+                    ? 'border-zinc-400 bg-zinc-200 dark:border-zinc-600 dark:bg-zinc-800/60'
+                    : 'bg-muted/20'
+              }`}
             >
               <p className="text-xs font-medium flex flex-wrap items-center gap-1.5">
                 {typeLabel}{lv.grade ? ` · ${lv.grade}` : ''}
                 {isMatiItem && <span className="text-destructive text-[10px] font-semibold">MATI</span>}
+                {isSakitItem && <span className="text-zinc-700 dark:text-zinc-100 bg-zinc-300 dark:bg-zinc-600 text-[10px] font-semibold px-1.5 py-0.5 rounded">SAKIT</span>}
                 <span className="text-muted-foreground font-mono text-[10px]">{lv.sku}</span>
                 {(isSalesOnApproved || isAdminOnApproved) && (
                   <LivestockSwapDialog
@@ -1626,11 +1674,14 @@ const EntryRow = memo(function EntryRow({
   } = useEntryRow(entry, onSaved, isAdmin);
 
   const isMati = entry.items.some((i) => i.livestock.condition === 'MATI');
+  const isSakit = !isMati && entry.items.some((i) => i.livestock.condition === 'SAKIT');
   const rowClass = isMati
-    ? 'bg-zinc-300 text-zinc-800 hover:bg-zinc-400/70 dark:bg-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-600'
-    : isEditing
-      ? 'bg-muted/30'
-      : '';
+    ? 'bg-zinc-400 text-zinc-900 hover:bg-zinc-500/70 dark:bg-zinc-700 dark:text-zinc-100 dark:hover:bg-zinc-600'
+    : isSakit
+      ? 'bg-zinc-200 text-zinc-700 hover:bg-zinc-300/70 dark:bg-zinc-800/50 dark:text-zinc-300 dark:hover:bg-zinc-800/70'
+      : isEditing
+        ? 'bg-muted/30'
+        : '';
 
   return (
     <>
@@ -1930,9 +1981,12 @@ const MobileEntryCard = memo(function MobileEntryCard({
 
   const open = expanded || isEditing;
   const isMati = entry.items.some((i) => i.livestock.condition === 'MATI');
+  const isSakit = !isMati && entry.items.some((i) => i.livestock.condition === 'SAKIT');
   const cardClass = isMati
-    ? 'bg-zinc-300 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-200'
-    : 'bg-card';
+    ? 'bg-zinc-400 text-zinc-900 dark:bg-zinc-700 dark:text-zinc-100'
+    : isSakit
+      ? 'bg-zinc-200 text-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-300'
+      : 'bg-card';
 
   const firstLv = entry.items[0]?.livestock;
   const firstWeight = firstLv?.type === 'SAPI' ? formatWeight(firstLv.weightMin, firstLv.weightMax) : null;

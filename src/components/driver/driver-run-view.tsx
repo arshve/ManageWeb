@@ -345,7 +345,7 @@ export function DriverRunView({
       </div>
 
       {/* ── Start Route Button ── */}
-      {isToday && notStarted && (
+      {notStarted && (
         <>
           <div className="rounded-xl border bg-card overflow-hidden">
             <div className="px-4 py-2.5 border-b bg-muted/30 flex items-center justify-between">
@@ -422,8 +422,8 @@ export function DriverRunView({
             <StopCard
               key={s.id}
               stop={s}
-              isCurrent={isToday && current?.id === s.id && !notStarted}
-              readOnly={!isToday}
+              isCurrent={current?.id === s.id && !notStarted}
+              readOnly={false}
               checkedItems={checkedItems}
               onToggleItem={handleToggleItem}
               onToggleAll={handleToggleAll}

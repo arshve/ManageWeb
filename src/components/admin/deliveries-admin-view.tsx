@@ -18,6 +18,11 @@ import {
   recalculateDriverRoute,
   addEntriesToDriverRoute,
   resetDriverRoute,
+  bulkToggleItemsForDriver,
+  startDeliveryRunForDriver,
+  forceUnassignDeliveryDate,
+  markDelivered,
+  markFailed,
 } from '@/app/actions/deliveries';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -27,6 +32,18 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Lightbox } from '@/components/ui/lightbox';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { toThumbnailUrl, compressImage } from '@/lib/image';
+import { Textarea } from '@/components/ui/textarea';
 import { parseLatLngCoord } from '@/lib/delivery/geo';
 import { navigationUrl } from '@/lib/delivery/maps';
 import {
@@ -40,7 +57,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { StatusToken, DELIVERY_STATUS } from '@/components/ui/status-token';
 import { StatCard } from '@/components/ui/stat-card';
-import { Printer } from 'lucide-react';
+import { Printer, Trash2, CheckCircle2 } from 'lucide-react';
 
 
 const SERIF = "var(--font-dm-serif), 'DM Serif Display', serif";
@@ -61,6 +78,7 @@ type ScheduledEntry = {
   buyerLng: number | null;
   buyerMaps: string | null;
   pengiriman: string | null;
+  notes: string | null;
   delivery: {
     id: string;
     sequence: number | null;
@@ -185,6 +203,18 @@ export function DeliveriesAdminView({
   const [startInput, setStartInput] = useState(defaultStart);
   const [maxPerDriver, setMaxPerDriver] = useState(30);
   const [mapDepot, setMapDepot] = useState(() => parseLatLngCoord(defaultStart) ?? initialDepot);
+  const [removeTarget, setRemoveTarget] = useState<ScheduledEntry | null>(null);
+  const [deliverTarget, setDeliverTarget] = useState<ScheduledEntry | null>(null);
+  function doRemoveStop() {
+    if (!removeTarget) return;
+    const id = removeTarget.id;
+    setRemoveTarget(null);
+    startTransition(async () => {
+      const r = await forceUnassignDeliveryDate([id]);
+      if (r && 'error' in r) toast.error(r.error);
+      else { toast.success('Entry dihapus dari rute'); refresh(); }
+    });
+  }
 
   function updateStartInput(next: string) {
     setStartInput(next);
@@ -384,6 +414,32 @@ export function DeliveriesAdminView({
       else { toast.success(`${r.count} entry dilepas`); refresh(); }
     });
   }
+  function handleCheckAllDriver(driverId: string, itemIds: string[], loaded: boolean) {
+    setCheckedItems((prev) => {
+      const next = new Set(prev);
+      itemIds.forEach((id) => { if (loaded) next.add(id); else next.delete(id); });
+      return next;
+    });
+    startToggleTransition(async () => {
+      const r = await bulkToggleItemsForDriver(driverId, dateStr, loaded);
+      if (r && 'error' in r) {
+        toast.error(r.error);
+        setCheckedItems((prev) => {
+          const next = new Set(prev);
+          itemIds.forEach((id) => { if (loaded) next.delete(id); else next.add(id); });
+          return next;
+        });
+      }
+    });
+  }
+  function handleStartRun(driverId: string, allLoaded: boolean) {
+    if (!allLoaded && !confirm('Sebagian hewan belum dimuat. Sisa muatan akan dikembalikan ke unscheduled. Mulai perjalanan?')) return;
+    startTransition(async () => {
+      const r = await startDeliveryRunForDriver(driverId, dateStr);
+      if (r && 'error' in r) toast.error(r.error);
+      else { toast.success('Perjalanan dimulai'); refresh(); }
+    });
+  }
   function handleResetRoutes() {
     if (!confirm(`Reset semua rute untuk ${dateStr}?`)) return;
     startTransition(async () => {
@@ -411,6 +467,31 @@ export function DeliveriesAdminView({
   return (
     <div className="flex flex-col gap-4 min-w-0 overflow-x-hidden">
       <Lightbox src={lightboxUrl ?? ''} alt="Bukti kirim" open={!!lightboxUrl} onClose={() => setLightboxUrl(null)} />
+
+      <AdminDeliverDialog
+        stop={deliverTarget}
+        onClose={() => setDeliverTarget(null)}
+        onSaved={() => { setDeliverTarget(null); refresh(); }}
+      />
+
+      <AlertDialog open={!!removeTarget} onOpenChange={(o) => { if (!o) setRemoveTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Hapus entry dari rute?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <span className="font-medium">{removeTarget?.buyerName}</span> akan dilepas dari jadwal — <span className="font-mono">deliveryDate</span> dikosongkan, delivery dihapus, dan checklist muatan di-reset.
+              {removeTarget?.delivery?.status === 'ON_DELIVERY' && (
+                <> <span className="block mt-2 text-warning-fg font-medium">⚠ Rute sedang berjalan — driver akan kehilangan stop ini.</span></>
+              )}
+              <span className="block mt-2 text-muted-foreground">Entry &amp; item-nya tetap ada di sistem dan bisa dijadwalkan ulang nanti.</span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={pending}>Batal</AlertDialogCancel>
+            <AlertDialogAction onClick={doRemoveStop} disabled={pending}>Hapus dari Rute</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* ── Date nav ── */}
       <div className="rounded-xl border bg-card px-4 py-3 flex flex-wrap items-center gap-2">
@@ -886,9 +967,37 @@ export function DeliveriesAdminView({
                       </div>
                     </div>
                   </div>
-                  <Button size="sm" variant="ghost" className="text-xs h-7" onClick={() => handleUnassign(stops.map((s) => s.id))} disabled={pending}>
-                    Lepas
-                  </Button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {!isUnassigned && assignedStopsInBucket.length > 0 && (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs h-7"
+                          disabled={togglePending || bucketTotalItems === 0}
+                          onClick={() => handleCheckAllDriver(
+                            driverId,
+                            assignedStopsInBucket.flatMap((s) => s.items.map((i) => i.itemId)),
+                            bucketLoadedItems !== bucketTotalItems,
+                          )}
+                        >
+                          {bucketLoadedItems === bucketTotalItems ? 'Hapus Semua Muatan' : 'Centang Semua Muatan'}
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="text-xs h-7"
+                          disabled={pending || bucketLoadedItems === 0}
+                          onClick={() => handleStartRun(driverId, bucketLoadedItems === bucketTotalItems)}
+                          style={{ background: 'var(--primary)', color: 'var(--sidebar-primary)' }}
+                        >
+                          Mulai Perjalanan
+                        </Button>
+                      </>
+                    )}
+                    <Button size="sm" variant="ghost" className="text-xs h-7" onClick={() => handleUnassign(stops.map((s) => s.id))} disabled={pending}>
+                      Lepas
+                    </Button>
+                  </div>
                 </div>
 
                 {/* Desktop stops table */}
@@ -1045,6 +1154,26 @@ export function DeliveriesAdminView({
                                     ↗
                                   </a>
                                 )}
+                                {s.delivery?.status === 'ON_DELIVERY' && (
+                                  <button
+                                    type="button"
+                                    title="Tandai terkirim / gagal (admin)"
+                                    onClick={() => setDeliverTarget(s)}
+                                    className="inline-flex items-center justify-center size-7 rounded-lg border text-muted-foreground hover:bg-success-bg hover:text-success-fg hover:border-success-ring/40 transition-colors"
+                                  >
+                                    <CheckCircle2 className="size-3.5" />
+                                  </button>
+                                )}
+                                {s.delivery?.status !== 'DELIVERED' && (
+                                  <button
+                                    type="button"
+                                    title="Hapus dari rute"
+                                    onClick={() => setRemoveTarget(s)}
+                                    className="inline-flex items-center justify-center size-7 rounded-lg border text-muted-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/40 transition-colors"
+                                  >
+                                    <Trash2 className="size-3.5" />
+                                  </button>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -1061,65 +1190,89 @@ export function DeliveriesAdminView({
                     const dsMob = DELIVERY_STATUS[s.delivery?.status ?? 'PENDING'] ?? DELIVERY_STATUS.PENDING;
                     return (
                       <div key={s.id} className="px-4 py-3 flex flex-col gap-1.5">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            {isUnassigned && (
-                              s.buyerLat != null && s.buyerLng != null ? (
-                                <Checkbox
-                                  checked={selectedScheduled.has(s.id)}
-                                  onCheckedChange={() => toggleScheduled(s.id)}
-                                  className="size-4 shrink-0"
-                                />
-                              ) : (
-                                <span className="text-[10px] text-muted-foreground shrink-0" title="Tanpa koordinat">⚠</span>
-                              )
-                            )}
-                            <span
-                              className="size-5 shrink-0 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
-                              style={{ background: `var(--${dsMob.intent}-ring)` }}
-                            >
-                              {(s.delivery?.sequence ?? 0) + 1}
-                            </span>
-                            <div className="min-w-0">
-                              <span className="font-medium text-sm text-foreground truncate block">{s.buyerName}</span>
-                              {s.salesName && <span className="text-[11px] text-muted-foreground">{s.salesName}</span>}
-                              {s.delivery?.status === 'DELIVERED' && s.delivery.proofPhotoUrl && (
-                                <button
-                                  type="button"
-                                  onClick={() => setLightboxUrl(s.delivery!.proofPhotoUrl!)}
-                                  className="group relative mt-1 block size-12 rounded-lg overflow-hidden border hover:ring-2 ring-info-ring transition-all"
-                                >
-                                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                                  <img src={s.delivery.proofPhotoUrl} alt="bukti kirim" className="w-full h-full object-cover" />
-                                </button>
-                              )}
-                              {s.delivery?.status === 'FAILED' && s.delivery.notes && (
-                                <span className="block text-[11px] text-danger-fg">
-                                  ⚠ {s.delivery.notes}
-                                </span>
-                              )}
+                        {/* Header: seq + full name + info chips */}
+                        <div className="flex items-start gap-2">
+                          {isUnassigned && (
+                            s.buyerLat != null && s.buyerLng != null ? (
+                              <Checkbox
+                                checked={selectedScheduled.has(s.id)}
+                                onCheckedChange={() => toggleScheduled(s.id)}
+                                className="size-4 shrink-0 mt-0.5"
+                              />
+                            ) : (
+                              <span className="text-[10px] text-muted-foreground shrink-0 mt-0.5" title="Tanpa koordinat">⚠</span>
+                            )
+                          )}
+                          <span
+                            className="size-5 shrink-0 mt-0.5 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
+                            style={{ background: `var(--${dsMob.intent}-ring)` }}
+                          >
+                            {(s.delivery?.sequence ?? 0) + 1}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <span className="font-medium text-sm text-foreground break-words leading-snug">{s.buyerName}</span>
+                                {s.salesName && <span className="block text-[11px] text-muted-foreground">{s.salesName}</span>}
+                              </div>
+                              <div className="flex items-center gap-1 shrink-0">
+                                {s.pengiriman && <StatusToken intent="info" outlined size="sm">{formatPengiriman(s.pengiriman)}</StatusToken>}
+                                <StatusToken intent={dsMob.intent} size="sm">{dsMob.label}</StatusToken>
+                              </div>
                             </div>
-                          </div>
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            {s.pengiriman && <StatusToken intent="info" outlined size="sm">{formatPengiriman(s.pengiriman)}</StatusToken>}
-                            <StatusToken intent={dsMob.intent}>{dsMob.label}</StatusToken>
-                            {s.delivery?.id && (s.delivery.status === 'ASSIGNED' || s.delivery.status === 'ON_DELIVERY') && (
+                            {s.delivery?.status === 'DELIVERED' && s.delivery.proofPhotoUrl && (
                               <button
                                 type="button"
-                                title="Surat Jalan"
-                                onClick={() => window.open(`/api/deliveries/${s.delivery!.id}/surat-jalan`, '_blank')}
-                                className="inline-flex items-center justify-center size-7 rounded-lg border text-muted-foreground hover:bg-muted/40 transition-colors shrink-0"
+                                onClick={() => setLightboxUrl(s.delivery!.proofPhotoUrl!)}
+                                className="group relative mt-1 block size-12 rounded-lg overflow-hidden border hover:ring-2 ring-info-ring transition-all"
                               >
-                                <Printer className="size-3.5" />
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={s.delivery.proofPhotoUrl} alt="bukti kirim" className="w-full h-full object-cover" />
                               </button>
                             )}
-                            {href && (
-                              <a href={href} target="_blank" rel="noreferrer"
-                                className="inline-flex items-center justify-center size-7 rounded-lg border text-muted-foreground hover:bg-muted/40 transition-colors text-sm shrink-0">
-                                ↗
-                              </a>
+                            {s.delivery?.status === 'FAILED' && s.delivery.notes && (
+                              <span className="block text-[11px] text-danger-fg mt-0.5">⚠ {s.delivery.notes}</span>
                             )}
                           </div>
+                        </div>
+                        {/* Actions row — right aligned */}
+                        <div className="flex items-center justify-end gap-1">
+                          {s.delivery?.id && (s.delivery.status === 'ASSIGNED' || s.delivery.status === 'ON_DELIVERY') && (
+                            <button
+                              type="button"
+                              title="Surat Jalan"
+                              onClick={() => window.open(`/api/deliveries/${s.delivery!.id}/surat-jalan`, '_blank')}
+                              className="inline-flex items-center justify-center size-7 rounded-lg border text-muted-foreground hover:bg-muted/40 transition-colors"
+                            >
+                              <Printer className="size-3.5" />
+                            </button>
+                          )}
+                          {href && (
+                            <a href={href} target="_blank" rel="noreferrer" title="Buka di Maps"
+                              className="inline-flex items-center justify-center size-7 rounded-lg border text-muted-foreground hover:bg-muted/40 transition-colors text-sm">
+                              ↗
+                            </a>
+                          )}
+                          {s.delivery?.status === 'ON_DELIVERY' && (
+                            <button
+                              type="button"
+                              title="Tandai terkirim / gagal (admin)"
+                              onClick={() => setDeliverTarget(s)}
+                              className="inline-flex items-center justify-center size-7 rounded-lg border text-muted-foreground hover:bg-success-bg hover:text-success-fg hover:border-success-ring/40 transition-colors"
+                            >
+                              <CheckCircle2 className="size-3.5" />
+                            </button>
+                          )}
+                          {s.delivery?.status !== 'DELIVERED' && (
+                            <button
+                              type="button"
+                              title="Hapus dari rute"
+                              onClick={() => setRemoveTarget(s)}
+                              className="inline-flex items-center justify-center size-7 rounded-lg border text-muted-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/40 transition-colors"
+                            >
+                              <Trash2 className="size-3.5" />
+                            </button>
+                          )}
                         </div>
                         {s.delivery?.status === 'ASSIGNED' && s.delivery.id ? (
                           <div className="rounded-lg border bg-muted/20 overflow-hidden">
@@ -1204,6 +1357,12 @@ export function DeliveriesAdminView({
           dateStr={dateStr}
           insertCandidates={insertCandidates}
           onChanged={refresh}
+          mapStops={mapStops}
+          mapDepot={mapDepot}
+          mapDrivers={mapDrivers}
+          onPhotoClick={setLightboxUrl}
+          onRemove={setRemoveTarget}
+          onDeliver={setDeliverTarget}
         />
       )}
 
@@ -1460,6 +1619,12 @@ function PerDriverPanel({
   dateStr,
   insertCandidates,
   onChanged,
+  mapStops,
+  mapDepot,
+  mapDrivers,
+  onPhotoClick,
+  onRemove,
+  onDeliver,
 }: {
   drivers: { id: string; name: string; count: number; started: boolean; done: boolean }[];
   focusDriver: string | null;
@@ -1468,11 +1633,19 @@ function PerDriverPanel({
   dateStr: string;
   insertCandidates: { id: string; name: string; hasCoords: boolean }[];
   onChanged: () => void;
+  mapStops: MapStop[];
+  mapDepot: { lat: number; lng: number };
+  mapDrivers: MapDriver[];
+  onPhotoClick: (url: string) => void;
+  onRemove: (stop: ScheduledEntry) => void;
+  onDeliver: (stop: ScheduledEntry) => void;
 }) {
   const [pending, startTransition] = useTransition();
   const [insertOpen, setInsertOpen] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
   const started = stops.some((s) => s.delivery?.status === 'ON_DELIVERY');
   const sorted = [...stops].sort((a, b) => (a.delivery?.sequence ?? 0) - (b.delivery?.sequence ?? 0));
+  const driverMapStops = focusDriver ? mapStops.filter((s) => s.driverId === focusDriver) : [];
 
   function recalc() {
     if (!focusDriver) return;
@@ -1482,9 +1655,9 @@ function PerDriverPanel({
       else { toast.success('Rute dihitung ulang'); onChanged(); }
     });
   }
-  function reset() {
+  function doReset() {
     if (!focusDriver) return;
-    if (!confirm('Reset rute ini? Status driver kembali ke ASSIGNED (belum jalan).')) return;
+    setResetOpen(false);
     startTransition(async () => {
       const r = await resetDriverRoute(focusDriver, dateStr);
       if (r && 'error' in r) toast.error(r.error);
@@ -1516,6 +1689,17 @@ function PerDriverPanel({
         )}
       </div>
 
+      {focusDriver && driverMapStops.length > 0 && (
+        <div className="rounded-xl border bg-card overflow-hidden">
+          <div className="px-5 py-3 border-b bg-muted/30">
+            <h2 className="text-[13px] font-semibold" style={{ fontFamily: SERIF }}>Peta Rute Driver</h2>
+          </div>
+          <div className="p-4">
+            <DeliveryMap depot={mapDepot} stops={driverMapStops} drivers={mapDrivers.filter((d) => d.id === focusDriver)} />
+          </div>
+        </div>
+      )}
+
       {focusDriver && (
         <div className="rounded-xl border bg-card overflow-hidden">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/30 px-4 py-3">
@@ -1524,7 +1708,7 @@ function PerDriverPanel({
             </span>
             <div className="flex flex-wrap gap-2">
               {started ? (
-                <Button size="sm" variant="outline" onClick={reset} disabled={pending}>
+                <Button size="sm" variant="outline" onClick={() => setResetOpen(true)} disabled={pending}>
                   Reset Rute (sudah jalan)
                 </Button>
               ) : (
@@ -1548,23 +1732,99 @@ function PerDriverPanel({
             {sorted.map((s) => {
               const ds = DELIVERY_STATUS[s.delivery?.status ?? 'PENDING'] ?? DELIVERY_STATUS.PENDING;
               const href = navigationUrl({ buyerMaps: s.buyerMaps, buyerLat: s.buyerLat, buyerLng: s.buyerLng, buyerAddress: s.buyerAddress });
+              const firstPhoto = s.items.find((i) => i.photoUrl)?.photoUrl ?? null;
+              const extra = Math.max(0, s.items.length - 1);
+              const itemSummary = s.items
+                .map((i) => {
+                  const t = i.type ? i.type.charAt(0) + i.type.slice(1).toLowerCase() : '';
+                  return [t + (i.grade ? ` ${i.grade}` : ''), i.tag].filter(Boolean).join(' · ');
+                })
+                .filter(Boolean)
+                .join(', ');
               return (
-                <li key={s.id} className="flex items-center gap-3 px-4 py-2.5">
+                <li key={s.id} className="flex items-start gap-3 px-4 py-3">
                   <span
-                    className="size-5 shrink-0 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
+                    className="size-5 shrink-0 mt-0.5 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
                     style={{ background: `var(--${ds.intent}-ring)` }}
                   >
                     {(s.delivery?.sequence ?? 0) + 1}
                   </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{s.buyerName}</p>
-                    <p className="text-[11px] text-muted-foreground truncate">{s.buyerAddress ?? '—'}</p>
-                  </div>
-                  {s.pengiriman && <StatusToken intent="info" outlined size="sm">{formatPengiriman(s.pengiriman)}</StatusToken>}
-                  <StatusToken intent={ds.intent} size="sm">{ds.label}</StatusToken>
-                  {href && (
-                    <a href={href} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center size-7 rounded-lg border text-muted-foreground hover:bg-muted/40 text-sm shrink-0">↗</a>
+                  {firstPhoto && (
+                    <button
+                      type="button"
+                      onClick={() => onPhotoClick(firstPhoto)}
+                      className="relative shrink-0 size-11 rounded-md overflow-hidden border bg-muted cursor-zoom-in"
+                      title="Lihat foto hewan"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={toThumbnailUrl(firstPhoto)} alt={s.buyerName} width={44} height={44} loading="lazy" className="size-11 object-cover" />
+                      {extra > 0 && (
+                        <span className="absolute bottom-0 right-0 bg-black/60 text-white text-[8px] leading-none px-1 py-0.5 rounded-tl">+{extra}</span>
+                      )}
+                    </button>
                   )}
+                  <div className="flex-1 min-w-0">
+                    {/* Header: full name + info chips (pengiriman + status) */}
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm font-medium flex-1 min-w-0 break-words leading-snug">{s.buyerName}</p>
+                      <div className="flex items-center gap-1 shrink-0">
+                        {s.pengiriman && <StatusToken intent="info" outlined size="sm">{formatPengiriman(s.pengiriman)}</StatusToken>}
+                        <StatusToken intent={ds.intent} size="sm">{ds.label}</StatusToken>
+                      </div>
+                    </div>
+                    {/* Address — single line */}
+                    <p className="text-[11px] text-muted-foreground line-clamp-1 mt-0.5" title={s.buyerAddress ?? undefined}>{s.buyerAddress ?? '—'}</p>
+                    {/* Meta: animal + notes inline */}
+                    {(itemSummary || s.notes) && (
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1 text-[11px]">
+                        {itemSummary && <span className="text-muted-foreground">{itemSummary}</span>}
+                        {s.notes && (
+                          <span className="italic text-foreground/80 bg-muted/40 px-1.5 py-0.5 rounded">
+                            {s.notes}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    {/* Delivery extras */}
+                    {s.delivery?.status === 'FAILED' && s.delivery.notes && (
+                      <p className="text-[11px] text-danger-fg mt-1">⚠ {s.delivery.notes}</p>
+                    )}
+                    {s.delivery?.status === 'DELIVERED' && s.delivery.proofPhotoUrl && (
+                      <button
+                        type="button"
+                        onClick={() => onPhotoClick(s.delivery!.proofPhotoUrl!)}
+                        className="mt-1 text-[11px] text-info-fg underline underline-offset-2 hover:no-underline"
+                      >
+                        Lihat bukti kirim
+                      </button>
+                    )}
+                    {/* Actions — bottom-right */}
+                    <div className="flex items-center justify-end gap-1 mt-1.5">
+                      {href && (
+                        <a href={href} target="_blank" rel="noreferrer" title="Buka di Maps" className="inline-flex items-center justify-center size-7 rounded-lg border text-muted-foreground hover:bg-muted/40 hover:text-foreground text-sm transition-colors">↗</a>
+                      )}
+                      {s.delivery?.status === 'ON_DELIVERY' && (
+                        <button
+                          type="button"
+                          onClick={() => onDeliver(s)}
+                          title="Tandai terkirim / gagal (admin)"
+                          className="inline-flex items-center justify-center size-7 rounded-lg border text-muted-foreground hover:bg-success-bg hover:text-success-fg hover:border-success-ring/40 transition-colors"
+                        >
+                          <CheckCircle2 className="size-3.5" />
+                        </button>
+                      )}
+                      {s.delivery?.status !== 'DELIVERED' && (
+                        <button
+                          type="button"
+                          onClick={() => onRemove(s)}
+                          title="Hapus dari rute"
+                          className="inline-flex items-center justify-center size-7 rounded-lg border text-muted-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/40 transition-colors"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </li>
               );
             })}
@@ -1585,6 +1845,22 @@ function PerDriverPanel({
           onSaved={() => { setInsertOpen(false); onChanged(); }}
         />
       )}
+
+      <AlertDialog open={resetOpen} onOpenChange={setResetOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reset rute yang sudah jalan?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Rute driver ini sedang berjalan (<span className="font-medium">ON_DELIVERY</span>). Reset akan mengembalikan status semua stop yang belum selesai ke <span className="font-medium">ASSIGNED</span> supaya bisa diubah / dihitung ulang. Stop yang sudah <span className="font-medium">DELIVERED / FAILED</span> tidak terpengaruh. Driver akan perlu memulai ulang perjalanan.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={pending}>Batal</AlertDialogCancel>
+            <AlertDialogAction onClick={doReset} disabled={pending}>Reset Rute</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   );
 }
@@ -1654,6 +1930,134 @@ function InsertEntryDialog({
               {pending ? 'Menyimpan…' : 'Tambah & Hitung Ulang'}
             </Button>
           </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Admin: mark ON_DELIVERY stop as delivered/failed on behalf of driver ────
+
+function AdminDeliverDialog({
+  stop,
+  onClose,
+  onSaved,
+}: {
+  stop: ScheduledEntry | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [notes, setNotes] = useState('');
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  // Reset form when target changes
+  useEffect(() => {
+    setNotes('');
+    setFile(null);
+    if (preview) URL.revokeObjectURL(preview);
+    setPreview(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stop?.id]);
+
+  async function pickFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    try {
+      const compressed = await compressImage(f);
+      setFile(compressed);
+      if (preview) URL.revokeObjectURL(preview);
+      setPreview(URL.createObjectURL(compressed));
+    } catch {
+      toast.error('Gagal proses foto');
+    }
+  }
+
+  async function uploadProof(): Promise<string | undefined> {
+    if (!file) return undefined;
+    const fd = new FormData();
+    fd.append('file', file);
+    const res = await fetch('/api/upload?folder=delivery-proof', { method: 'POST', body: fd });
+    if (!res.ok) throw new Error('Upload bukti gagal');
+    const data = (await res.json()) as { url: string };
+    return data.url;
+  }
+
+  function handleDelivered() {
+    if (!stop?.delivery?.id) return;
+    startTransition(async () => {
+      try {
+        const proofUrl = await uploadProof();
+        const r = await markDelivered(stop.delivery!.id, notes.trim() || undefined, proofUrl);
+        if (r && 'error' in r) toast.error(r.error);
+        else { toast.success('Ditandai terkirim'); onSaved(); }
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Gagal');
+      }
+    });
+  }
+  function handleFailed() {
+    if (!stop?.delivery?.id) return;
+    const reason = notes.trim();
+    if (!reason) { toast.error('Alasan wajib diisi untuk Gagal'); return; }
+    startTransition(async () => {
+      const r = await markFailed(stop.delivery!.id, reason);
+      if (r && 'error' in r) toast.error(r.error);
+      else { toast.success('Ditandai gagal'); onSaved(); }
+    });
+  }
+
+  return (
+    <Dialog open={!!stop} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-md w-[95vw] max-h-[90dvh] overflow-hidden flex flex-col p-0">
+        <DialogHeader className="px-5 pt-5 pb-0 shrink-0">
+          <DialogTitle>Tandai Delivery — {stop?.buyerName}</DialogTitle>
+        </DialogHeader>
+        <div className="flex-1 min-h-0 overflow-y-auto px-5 py-3 flex flex-col gap-3">
+          <p className="text-[11px] text-muted-foreground">
+            Atas nama driver. Isi catatan / alasan, lampirkan foto bukti (opsional untuk Terkirim).
+          </p>
+          <div>
+            <p className="text-xs text-muted-foreground mb-1">Foto Bukti</p>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={pickFile}
+              className="text-xs file:mr-2 file:px-2 file:py-1 file:rounded-md file:border file:bg-muted file:text-foreground hover:file:bg-muted/70 file:cursor-pointer"
+            />
+            {preview && (
+              <div className="mt-2 relative inline-block">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={preview} alt="preview" className="max-h-40 rounded-md border" />
+                <button
+                  type="button"
+                  onClick={() => { setFile(null); if (preview) URL.revokeObjectURL(preview); setPreview(null); }}
+                  className="absolute top-1 right-1 size-5 rounded-full bg-black/60 text-white text-xs"
+                >×</button>
+              </div>
+            )}
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground mb-1">Catatan / Alasan</p>
+            <Textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Catatan tambahan (atau alasan jika gagal)..."
+              rows={3}
+              className="text-sm"
+            />
+            <p className="text-[10px] text-muted-foreground mt-1">Wajib untuk Tandai Gagal; opsional untuk Tandai Terkirim.</p>
+          </div>
+        </div>
+        <div className="px-5 py-3 border-t flex flex-wrap items-center justify-end gap-2 shrink-0">
+          <Button variant="outline" size="sm" onClick={onClose} disabled={pending}>Batal</Button>
+          <Button variant="outline" size="sm" onClick={handleFailed} disabled={pending} className="text-destructive border-destructive/40 hover:bg-destructive/10">
+            Tandai Gagal
+          </Button>
+          <Button size="sm" onClick={handleDelivered} disabled={pending}>
+            {pending ? 'Menyimpan…' : 'Tandai Terkirim'}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

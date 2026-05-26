@@ -100,6 +100,55 @@ export async function unassignDeliveryDate(entryIds: string[]) {
   return { success: true as const, count: entryIds.length };
 }
 
+/**
+ * Admin force-remove entries from their route regardless of status, except DELIVERED.
+ * Allows ON_DELIVERY ("on the way") to be pulled off a running route. Resets item
+ * loadedAt so the entry can be re-scheduled cleanly later.
+ */
+export async function forceUnassignDeliveryDate(entryIds: string[]) {
+  const admin = await requireRole('ADMIN', 'SUPER_ADMIN');
+  if (entryIds.length === 0) return { error: 'Pilih minimal satu entry' };
+
+  const delivered = await prisma.delivery.findMany({
+    where: { entryId: { in: entryIds }, status: 'DELIVERED' },
+    select: { entryId: true },
+  });
+  if (delivered.length > 0) {
+    return { error: `Tidak bisa dihapus — ${delivered.length} sudah DELIVERED` };
+  }
+
+  await prisma.$transaction(async (tx) => {
+    // Reset loadedAt so items can be re-scheduled cleanly later
+    await tx.entryItem.updateMany({
+      where: { entryId: { in: entryIds } },
+      data: { loadedAt: null, loadedBy: null },
+    });
+    await tx.delivery.deleteMany({
+      where: {
+        entryId: { in: entryIds },
+        status: { in: ['PENDING', 'ASSIGNED', 'ON_DELIVERY', 'FAILED'] },
+      },
+    });
+    await tx.entry.updateMany({
+      where: { id: { in: entryIds } },
+      data: { deliveryDate: null },
+    });
+  });
+
+  await logAudit({
+    actor: admin,
+    action: 'UPDATE',
+    entity: 'Entry',
+    entityId: entryIds.join(','),
+    label: `Force unassign ${entryIds.length} entry (admin hapus dari rute)`,
+    after: { deliveryDate: null, count: entryIds.length, force: true },
+  });
+
+  revalidatePath('/admin/deliveries');
+  revalidatePath('/driver');
+  return { success: true as const, count: entryIds.length };
+}
+
 export async function resetRoutes(deliveryDate: string) {
   const admin = await requireRole('ADMIN', 'SUPER_ADMIN');
   const date = parseDateOnly(deliveryDate);
@@ -428,15 +477,14 @@ export async function bulkToggleItemsLoaded(deliveryId: string, loaded: boolean)
   return { success: true };
 }
 
-export async function startDeliveryRun(deliveryDate: string) {
-  const profile = await requireAuth();
-  if (profile.role !== 'DRIVER') return { error: 'Hanya driver' };
-  const date = parseDateOnly(deliveryDate);
-  if (!date) return { error: 'Tanggal tidak valid' };
-
+async function executeStartRun(
+  driverId: string,
+  date: Date,
+  actor: { id: string; name: string },
+) {
   const deliveries = await prisma.delivery.findMany({
     where: {
-      driverId: profile.id,
+      driverId,
       status: 'ASSIGNED',
       entry: { deliveryDate: date },
     },
@@ -516,11 +564,11 @@ export async function startDeliveryRun(deliveryDate: string) {
   });
 
   await logAudit({
-    actor: profile,
+    actor,
     action: 'UPDATE',
     entity: 'Delivery',
-    entityId: deliveryDate,
-    label: `Start delivery run ${deliveryDate} — ${profile.name}`,
+    entityId: date.toISOString().slice(0, 10),
+    label: `Start delivery run ${date.toISOString().slice(0, 10)} — ${actor.name}`,
     after: { assigned: deliveries.length, totalItems, totalLoaded, fullLoad, partialLoad, skipped, splitEntries },
   });
 
@@ -528,6 +576,57 @@ export async function startDeliveryRun(deliveryDate: string) {
   revalidatePath('/admin/deliveries');
   revalidatePath('/admin/entries');
   return { success: true, skipped, splitEntries };
+}
+
+/** Driver starts their own run. */
+export async function startDeliveryRun(deliveryDate: string) {
+  const profile = await requireAuth();
+  if (profile.role !== 'DRIVER') return { error: 'Hanya driver' };
+  const date = parseDateOnly(deliveryDate);
+  if (!date) return { error: 'Tanggal tidak valid' };
+  return executeStartRun(profile.id, date, profile);
+}
+
+/** Admin starts a specific driver's run from the admin delivery page. */
+export async function startDeliveryRunForDriver(driverId: string, deliveryDate: string) {
+  const admin = await requireRole('ADMIN', 'SUPER_ADMIN');
+  const date = parseDateOnly(deliveryDate);
+  if (!date) return { error: 'Tanggal tidak valid' };
+  return executeStartRun(driverId, date, admin);
+}
+
+/** Mark every item of a driver's ASSIGNED stops (for a date) loaded/unloaded — admin "check all". */
+export async function bulkToggleItemsForDriver(
+  driverId: string,
+  deliveryDate: string,
+  loaded: boolean,
+) {
+  const profile = await requireAuth();
+  const isAdmin = profile.role === 'ADMIN' || profile.role === 'SUPER_ADMIN';
+  if (!isAdmin && driverId !== profile.id) return { error: 'Bukan delivery Anda' };
+  const date = parseDateOnly(deliveryDate);
+  if (!date) return { error: 'Tanggal tidak valid' };
+
+  await prisma.entryItem.updateMany({
+    where: {
+      entry: { deliveryDate: date, delivery: { driverId, status: 'ASSIGNED' } },
+    },
+    data: {
+      loadedAt: loaded ? new Date() : null,
+      loadedBy: loaded ? profile.id : null,
+    },
+  });
+
+  await logAudit({
+    actor: profile,
+    action: 'UPDATE',
+    entity: 'Delivery',
+    entityId: driverId,
+    label: `${loaded ? 'Muat' : 'Batal muat'} semua hewan rute driver ${deliveryDate}`,
+  });
+  revalidatePath('/driver');
+  revalidatePath('/admin/deliveries');
+  return { success: true as const };
 }
 
 export async function markDelivered(deliveryId: string, notes?: string, proofPhotoUrl?: string) {

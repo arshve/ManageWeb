@@ -69,6 +69,7 @@ export default async function DriverPage({
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
   const isToday = dateStr === today.toISOString().slice(0, 10);
+  const hasActiveRun = deliveries.some((d) => d.status === 'ON_DELIVERY');
 
   const depotForMap = getDefaultDepot();
 
@@ -102,7 +103,7 @@ export default async function DriverPage({
       title={`Rute ${dateStr} — ${profile.name}`}
       description={`${deliveries.length} stop`}
     >
-      {isToday && <LocationPinger />}
+      {(isToday || hasActiveRun) && <LocationPinger />}
       {mapStops.length > 0 && (
         <div className="rounded-xl border bg-card overflow-hidden mb-4">
           <div className="px-5 py-3 border-b bg-muted/30">

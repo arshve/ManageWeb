@@ -11,7 +11,9 @@ import {
 } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { ChevronDown, ChevronUp, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { cn } from '@/lib/utils';
 
 export type MapStop = {
   id: string;
@@ -90,6 +92,16 @@ export function DeliveryMap({
   drivers: MapDriver[];
 }) {
   const [drivers, setDrivers] = useState(initialDrivers);
+  const [hiddenKeys, setHiddenKeys] = useState<Set<string>>(new Set());
+  const [routesPanelOpen, setRoutesPanelOpen] = useState(false);
+
+  const toggleKey = (key: string) =>
+    setHiddenKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
 
   useEffect(() => setDrivers(initialDrivers), [initialDrivers]);
 
@@ -234,6 +246,23 @@ export function DeliveryMap({
 
   const center: [number, number] = [depot.lat, depot.lng];
 
+  const routeList = useMemo(
+    () =>
+      Array.from(driverGroups.entries()).map(([key, list]) => {
+        const idx = driverIndexMap.get(key) ?? 0;
+        return {
+          key,
+          color: colorFor(key === '__unassigned__' ? null : key, idx),
+          name:
+            key === '__unassigned__'
+              ? 'Belum di-assign'
+              : list[0]?.driverName ?? 'Driver',
+          count: list.length,
+        };
+      }),
+    [driverGroups, driverIndexMap],
+  );
+
   return (
     <div className="flex flex-col gap-2">
     {routingFailed && (
@@ -241,7 +270,7 @@ export function DeliveryMap({
         ⚠ Gagal memuat rute jalan dari OSRM — menampilkan garis lurus. Periksa koneksi internet lalu refresh halaman.
       </p>
     )}
-    <div className="h-[500px] w-full rounded-lg overflow-hidden border">
+    <div className="relative h-[500px] w-full rounded-lg overflow-hidden border">
       <MapContainer
         center={center}
         zoom={12}
@@ -263,6 +292,7 @@ export function DeliveryMap({
         </Marker>
 
         {Array.from(driverGroups.entries()).map(([key, list]) => {
+          if (hiddenKeys.has(key)) return null;
           const idx = driverIndexMap.get(key) ?? 0;
           const markerColor = colorFor(key === '__unassigned__' ? null : key, idx);
           const lineColor = resolvedPinColors[idx % resolvedPinColors.length];
@@ -309,6 +339,7 @@ export function DeliveryMap({
 
         {drivers.map((d) => {
           if (d.lastLat == null || d.lastLng == null) return null;
+          if (hiddenKeys.has(d.id)) return null;
           const idx = driverIndexMap.get(d.id) ?? 0;
           const color = colorFor(d.id, idx);
           return (
@@ -333,6 +364,59 @@ export function DeliveryMap({
           );
         })}
       </MapContainer>
+
+      {routeList.length > 0 && (
+        <div className="absolute bottom-3 left-3 z-[1000] w-56 max-w-[calc(100%-1.5rem)] overflow-hidden rounded-lg border bg-card/95 shadow-lg backdrop-blur">
+          <button
+            type="button"
+            onClick={() => setRoutesPanelOpen((o) => !o)}
+            className="flex w-full items-center justify-between gap-2 px-3 py-2 text-xs font-medium"
+          >
+            <span>Rute Driver ({routeList.length})</span>
+            {routesPanelOpen ? (
+              <ChevronDown className="h-4 w-4" />
+            ) : (
+              <ChevronUp className="h-4 w-4" />
+            )}
+          </button>
+          {routesPanelOpen && (
+            <div className="max-h-48 space-y-0.5 overflow-y-auto border-t p-1">
+              {routeList.map((d) => {
+                const hidden = hiddenKeys.has(d.key);
+                return (
+                  <button
+                    key={d.key}
+                    type="button"
+                    onClick={() => toggleKey(d.key)}
+                    className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-xs hover:bg-muted"
+                  >
+                    <span
+                      className="h-3 w-3 shrink-0 rounded-full"
+                      style={{ background: d.color, opacity: hidden ? 0.25 : 1 }}
+                    />
+                    <span
+                      className={cn(
+                        'flex-1 truncate text-left',
+                        hidden && 'text-muted-foreground line-through',
+                      )}
+                    >
+                      {d.name}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {d.count}
+                    </span>
+                    {hidden ? (
+                      <EyeOff className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    ) : (
+                      <Eye className="h-3.5 w-3.5 shrink-0" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
     </div>
   );

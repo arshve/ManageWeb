@@ -692,6 +692,43 @@ export async function markFailed(deliveryId: string, reason: string) {
   return { success: true };
 }
 
+/**
+ * Edit proof photo / notes of an already-recorded delivery without changing
+ * its status or deliveredAt. Admin (or owning driver) only.
+ */
+export async function updateDeliveryNotesProof(
+  deliveryId: string,
+  notes?: string,
+  proofPhotoUrl?: string,
+) {
+  const result = await requireDriverOwnership(deliveryId);
+  if ('error' in result) return result;
+  const { profile, delivery } = result;
+
+  await prisma.delivery.update({
+    where: { id: deliveryId },
+    data: {
+      notes: notes ?? delivery.notes,
+      ...(proofPhotoUrl ? { proofPhotoUrl } : {}),
+    },
+  });
+
+  await logAudit({
+    actor: profile,
+    action: 'UPDATE',
+    entity: 'Delivery',
+    entityId: deliveryId,
+    label: `${delivery.entry.invoiceNo} — edit bukti/catatan`,
+    before: { notes: delivery.notes },
+    after: { notes: notes ?? delivery.notes },
+  });
+
+  revalidatePath('/driver');
+  revalidatePath('/admin/deliveries');
+  revalidatePath('/sales');
+  return { success: true };
+}
+
 export async function updateEntryCoordinates(
   entryId: string,
   lat: number | null,

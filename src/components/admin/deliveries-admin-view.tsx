@@ -23,6 +23,7 @@ import {
   forceUnassignDeliveryDate,
   markDelivered,
   markFailed,
+  updateDeliveryNotesProof,
 } from '@/app/actions/deliveries';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -57,7 +58,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { StatusToken, DELIVERY_STATUS } from '@/components/ui/status-token';
 import { StatCard } from '@/components/ui/stat-card';
-import { Printer, Trash2, CheckCircle2 } from 'lucide-react';
+import { Printer, Trash2, CheckCircle2, ChevronDown, ChevronRight, Pencil, Camera } from 'lucide-react';
 
 
 const SERIF = "var(--font-dm-serif), 'DM Serif Display', serif";
@@ -205,6 +206,15 @@ export function DeliveriesAdminView({
   const [mapDepot, setMapDepot] = useState(() => parseLatLngCoord(defaultStart) ?? initialDepot);
   const [removeTarget, setRemoveTarget] = useState<ScheduledEntry | null>(null);
   const [deliverTarget, setDeliverTarget] = useState<ScheduledEntry | null>(null);
+  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
+  function toggleGroup(id: string) {
+    setOpenGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
   function doRemoveStop() {
     if (!removeTarget) return;
     const id = removeTarget.id;
@@ -939,20 +949,30 @@ export function DeliveriesAdminView({
             const assignedStopsInBucket = stops.filter((s) => s.delivery?.status === 'ASSIGNED');
             const bucketTotalItems = assignedStopsInBucket.flatMap((s) => s.items).length;
             const bucketLoadedItems = assignedStopsInBucket.flatMap((s) => s.items).filter((i) => checkedItems.has(i.itemId)).length;
+            const isOpen = openGroups.has(driverId);
             return (
               <div key={driverId} className="rounded-xl border bg-card overflow-hidden">
                 {/* group header */}
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/30 px-4 py-2.5">
-                  <div className="flex items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => toggleGroup(driverId)}
+                    className="flex items-center gap-2.5 min-w-0 flex-1 text-left"
+                  >
+                    {isOpen ? (
+                      <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
+                    ) : (
+                      <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+                    )}
                     <div
                       className={cn('size-8 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 select-none', isUnassigned ? 'bg-warning-bg text-warning-fg' : 'bg-primary')}
                       style={!isUnassigned ? { color: 'var(--sidebar-primary)' } : undefined}
                     >
                       {isUnassigned ? '?' : initials(driverName)}
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <span className="text-sm font-semibold text-foreground" style={{ fontFamily: SERIF }}>{driverName}</span>
-                      <div className="flex items-center gap-2 mt-0.5">
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                         <span className="text-[10px] text-muted-foreground">{stops.length} stop</span>
                         {doneCount > 0 && <span className="text-[10px] text-success-fg">✓ {doneCount} terkirim</span>}
                         {failCount > 0 && <span className="text-[10px] text-danger-fg">✗ {failCount} gagal</span>}
@@ -966,7 +986,7 @@ export function DeliveriesAdminView({
                         )}
                       </div>
                     </div>
-                  </div>
+                  </button>
                   <div className="flex flex-wrap items-center gap-2">
                     {!isUnassigned && assignedStopsInBucket.length > 0 && (
                       <>
@@ -1000,6 +1020,8 @@ export function DeliveriesAdminView({
                   </div>
                 </div>
 
+                {isOpen && (
+                <>
                 {/* Desktop stops table */}
                 <div className="hidden sm:block overflow-x-auto">
                   <table className="w-full">
@@ -1154,14 +1176,14 @@ export function DeliveriesAdminView({
                                     ↗
                                   </a>
                                 )}
-                                {s.delivery?.status === 'ON_DELIVERY' && (
+                                {(s.delivery?.status === 'ON_DELIVERY' || s.delivery?.status === 'DELIVERED') && (
                                   <button
                                     type="button"
-                                    title="Tandai terkirim / gagal (admin)"
+                                    title={s.delivery.status === 'DELIVERED' ? 'Edit bukti / catatan' : 'Tandai terkirim / gagal (admin)'}
                                     onClick={() => setDeliverTarget(s)}
                                     className="inline-flex items-center justify-center size-7 rounded-lg border text-muted-foreground hover:bg-success-bg hover:text-success-fg hover:border-success-ring/40 transition-colors"
                                   >
-                                    <CheckCircle2 className="size-3.5" />
+                                    {s.delivery.status === 'DELIVERED' ? <Pencil className="size-3.5" /> : <CheckCircle2 className="size-3.5" />}
                                   </button>
                                 )}
                                 {s.delivery?.status !== 'DELIVERED' && (
@@ -1253,14 +1275,14 @@ export function DeliveriesAdminView({
                               ↗
                             </a>
                           )}
-                          {s.delivery?.status === 'ON_DELIVERY' && (
+                          {(s.delivery?.status === 'ON_DELIVERY' || s.delivery?.status === 'DELIVERED') && (
                             <button
                               type="button"
-                              title="Tandai terkirim / gagal (admin)"
+                              title={s.delivery.status === 'DELIVERED' ? 'Edit bukti / catatan' : 'Tandai terkirim / gagal (admin)'}
                               onClick={() => setDeliverTarget(s)}
                               className="inline-flex items-center justify-center size-7 rounded-lg border text-muted-foreground hover:bg-success-bg hover:text-success-fg hover:border-success-ring/40 transition-colors"
                             >
-                              <CheckCircle2 className="size-3.5" />
+                              {s.delivery.status === 'DELIVERED' ? <Pencil className="size-3.5" /> : <CheckCircle2 className="size-3.5" />}
                             </button>
                           )}
                           {s.delivery?.status !== 'DELIVERED' && (
@@ -1334,6 +1356,8 @@ export function DeliveriesAdminView({
                     );
                   })}
                 </div>
+                </>
+                )}
               </div>
             );
           })}
@@ -1803,14 +1827,14 @@ function PerDriverPanel({
                       {href && (
                         <a href={href} target="_blank" rel="noreferrer" title="Buka di Maps" className="inline-flex items-center justify-center size-7 rounded-lg border text-muted-foreground hover:bg-muted/40 hover:text-foreground text-sm transition-colors">↗</a>
                       )}
-                      {s.delivery?.status === 'ON_DELIVERY' && (
+                      {(s.delivery?.status === 'ON_DELIVERY' || s.delivery?.status === 'DELIVERED') && (
                         <button
                           type="button"
                           onClick={() => onDeliver(s)}
-                          title="Tandai terkirim / gagal (admin)"
+                          title={s.delivery.status === 'DELIVERED' ? 'Edit bukti / catatan' : 'Tandai terkirim / gagal (admin)'}
                           className="inline-flex items-center justify-center size-7 rounded-lg border text-muted-foreground hover:bg-success-bg hover:text-success-fg hover:border-success-ring/40 transition-colors"
                         >
-                          <CheckCircle2 className="size-3.5" />
+                          {s.delivery.status === 'DELIVERED' ? <Pencil className="size-3.5" /> : <CheckCircle2 className="size-3.5" />}
                         </button>
                       )}
                       {s.delivery?.status !== 'DELIVERED' && (
@@ -1936,7 +1960,8 @@ function InsertEntryDialog({
   );
 }
 
-// ─── Admin: mark ON_DELIVERY stop as delivered/failed on behalf of driver ────
+// ─── Admin: mark delivered/failed on behalf of driver, or edit proof/notes ───
+// ON_DELIVERY → tandai terkirim/gagal · DELIVERED → edit foto bukti + catatan.
 
 function AdminDeliverDialog({
   stop,
@@ -1947,14 +1972,20 @@ function AdminDeliverDialog({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const status = stop?.delivery?.status;
+  const isDelivered = status === 'DELIVERED';
+  const existingProof = stop?.delivery?.proofPhotoUrl ?? null;
+  const existingNotes = stop?.delivery?.notes ?? '';
+  const deliveredAt = stop?.delivery?.deliveredAt ?? null;
+
   const [notes, setNotes] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  // Reset form when target changes
+  // Reset form when target changes — prefill existing notes when editing a delivered stop.
   useEffect(() => {
-    setNotes('');
+    setNotes(stop?.delivery?.status === 'DELIVERED' ? stop.delivery.notes ?? '' : '');
     setFile(null);
     if (preview) URL.revokeObjectURL(preview);
     setPreview(null);
@@ -2007,57 +2038,114 @@ function AdminDeliverDialog({
       else { toast.success('Ditandai gagal'); onSaved(); }
     });
   }
+  function handleSaveEdit() {
+    if (!stop?.delivery?.id) return;
+    startTransition(async () => {
+      try {
+        const proofUrl = await uploadProof();
+        if (!proofUrl && notes.trim() === existingNotes.trim()) {
+          toast.error('Tidak ada perubahan');
+          return;
+        }
+        const r = await updateDeliveryNotesProof(stop.delivery!.id, notes.trim() || undefined, proofUrl);
+        if (r && 'error' in r) toast.error(r.error);
+        else { toast.success('Perubahan disimpan'); onSaved(); }
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Gagal');
+      }
+    });
+  }
+
+  const ds = DELIVERY_STATUS[status ?? 'PENDING'] ?? DELIVERY_STATUS.PENDING;
 
   return (
     <Dialog open={!!stop} onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="max-w-md w-[95vw] max-h-[90dvh] overflow-hidden flex flex-col p-0">
-        <DialogHeader className="px-5 pt-5 pb-0 shrink-0">
-          <DialogTitle>Tandai Delivery — {stop?.buyerName}</DialogTitle>
+        <DialogHeader className="px-5 pt-5 pb-3 border-b shrink-0">
+          <div className="flex items-center gap-2">
+            <DialogTitle className="text-base">
+              {isDelivered ? 'Edit Bukti Kirim' : 'Tandai Delivery'}
+            </DialogTitle>
+            <StatusToken intent={ds.intent} size="sm">{ds.label}</StatusToken>
+          </div>
+          <p className="text-[13px] text-muted-foreground mt-0.5">{stop?.buyerName}</p>
+          {isDelivered && deliveredAt && (
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              Terkirim {new Date(deliveredAt).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}
+            </p>
+          )}
         </DialogHeader>
-        <div className="flex-1 min-h-0 overflow-y-auto px-5 py-3 flex flex-col gap-3">
-          <p className="text-[11px] text-muted-foreground">
-            Atas nama driver. Isi catatan / alasan, lampirkan foto bukti (opsional untuk Terkirim).
-          </p>
-          <div>
-            <p className="text-xs text-muted-foreground mb-1">Foto Bukti</p>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={pickFile}
-              className="text-xs file:mr-2 file:px-2 file:py-1 file:rounded-md file:border file:bg-muted file:text-foreground hover:file:bg-muted/70 file:cursor-pointer"
-            />
-            {preview && (
-              <div className="mt-2 relative inline-block">
+
+        <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 flex flex-col gap-4">
+          {!isDelivered && (
+            <p className="text-[11px] text-muted-foreground -mt-1">
+              Atas nama driver. Lampirkan foto bukti (opsional untuk terkirim) & isi catatan / alasan.
+            </p>
+          )}
+
+          {/* Foto bukti */}
+          <div className="flex flex-col gap-2">
+            <p className="text-xs font-medium text-foreground">Foto Bukti</p>
+            {preview ? (
+              <div className="relative w-full overflow-hidden rounded-xl border">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={preview} alt="preview" className="max-h-40 rounded-md border" />
+                <img src={preview} alt="preview" className="w-full max-h-56 object-contain bg-muted/30" />
+                <span className="absolute top-2 left-2 rounded-full bg-info-bg text-info-fg text-[10px] font-medium px-2 py-0.5">Foto baru</span>
                 <button
                   type="button"
                   onClick={() => { setFile(null); if (preview) URL.revokeObjectURL(preview); setPreview(null); }}
-                  className="absolute top-1 right-1 size-5 rounded-full bg-black/60 text-white text-xs"
+                  className="absolute top-2 right-2 size-6 rounded-full bg-black/60 text-white text-sm leading-none hover:bg-black/80 transition-colors"
                 >×</button>
               </div>
-            )}
+            ) : existingProof ? (
+              <div className="relative w-full overflow-hidden rounded-xl border">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={existingProof} alt="bukti" className="w-full max-h-56 object-contain bg-muted/30" />
+                <span className="absolute top-2 left-2 rounded-full bg-muted text-muted-foreground text-[10px] font-medium px-2 py-0.5">Foto saat ini</span>
+              </div>
+            ) : null}
+            <label className="cursor-pointer flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed py-5 text-center hover:bg-muted/40 transition-colors">
+              <Camera className="size-5 text-muted-foreground" />
+              <span className="text-xs font-medium">
+                {preview || existingProof ? 'Ganti Foto' : 'Pilih / Ambil Foto'}
+              </span>
+              <span className="text-[10px] text-muted-foreground">Dikompres otomatis</span>
+              <input type="file" accept="image/*" onChange={pickFile} className="hidden" />
+            </label>
           </div>
-          <div>
-            <p className="text-xs text-muted-foreground mb-1">Catatan / Alasan</p>
+
+          {/* Catatan */}
+          <div className="flex flex-col gap-1.5">
+            <p className="text-xs font-medium text-foreground">Catatan {isDelivered ? '' : '/ Alasan'}</p>
             <Textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Catatan tambahan (atau alasan jika gagal)..."
+              placeholder={isDelivered ? 'Catatan pengiriman...' : 'Catatan tambahan (atau alasan jika gagal)...'}
               rows={3}
               className="text-sm"
             />
-            <p className="text-[10px] text-muted-foreground mt-1">Wajib untuk Tandai Gagal; opsional untuk Tandai Terkirim.</p>
+            {!isDelivered && (
+              <p className="text-[10px] text-muted-foreground">Wajib untuk Tandai Gagal; opsional untuk Tandai Terkirim.</p>
+            )}
           </div>
         </div>
+
         <div className="px-5 py-3 border-t flex flex-wrap items-center justify-end gap-2 shrink-0">
           <Button variant="outline" size="sm" onClick={onClose} disabled={pending}>Batal</Button>
-          <Button variant="outline" size="sm" onClick={handleFailed} disabled={pending} className="text-destructive border-destructive/40 hover:bg-destructive/10">
-            Tandai Gagal
-          </Button>
-          <Button size="sm" onClick={handleDelivered} disabled={pending}>
-            {pending ? 'Menyimpan…' : 'Tandai Terkirim'}
-          </Button>
+          {isDelivered ? (
+            <Button size="sm" onClick={handleSaveEdit} disabled={pending}>
+              {pending ? 'Menyimpan…' : 'Simpan Perubahan'}
+            </Button>
+          ) : (
+            <>
+              <Button variant="outline" size="sm" onClick={handleFailed} disabled={pending} className="text-destructive border-destructive/40 hover:bg-destructive/10">
+                Tandai Gagal
+              </Button>
+              <Button size="sm" onClick={handleDelivered} disabled={pending}>
+                {pending ? 'Menyimpan…' : 'Tandai Terkirim'}
+              </Button>
+            </>
+          )}
         </div>
       </DialogContent>
     </Dialog>

@@ -15,6 +15,9 @@ import {
   updateEntryCoordinates,
   toggleItemLoaded,
   bulkToggleItemsLoaded,
+  recalculateDriverRoute,
+  addEntriesToDriverRoute,
+  resetDriverRoute,
 } from '@/app/actions/deliveries';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -175,6 +178,8 @@ export function DeliveriesAdminView({
   }
   const [selectedUnscheduled, setSelectedUnscheduled] = useState<Set<string>>(new Set());
   const [selectedScheduled, setSelectedScheduled] = useState<Set<string>>(new Set());
+  const [viewMode, setViewMode] = useState<'all' | 'perDriver'>('all');
+  const [focusDriver, setFocusDriver] = useState<string | null>(null);
   const [buckets, setBuckets] = useState<string[][] | null>(null);
   const [bucketDrivers, setBucketDrivers] = useState<Record<number, string>>({});
   const [startInput, setStartInput] = useState(defaultStart);
@@ -300,6 +305,22 @@ export function DeliveriesAdminView({
   }
   function clearScheduled() { setSelectedScheduled(new Set()); }
 
+  // Per-driver view: drivers that have stops today
+  const deliveringDrivers = Array.from(groupedByDriver.entries())
+    .filter(([id]) => id !== '__unassigned__')
+    .map(([id, stops]) => ({
+      id,
+      name: stops[0]?.delivery?.driver?.name ?? id,
+      count: stops.length,
+      started: stops.some((s) => s.delivery?.status === 'ON_DELIVERY'),
+      done: stops.length > 0 && stops.every((s) => s.delivery?.status === 'DELIVERED' || s.delivery?.status === 'FAILED'),
+    }));
+  // Left-behind entries that can be inserted into a route (coords required to route)
+  const insertCandidates = [
+    ...unassignedStops.map((s) => ({ id: s.id, name: s.buyerName, hasCoords: s.buyerLat != null && s.buyerLng != null })),
+    ...unscheduled.map((e) => ({ id: e.id, name: e.buyerName, hasCoords: e.hasCoords })),
+  ];
+
   function refresh() { router.refresh(); }
   function gotoDate(d: string) { router.push(`/admin/deliveries?date=${d}`); }
   function dateOffset(days: number) {
@@ -413,6 +434,22 @@ export function DeliveriesAdminView({
         </span>
       </div>
 
+      {/* ── View mode toggle ── */}
+      <div className="flex gap-1 p-0.5 rounded-lg bg-muted w-fit">
+        {([['all', 'Semua'], ['perDriver', 'Per Driver']] as const).map(([mode, label]) => (
+          <button
+            key={mode}
+            onClick={() => setViewMode(mode)}
+            className={cn(
+              'rounded-md px-3 py-1.5 text-xs cursor-pointer transition-all',
+              viewMode === mode ? 'bg-card shadow-sm font-medium text-foreground' : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       {/* ── Stat cards ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard accent="info"    label="Dijadwalkan"    value={scheduled.length}  sub="hari ini" />
@@ -421,6 +458,8 @@ export function DeliveriesAdminView({
         <StatCard accent="primary" label="Driver Aktif"   value={driverCount}        sub="tersedia" />
       </div>
 
+      {viewMode === 'all' && (
+        <>
       {/* ── Map ── */}
       <div className="rounded-xl border bg-card overflow-hidden">
         <div className="px-5 py-3.5 border-b bg-muted/30">
@@ -1153,6 +1192,20 @@ export function DeliveriesAdminView({
           )}
         </div>
       </div>
+        </>
+      )}
+
+      {viewMode === 'perDriver' && (
+        <PerDriverPanel
+          drivers={deliveringDrivers}
+          focusDriver={focusDriver}
+          onFocus={setFocusDriver}
+          stops={focusDriver ? (groupedByDriver.get(focusDriver) ?? []) : []}
+          dateStr={dateStr}
+          insertCandidates={insertCandidates}
+          onChanged={refresh}
+        />
+      )}
 
     </div>
   );
@@ -1394,5 +1447,215 @@ function UnscheduledCard({
         )}
       </div>
     </div>
+  );
+}
+
+// ─── Per-driver panel (view mode: Per Driver) ─────────────────────────────────
+
+function PerDriverPanel({
+  drivers,
+  focusDriver,
+  onFocus,
+  stops,
+  dateStr,
+  insertCandidates,
+  onChanged,
+}: {
+  drivers: { id: string; name: string; count: number; started: boolean; done: boolean }[];
+  focusDriver: string | null;
+  onFocus: (id: string) => void;
+  stops: ScheduledEntry[];
+  dateStr: string;
+  insertCandidates: { id: string; name: string; hasCoords: boolean }[];
+  onChanged: () => void;
+}) {
+  const [pending, startTransition] = useTransition();
+  const [insertOpen, setInsertOpen] = useState(false);
+  const started = stops.some((s) => s.delivery?.status === 'ON_DELIVERY');
+  const sorted = [...stops].sort((a, b) => (a.delivery?.sequence ?? 0) - (b.delivery?.sequence ?? 0));
+
+  function recalc() {
+    if (!focusDriver) return;
+    startTransition(async () => {
+      const r = await recalculateDriverRoute(focusDriver, dateStr);
+      if (r && 'error' in r) toast.error(r.error);
+      else { toast.success('Rute dihitung ulang'); onChanged(); }
+    });
+  }
+  function reset() {
+    if (!focusDriver) return;
+    if (!confirm('Reset rute ini? Status driver kembali ke ASSIGNED (belum jalan).')) return;
+    startTransition(async () => {
+      const r = await resetDriverRoute(focusDriver, dateStr);
+      if (r && 'error' in r) toast.error(r.error);
+      else { toast.success('Rute di-reset'); onChanged(); }
+    });
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="rounded-xl border bg-card p-4">
+        <p className="text-sm font-semibold mb-3" style={{ fontFamily: SERIF }}>Pilih Driver</p>
+        {drivers.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Belum ada driver dengan rute hari ini.</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {drivers.map((d) => (
+              <button
+                key={d.id}
+                onClick={() => onFocus(d.id)}
+                className={cn(
+                  'rounded-lg border px-3 py-1.5 text-xs transition-colors',
+                  focusDriver === d.id ? 'border-foreground/40 bg-muted font-medium' : 'hover:bg-muted/40',
+                )}
+              >
+                {d.name} · {d.count} stop{d.done ? ' · Selesai' : d.started ? ' · Jalan' : ' · Belum'}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {focusDriver && (
+        <div className="rounded-xl border bg-card overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/30 px-4 py-3">
+            <span className="text-sm font-semibold" style={{ fontFamily: SERIF }}>
+              {drivers.find((d) => d.id === focusDriver)?.name ?? 'Driver'} — {sorted.length} stop
+            </span>
+            <div className="flex flex-wrap gap-2">
+              {started ? (
+                <Button size="sm" variant="outline" onClick={reset} disabled={pending}>
+                  Reset Rute (sudah jalan)
+                </Button>
+              ) : (
+                <>
+                  <Button size="sm" variant="outline" onClick={() => setInsertOpen(true)} disabled={pending}>
+                    Tambah Entry Tertinggal
+                  </Button>
+                  <Button size="sm" onClick={recalc} disabled={pending || sorted.length === 0}>
+                    Hitung Ulang Rute
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+          {started && (
+            <p className="px-4 py-2 text-[11px] text-warning-fg bg-warning-bg border-b">
+              Rute sudah jalan. Reset dulu untuk menambah entry atau hitung ulang.
+            </p>
+          )}
+          <ol className="divide-y">
+            {sorted.map((s) => {
+              const ds = DELIVERY_STATUS[s.delivery?.status ?? 'PENDING'] ?? DELIVERY_STATUS.PENDING;
+              const href = navigationUrl({ buyerMaps: s.buyerMaps, buyerLat: s.buyerLat, buyerLng: s.buyerLng, buyerAddress: s.buyerAddress });
+              return (
+                <li key={s.id} className="flex items-center gap-3 px-4 py-2.5">
+                  <span
+                    className="size-5 shrink-0 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
+                    style={{ background: `var(--${ds.intent}-ring)` }}
+                  >
+                    {(s.delivery?.sequence ?? 0) + 1}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{s.buyerName}</p>
+                    <p className="text-[11px] text-muted-foreground truncate">{s.buyerAddress ?? '—'}</p>
+                  </div>
+                  {s.pengiriman && <StatusToken intent="info" outlined size="sm">{formatPengiriman(s.pengiriman)}</StatusToken>}
+                  <StatusToken intent={ds.intent} size="sm">{ds.label}</StatusToken>
+                  {href && (
+                    <a href={href} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center size-7 rounded-lg border text-muted-foreground hover:bg-muted/40 text-sm shrink-0">↗</a>
+                  )}
+                </li>
+              );
+            })}
+            {sorted.length === 0 && (
+              <li className="px-4 py-8 text-center text-sm text-muted-foreground">Rute kosong.</li>
+            )}
+          </ol>
+        </div>
+      )}
+
+      {focusDriver && (
+        <InsertEntryDialog
+          open={insertOpen}
+          onClose={() => setInsertOpen(false)}
+          driverId={focusDriver}
+          dateStr={dateStr}
+          candidates={insertCandidates}
+          onSaved={() => { setInsertOpen(false); onChanged(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function InsertEntryDialog({
+  open,
+  onClose,
+  driverId,
+  dateStr,
+  candidates,
+  onSaved,
+}: {
+  open: boolean;
+  onClose: () => void;
+  driverId: string;
+  dateStr: string;
+  candidates: { id: string; name: string; hasCoords: boolean }[];
+  onSaved: () => void;
+}) {
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const [q, setQ] = useState('');
+  const [pending, startTransition] = useTransition();
+  const filtered = candidates.filter((c) => c.name.toLowerCase().includes(q.toLowerCase()));
+
+  function toggle(id: string) {
+    setSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  }
+  function save() {
+    const ids = Array.from(sel);
+    if (!ids.length) return;
+    startTransition(async () => {
+      const r = await addEntriesToDriverRoute(driverId, dateStr, ids);
+      if (r && 'error' in r) { toast.error(r.error); return; }
+      toast.success(`${ids.length} entry ditambahkan & rute dihitung ulang`);
+      setSel(new Set());
+      onSaved();
+    });
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-md w-[95vw] max-h-[85dvh] overflow-hidden flex flex-col p-0">
+        <DialogHeader className="px-5 pt-5 pb-0 shrink-0">
+          <DialogTitle>Tambah Entry Tertinggal</DialogTitle>
+        </DialogHeader>
+        <div className="px-5 py-3 shrink-0">
+          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cari pembeli…" className="h-8 text-sm" />
+        </div>
+        <div className="flex-1 min-h-0 overflow-y-auto px-5 pb-3 flex flex-col gap-1">
+          {filtered.length === 0 && <p className="py-8 text-center text-sm text-muted-foreground">Tidak ada entry.</p>}
+          {filtered.map((c) => (
+            <label
+              key={c.id}
+              className={cn('flex items-center gap-2 rounded-md border px-3 py-2 text-sm', c.hasCoords ? 'cursor-pointer hover:bg-muted/40' : 'opacity-50')}
+            >
+              <Checkbox checked={sel.has(c.id)} disabled={!c.hasCoords} onCheckedChange={() => c.hasCoords && toggle(c.id)} className="size-4" />
+              <span className="flex-1 truncate">{c.name}</span>
+              {!c.hasCoords && <span className="text-[10px] text-destructive shrink-0">Backfill dulu</span>}
+            </label>
+          ))}
+        </div>
+        <div className="px-5 py-4 border-t flex items-center justify-between gap-3 shrink-0">
+          <span className="text-xs text-muted-foreground">{sel.size} dipilih</span>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={onClose} disabled={pending}>Batal</Button>
+            <Button size="sm" onClick={save} disabled={pending || sel.size === 0}>
+              {pending ? 'Menyimpan…' : 'Tambah & Hitung Ulang'}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

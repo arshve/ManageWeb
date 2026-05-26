@@ -651,3 +651,143 @@ export async function backfillCoordinates(entryIds?: string[]) {
   revalidatePath('/admin/deliveries');
   return { success: true, resolved, failed, total: entries.length };
 }
+
+// ── Per-driver single-route ops ──────────────────────────────────────────────
+
+/**
+ * Re-optimize ONE driver's route in place (TSP). Other drivers untouched.
+ * DELIVERED/FAILED stops are pinned at the front by their current order;
+ * only ASSIGNED stops are re-sequenced. Blocked if the route is ON_DELIVERY.
+ */
+export async function recalculateDriverRoute(driverId: string, deliveryDate: string) {
+  const admin = await requireRole('ADMIN', 'SUPER_ADMIN');
+  const date = parseDateOnly(deliveryDate);
+  if (!date) return { error: 'Tanggal tidak valid' };
+
+  const rows = await prisma.delivery.findMany({
+    where: { driverId, entry: { deliveryDate: date } },
+    select: {
+      id: true,
+      status: true,
+      sequence: true,
+      entry: { select: { buyerLat: true, buyerLng: true } },
+    },
+  });
+  if (!rows.length) return { error: 'Rute kosong' };
+  if (rows.some((r) => r.status === 'ON_DELIVERY')) {
+    return { error: 'Rute sudah jalan — reset dulu sebelum hitung ulang' };
+  }
+
+  const done = rows
+    .filter((r) => r.status === 'DELIVERED' || r.status === 'FAILED')
+    .sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0));
+  const active = rows.filter((r) => r.status === 'ASSIGNED');
+  if (active.some((r) => r.entry.buyerLat == null || r.entry.buyerLng == null)) {
+    return { error: 'Ada stop tanpa koordinat — Backfill dulu' };
+  }
+
+  const depot = { id: 'DEPOT', ...getDefaultDepot() };
+  const ordered = solveTSP(
+    depot,
+    active.map((r) => ({ id: r.id, lat: r.entry.buyerLat!, lng: r.entry.buyerLng! })),
+  );
+
+  await prisma.$transaction([
+    ...done.map((r, i) =>
+      prisma.delivery.update({ where: { id: r.id }, data: { sequence: i } }),
+    ),
+    ...ordered.map((p, i) =>
+      prisma.delivery.update({ where: { id: p.id }, data: { sequence: done.length + i } }),
+    ),
+  ]);
+
+  await logAudit({
+    actor: admin,
+    action: 'UPDATE',
+    entity: 'Delivery',
+    entityId: driverId,
+    label: `Hitung ulang rute driver ${deliveryDate}`,
+    after: { stops: rows.length },
+  });
+  revalidatePath('/admin/deliveries');
+  return { success: true as const };
+}
+
+/**
+ * Attach left-behind entries to a driver's NOT-started route, then recalc.
+ * Entries must be APPROVED and have coordinates. Adopts scheduled-unassigned
+ * delivery rows and creates rows for unscheduled entries (sets deliveryDate).
+ */
+export async function addEntriesToDriverRoute(
+  driverId: string,
+  deliveryDate: string,
+  entryIds: string[],
+) {
+  const admin = await requireRole('ADMIN', 'SUPER_ADMIN');
+  const date = parseDateOnly(deliveryDate);
+  if (!date) return { error: 'Tanggal tidak valid' };
+  if (!entryIds.length) return { error: 'Pilih entry' };
+
+  const started = await prisma.delivery.count({
+    where: { driverId, entry: { deliveryDate: date }, status: 'ON_DELIVERY' },
+  });
+  if (started) return { error: 'Rute sudah jalan — reset dulu' };
+
+  const entries = await prisma.entry.findMany({
+    where: { id: { in: entryIds }, status: 'APPROVED' },
+    select: { id: true, buyerLat: true, buyerLng: true },
+  });
+  if (entries.length !== entryIds.length) return { error: 'Sebagian entry tidak valid' };
+  if (entries.some((e) => e.buyerLat == null || e.buyerLng == null)) {
+    return { error: 'Ada entry tanpa koordinat — Backfill dulu' };
+  }
+
+  await prisma.$transaction(async (tx) => {
+    for (const e of entries) {
+      await tx.entry.update({ where: { id: e.id }, data: { deliveryDate: date } });
+      await tx.delivery.upsert({
+        where: { entryId: e.id },
+        create: { entryId: e.id, driverId, status: 'ASSIGNED' },
+        update: { driverId, status: 'ASSIGNED' },
+      });
+    }
+  });
+
+  await logAudit({
+    actor: admin,
+    action: 'UPDATE',
+    entity: 'Delivery',
+    entityId: driverId,
+    label: `Tambah ${entries.length} entry ke rute driver ${deliveryDate}`,
+    after: { entryIds },
+  });
+
+  // re-optimize this driver's route (also revalidates)
+  return recalculateDriverRoute(driverId, deliveryDate);
+}
+
+/**
+ * Un-start a driver's route: flip ON_DELIVERY back to ASSIGNED so admin can
+ * edit/recalc it. DELIVERED/FAILED stops and driver assignment are untouched.
+ */
+export async function resetDriverRoute(driverId: string, deliveryDate: string) {
+  const admin = await requireRole('ADMIN', 'SUPER_ADMIN');
+  const date = parseDateOnly(deliveryDate);
+  if (!date) return { error: 'Tanggal tidak valid' };
+
+  const res = await prisma.delivery.updateMany({
+    where: { driverId, entry: { deliveryDate: date }, status: 'ON_DELIVERY' },
+    data: { status: 'ASSIGNED' },
+  });
+
+  await logAudit({
+    actor: admin,
+    action: 'UPDATE',
+    entity: 'Delivery',
+    entityId: driverId,
+    label: `Reset (un-start) rute driver ${deliveryDate}`,
+    after: { count: res.count },
+  });
+  revalidatePath('/admin/deliveries');
+  return { success: true as const, count: res.count };
+}

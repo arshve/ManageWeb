@@ -24,6 +24,7 @@ import {
   markDelivered,
   markFailed,
   updateDeliveryNotesProof,
+  createManualRoute,
 } from '@/app/actions/deliveries';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -58,7 +59,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { StatusToken, DELIVERY_STATUS } from '@/components/ui/status-token';
 import { StatCard } from '@/components/ui/stat-card';
-import { Printer, Trash2, CheckCircle2, ChevronDown, ChevronRight, Pencil, Camera } from 'lucide-react';
+import { Printer, Trash2, CheckCircle2, ChevronDown, ChevronUp, ChevronRight, Pencil, Camera } from 'lucide-react';
 
 
 const SERIF = "var(--font-dm-serif), 'DM Serif Display', serif";
@@ -201,6 +202,9 @@ export function DeliveriesAdminView({
   const [focusDriver, setFocusDriver] = useState<string | null>(null);
   const [buckets, setBuckets] = useState<string[][] | null>(null);
   const [bucketDrivers, setBucketDrivers] = useState<Record<number, string>>({});
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualOrder, setManualOrder] = useState<string[]>([]);
+  const [manualDriver, setManualDriver] = useState('');
   const [startInput, setStartInput] = useState(defaultStart);
   const [maxPerDriver, setMaxPerDriver] = useState(30);
   const [mapDepot, setMapDepot] = useState(() => parseLatLngCoord(defaultStart) ?? initialDepot);
@@ -344,6 +348,41 @@ export function DeliveriesAdminView({
     setSelectedScheduled(allScheduledSelected ? new Set() : new Set(selectableScheduledIds));
   }
   function clearScheduled() { setSelectedScheduled(new Set()); }
+
+  // ─── Manual route builder (pick entries → driver → arrange order, no TSP) ──
+  const scheduledById = useMemo(() => new Map(scheduled.map((e) => [e.id, e])), [scheduled]);
+  function openManual() {
+    const ids = selectableScheduledIds.filter((id) => selectedScheduled.has(id));
+    if (!ids.length) { toast.error('Pilih entry dulu'); return; }
+    setManualOrder(ids);
+    setManualDriver('');
+    setBuckets(null);
+    setManualOpen(true);
+  }
+  function moveManual(idx: number, dir: -1 | 1) {
+    setManualOrder((prev) => {
+      const j = idx + dir;
+      if (j < 0 || j >= prev.length) return prev;
+      const next = [...prev];
+      [next[idx], next[j]] = [next[j], next[idx]];
+      return next;
+    });
+  }
+  function removeFromManual(id: string) {
+    setManualOrder((prev) => prev.filter((x) => x !== id));
+  }
+  function handleCreateManual() {
+    if (!manualDriver) { toast.error('Pilih driver'); return; }
+    if (!manualOrder.length) { toast.error('Rute kosong'); return; }
+    startTransition(async () => {
+      const r = await createManualRoute(dateStr, manualDriver, manualOrder);
+      if (r && 'error' in r) toast.error(r.error);
+      else {
+        toast.success('Rute manual dibuat');
+        setManualOpen(false); setManualOrder([]); setManualDriver(''); clearScheduled(); refresh();
+      }
+    });
+  }
 
   // Per-driver view: drivers that have stops today
   const deliveringDrivers = Array.from(groupedByDriver.entries())
@@ -883,6 +922,14 @@ export function DeliveriesAdminView({
             </div>
             <button
               type="button"
+              onClick={openManual}
+              disabled={pending || selectedScheduled.size === 0}
+              className="h-8 px-3 rounded-lg border text-xs font-medium hover:bg-muted/40 disabled:opacity-40 transition-colors"
+            >
+              Buat Rute Manual
+            </button>
+            <button
+              type="button"
               onClick={selectAllUnassigned}
               disabled={selectableScheduledIds.length === 0}
               className="h-8 px-3 rounded-lg border text-xs text-muted-foreground hover:bg-muted/40 disabled:opacity-40 transition-colors"
@@ -908,6 +955,74 @@ export function DeliveriesAdminView({
         </div>
 
         <div className="p-4 flex flex-col gap-4">
+          {/* Manual route builder — pick driver + arrange order by hand (no TSP) */}
+          {manualOpen && (
+            <div className="flex flex-col gap-3 rounded-xl border border-info-ring/40 bg-info-bg/30 overflow-hidden">
+              <div className="flex flex-wrap items-center justify-between gap-2 px-4 pt-3">
+                <p className="text-sm font-semibold" style={{ fontFamily: SERIF }}>Susun Rute Manual</p>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => setManualOpen(false)} disabled={pending}>Batal</Button>
+                  <Button size="sm" onClick={handleCreateManual} disabled={pending || !manualOrder.length || !manualDriver}
+                    style={{ background: 'var(--primary)', color: 'var(--sidebar-primary)' }}>
+                    Buat Rute
+                  </Button>
+                </div>
+              </div>
+              <div className="px-4 flex flex-wrap items-center gap-2">
+                <label className="text-[11px] text-muted-foreground font-medium">Driver</label>
+                <select
+                  value={manualDriver}
+                  onChange={(e) => setManualDriver(e.target.value)}
+                  className="h-8 rounded-lg border bg-background px-2 text-xs text-foreground focus:outline-none"
+                >
+                  <option value="">Pilih driver…</option>
+                  {assignableDrivers.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                </select>
+                <span className="text-[11px] text-muted-foreground">{manualOrder.length} stop · urutan manual (tanpa TSP)</span>
+              </div>
+              <ol className="px-4 pb-4 flex flex-col gap-1.5">
+                {manualOrder.map((id, idx) => {
+                  const e = scheduledById.get(id);
+                  return (
+                    <li key={id} className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2">
+                      <span className="size-6 shrink-0 rounded-full bg-muted text-foreground text-[11px] font-bold flex items-center justify-center">{idx + 1}</span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium truncate">{e?.buyerName ?? id}</p>
+                        {e?.buyerAddress && <p className="text-[11px] text-muted-foreground truncate">{e.buyerAddress}</p>}
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button" title="Naik" disabled={idx === 0}
+                          onClick={() => moveManual(idx, -1)}
+                          className="inline-flex items-center justify-center size-7 rounded-lg border text-muted-foreground hover:bg-muted/40 disabled:opacity-30 transition-colors"
+                        >
+                          <ChevronUp className="size-3.5" />
+                        </button>
+                        <button
+                          type="button" title="Turun" disabled={idx === manualOrder.length - 1}
+                          onClick={() => moveManual(idx, 1)}
+                          className="inline-flex items-center justify-center size-7 rounded-lg border text-muted-foreground hover:bg-muted/40 disabled:opacity-30 transition-colors"
+                        >
+                          <ChevronDown className="size-3.5" />
+                        </button>
+                        <button
+                          type="button" title="Keluarkan dari rute"
+                          onClick={() => removeFromManual(id)}
+                          className="inline-flex items-center justify-center size-7 rounded-lg border text-muted-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/40 transition-colors"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      </div>
+                    </li>
+                  );
+                })}
+                {manualOrder.length === 0 && (
+                  <li className="px-3 py-6 text-center text-xs text-muted-foreground">Semua entry dikeluarkan. Batal lalu pilih lagi.</li>
+                )}
+              </ol>
+            </div>
+          )}
+
           {/* Bucket driver assignment */}
           {buckets && (
             <div className="flex flex-col gap-3 rounded-xl border border-info-ring/40 bg-info-bg/30 overflow-hidden">

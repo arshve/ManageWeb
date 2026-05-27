@@ -402,6 +402,68 @@ export async function assignDriversToBuckets(
   return { success: true };
 }
 
+/**
+ * Build a route by hand: assign the given entries to one driver in the EXACT
+ * order provided (sequence = array index), no k-means split, no TSP. Entries
+ * must be APPROVED with coordinates; the driver must not already hold a route
+ * that day. Stops are created/updated as ASSIGNED.
+ */
+export async function createManualRoute(
+  deliveryDate: string,
+  driverId: string,
+  orderedEntryIds: string[],
+) {
+  const admin = await requireRole('ADMIN', 'SUPER_ADMIN');
+  const date = parseDateOnly(deliveryDate);
+  if (!date) return { error: 'Tanggal tidak valid' };
+  if (!driverId) return { error: 'Pilih driver' };
+  if (!orderedEntryIds.length) return { error: 'Rute kosong — pilih minimal satu entry' };
+
+  // One batch per driver per day
+  const clash = await prisma.delivery.count({
+    where: {
+      driverId,
+      entry: { deliveryDate: date },
+      status: { notIn: ['DELIVERED', 'FAILED'] },
+    },
+  });
+  if (clash) return { error: 'Driver sudah punya rute hari ini — pilih driver lain' };
+
+  const entries = await prisma.entry.findMany({
+    where: { id: { in: orderedEntryIds }, status: 'APPROVED' },
+    select: { id: true, buyerLat: true, buyerLng: true },
+  });
+  if (entries.length !== orderedEntryIds.length) return { error: 'Sebagian entry tidak valid' };
+  if (entries.some((e) => e.buyerLat == null || e.buyerLng == null)) {
+    return { error: 'Ada entry tanpa koordinat — Backfill dulu' };
+  }
+
+  await prisma.$transaction(async (tx) => {
+    for (let i = 0; i < orderedEntryIds.length; i++) {
+      const entryId = orderedEntryIds[i];
+      await tx.entry.update({ where: { id: entryId }, data: { deliveryDate: date } });
+      await tx.delivery.upsert({
+        where: { entryId },
+        create: { entryId, driverId, sequence: i, status: 'ASSIGNED' },
+        update: { driverId, sequence: i, status: 'ASSIGNED' },
+      });
+    }
+  });
+
+  await logAudit({
+    actor: admin,
+    action: 'UPDATE',
+    entity: 'Delivery',
+    entityId: deliveryDate,
+    label: `Rute manual ${deliveryDate} — driver, ${orderedEntryIds.length} stop`,
+    after: { driverId, stops: orderedEntryIds.length, manual: true },
+  });
+
+  revalidatePath('/admin/deliveries');
+  revalidatePath('/driver');
+  return { success: true as const };
+}
+
 export async function unassignDriver(deliveryIds: string[]) {
   await requireRole('ADMIN', 'SUPER_ADMIN');
   await prisma.delivery.updateMany({

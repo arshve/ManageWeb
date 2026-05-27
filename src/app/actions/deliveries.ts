@@ -117,6 +117,22 @@ export async function forceUnassignDeliveryDate(entryIds: string[]) {
     return { error: `Tidak bisa dihapus — ${delivered.length} sudah DELIVERED` };
   }
 
+  // Capture which driver routes these entries belong to (before removal) so we
+  // can re-optimize each affected route once the stops are gone.
+  const affectedRows = await prisma.delivery.findMany({
+    where: { entryId: { in: entryIds }, driverId: { not: null } },
+    select: { driverId: true, entry: { select: { deliveryDate: true } } },
+  });
+  const affected = new Map<string, { driverId: string; date: Date }>();
+  for (const r of affectedRows) {
+    if (r.driverId && r.entry.deliveryDate) {
+      affected.set(`${r.driverId}|${r.entry.deliveryDate.toISOString()}`, {
+        driverId: r.driverId,
+        date: r.entry.deliveryDate,
+      });
+    }
+  }
+
   await prisma.$transaction(async (tx) => {
     // Reset loadedAt so items can be re-scheduled cleanly later
     await tx.entryItem.updateMany({
@@ -135,13 +151,18 @@ export async function forceUnassignDeliveryDate(entryIds: string[]) {
     });
   });
 
+  // Re-optimize every route that lost a stop (best-effort; skip empty / no-coords).
+  for (const { driverId, date } of affected.values()) {
+    await reoptimizeDriverRoute(driverId, date);
+  }
+
   await logAudit({
     actor: admin,
     action: 'UPDATE',
     entity: 'Entry',
     entityId: entryIds.join(','),
     label: `Force unassign ${entryIds.length} entry (admin hapus dari rute)`,
-    after: { deliveryDate: null, count: entryIds.length, force: true },
+    after: { deliveryDate: null, count: entryIds.length, force: true, recalculated: affected.size },
   });
 
   revalidatePath('/admin/deliveries');
@@ -795,11 +816,14 @@ export async function backfillCoordinates(entryIds?: string[]) {
  * DELIVERED/FAILED stops are pinned at the front by their current order;
  * only ASSIGNED stops are re-sequenced. Blocked if the route is ON_DELIVERY.
  */
-export async function recalculateDriverRoute(driverId: string, deliveryDate: string) {
-  const admin = await requireRole('ADMIN', 'SUPER_ADMIN');
-  const date = parseDateOnly(deliveryDate);
-  if (!date) return { error: 'Tanggal tidak valid' };
-
+/**
+ * Re-optimize a driver's route for a date (TSP from depot). Works on idle AND
+ * running routes: DELIVERED/FAILED stops stay fixed at the front (in their
+ * existing order), while every not-yet-finished stop (ASSIGNED + ON_DELIVERY)
+ * is re-sequenced. Only `sequence` changes — statuses are untouched.
+ * Internal core: no auth, no revalidate (caller handles those).
+ */
+async function reoptimizeDriverRoute(driverId: string, date: Date) {
   const rows = await prisma.delivery.findMany({
     where: { driverId, entry: { deliveryDate: date } },
     select: {
@@ -809,24 +833,26 @@ export async function recalculateDriverRoute(driverId: string, deliveryDate: str
       entry: { select: { buyerLat: true, buyerLng: true } },
     },
   });
-  if (!rows.length) return { error: 'Rute kosong' };
-  if (rows.some((r) => r.status === 'ON_DELIVERY')) {
-    return { error: 'Rute sudah jalan — reset dulu sebelum hitung ulang' };
-  }
+  if (!rows.length) return { skipped: 'empty' as const };
 
   const done = rows
     .filter((r) => r.status === 'DELIVERED' || r.status === 'FAILED')
     .sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0));
-  const active = rows.filter((r) => r.status === 'ASSIGNED');
-  if (active.some((r) => r.entry.buyerLat == null || r.entry.buyerLng == null)) {
-    return { error: 'Ada stop tanpa koordinat — Backfill dulu' };
+  const remaining = rows
+    .filter((r) => r.status === 'ASSIGNED' || r.status === 'ON_DELIVERY')
+    .sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0));
+
+  if (remaining.some((r) => r.entry.buyerLat == null || r.entry.buyerLng == null)) {
+    return { error: 'Ada stop tanpa koordinat — Backfill dulu' as const };
   }
 
   const depot = { id: 'DEPOT', ...getDefaultDepot() };
-  const ordered = solveTSP(
-    depot,
-    active.map((r) => ({ id: r.id, lat: r.entry.buyerLat!, lng: r.entry.buyerLng! })),
-  );
+  const ordered = remaining.length
+    ? solveTSP(
+        depot,
+        remaining.map((r) => ({ id: r.id, lat: r.entry.buyerLat!, lng: r.entry.buyerLng! })),
+      )
+    : [];
 
   await prisma.$transaction([
     ...done.map((r, i) =>
@@ -837,22 +863,36 @@ export async function recalculateDriverRoute(driverId: string, deliveryDate: str
     ),
   ]);
 
+  return { success: true as const, stops: rows.length };
+}
+
+export async function recalculateDriverRoute(driverId: string, deliveryDate: string) {
+  const admin = await requireRole('ADMIN', 'SUPER_ADMIN');
+  const date = parseDateOnly(deliveryDate);
+  if (!date) return { error: 'Tanggal tidak valid' };
+
+  const res = await reoptimizeDriverRoute(driverId, date);
+  if ('skipped' in res) return { error: 'Rute kosong' };
+  if ('error' in res) return res;
+
   await logAudit({
     actor: admin,
     action: 'UPDATE',
     entity: 'Delivery',
     entityId: driverId,
     label: `Hitung ulang rute driver ${deliveryDate}`,
-    after: { stops: rows.length },
+    after: { stops: res.stops },
   });
   revalidatePath('/admin/deliveries');
+  revalidatePath('/driver');
   return { success: true as const };
 }
 
 /**
- * Attach left-behind entries to a driver's NOT-started route, then recalc.
- * Entries must be APPROVED and have coordinates. Adopts scheduled-unassigned
- * delivery rows and creates rows for unscheduled entries (sets deliveryDate).
+ * Attach left-behind entries to a driver's route, then re-optimize. Works on
+ * idle AND running routes — if the route is already running (ON_DELIVERY), new
+ * stops join as ON_DELIVERY so the driver can still deliver them; otherwise
+ * they're ASSIGNED. Entries must be APPROVED and have coordinates.
  */
 export async function addEntriesToDriverRoute(
   driverId: string,
@@ -864,10 +904,10 @@ export async function addEntriesToDriverRoute(
   if (!date) return { error: 'Tanggal tidak valid' };
   if (!entryIds.length) return { error: 'Pilih entry' };
 
-  const started = await prisma.delivery.count({
+  const running = await prisma.delivery.count({
     where: { driverId, entry: { deliveryDate: date }, status: 'ON_DELIVERY' },
   });
-  if (started) return { error: 'Rute sudah jalan — reset dulu' };
+  const newStatus = running > 0 ? 'ON_DELIVERY' : 'ASSIGNED';
 
   const entries = await prisma.entry.findMany({
     where: { id: { in: entryIds }, status: 'APPROVED' },
@@ -883,8 +923,8 @@ export async function addEntriesToDriverRoute(
       await tx.entry.update({ where: { id: e.id }, data: { deliveryDate: date } });
       await tx.delivery.upsert({
         where: { entryId: e.id },
-        create: { entryId: e.id, driverId, status: 'ASSIGNED' },
-        update: { driverId, status: 'ASSIGNED' },
+        create: { entryId: e.id, driverId, status: newStatus },
+        update: { driverId, status: newStatus },
       });
     }
   });

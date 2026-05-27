@@ -222,7 +222,7 @@ export function DeliveriesAdminView({
     startTransition(async () => {
       const r = await forceUnassignDeliveryDate([id]);
       if (r && 'error' in r) toast.error(r.error);
-      else { toast.success('Entry dihapus dari rute'); refresh(); }
+      else { toast.success('Entry dihapus — rute ditata ulang'); refresh(); }
     });
   }
 
@@ -1731,25 +1731,22 @@ function PerDriverPanel({
               {drivers.find((d) => d.id === focusDriver)?.name ?? 'Driver'} — {sorted.length} stop
             </span>
             <div className="flex flex-wrap gap-2">
-              {started ? (
+              <Button size="sm" variant="outline" onClick={() => setInsertOpen(true)} disabled={pending}>
+                Tambah Entry Tertinggal
+              </Button>
+              <Button size="sm" onClick={recalc} disabled={pending || sorted.length === 0}>
+                Hitung Ulang Rute
+              </Button>
+              {started && (
                 <Button size="sm" variant="outline" onClick={() => setResetOpen(true)} disabled={pending}>
                   Reset Rute (sudah jalan)
                 </Button>
-              ) : (
-                <>
-                  <Button size="sm" variant="outline" onClick={() => setInsertOpen(true)} disabled={pending}>
-                    Tambah Entry Tertinggal
-                  </Button>
-                  <Button size="sm" onClick={recalc} disabled={pending || sorted.length === 0}>
-                    Hitung Ulang Rute
-                  </Button>
-                </>
               )}
             </div>
           </div>
           {started && (
             <p className="px-4 py-2 text-[11px] text-warning-fg bg-warning-bg border-b">
-              Rute sudah jalan. Reset dulu untuk menambah entry atau hitung ulang.
+              Rute sudah jalan. Menambah / menghapus stop akan otomatis menata ulang stop yang belum terkirim (dihitung dari titik awal). Stop yang sudah terkirim / gagal tetap.
             </p>
           )}
           <ol className="divide-y">

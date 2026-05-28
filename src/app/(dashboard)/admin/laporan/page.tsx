@@ -14,10 +14,10 @@ function parseRange(params: SearchParams): { start: Date; end: Date } {
       return { start, end };
     }
   }
-  // default: current month
+  // default: current year (event is annual)
   const now = new Date();
-  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0));
+  const start = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
+  const end = new Date(Date.UTC(now.getUTCFullYear(), 11, 31));
   return { start, end };
 }
 
@@ -32,7 +32,7 @@ export default async function LaporanPage({
   const data = await getReportData(start, end);
 
   return (
-    <DashboardShell title="Laporan" description="Ringkasan penjualan, pengiriman & stok">
+    <DashboardShell title="Laporan Tahunan" description="Rekap penjualan, pengiriman, fee reseller & stok">
       <ReportView data={data} />
     </DashboardShell>
   );

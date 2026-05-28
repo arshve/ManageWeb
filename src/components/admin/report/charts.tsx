@@ -172,6 +172,64 @@ export function ComboDaily({
   );
 }
 
+/* ─── Monthly timeline (12 bars Jan–Des, with peak + future-month state) ─ */
+
+export function MonthlyTimeline({
+  data,
+  color = 'currentColor',
+  peakColor = 'var(--success-fg)',
+  height = 180,
+  format = (v: number) => Math.round(v).toLocaleString('id-ID'),
+}: {
+  data: { label: string; value: number; isFuture?: boolean }[];
+  color?: string;
+  peakColor?: string;
+  height?: number;
+  format?: (v: number) => string;
+}) {
+  if (!data.length) return <Empty />;
+  const max = Math.max(...data.map((d) => d.value), 1);
+  const peakIdx = data.reduce((bi, d, i) => (d.value > data[bi].value ? i : bi), 0);
+  const n = data.length;
+  const gap = 10;
+  const bw = 34;
+  const w = n * bw + (n - 1) * gap;
+  const chartH = height - 30;
+
+  return (
+    <svg viewBox={`0 0 ${w} ${height}`} width="100%" height={height} preserveAspectRatio="xMinYMid meet">
+      <line x1={0} y1={chartH + 0.5} x2={w} y2={chartH + 0.5} stroke="currentColor" strokeOpacity={0.12} strokeWidth={1} />
+      {data.map((d, i) => {
+        const h = Math.max((d.value / max) * chartH, d.value > 0 ? 3 : 2);
+        const x = i * (bw + gap);
+        const y = chartH - h;
+        const isPeak = i === peakIdx && d.value > 0;
+        const fill = d.isFuture ? 'currentColor' : isPeak ? peakColor : color;
+        const opacity = d.isFuture ? 0.08 : isPeak ? 1 : 0.85;
+        return (
+          <g key={i}>
+            <title>{`${d.label}: ${format(d.value)}${isPeak ? ' · puncak' : ''}${d.isFuture ? ' (akan datang)' : ''}`}</title>
+            <rect
+              x={x} y={y} width={bw} height={h} rx={4}
+              fill={fill} opacity={opacity}
+              className="report-bar-y"
+              style={{ animationDelay: `${i * 40}ms` }}
+            />
+            {isPeak && (
+              <text x={x + bw / 2} y={y - 6} textAnchor="middle" fontSize="9" fill={peakColor} fontWeight={700}>
+                PUNCAK
+              </text>
+            )}
+            <text x={x + bw / 2} y={height - 11} textAnchor="middle" fontSize="10" fill="currentColor" fillOpacity={d.isFuture ? 0.25 : 0.6}>
+              {d.label}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
 /* ─── Horizontal bars ───────────────────────────────────────────────── */
 
 export function HorizontalBars({

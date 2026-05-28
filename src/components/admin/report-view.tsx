@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { Download, ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { formatRupiah } from '@/lib/format';
 import type { ReportData, Delta } from '@/lib/report/get-report';
-import { ComboDaily, HorizontalBars, Donut, CountUp } from '@/components/admin/report/charts';
+import { ComboDaily, HorizontalBars, Donut, CountUp, MonthlyTimeline } from '@/components/admin/report/charts';
 
 const SERIF = "var(--font-dm-serif), 'DM Serif Display', serif";
 // compact rupiah for big hero figures: Rp 12,3 jt / Rp 1,2 M
@@ -24,11 +24,8 @@ export function ReportView({ data }: { data: ReportData }) {
   function go(s: string, e: string) {
     router.push(`/admin/laporan?start=${s}&end=${e}`);
   }
-  function shiftMonth(delta: number) {
-    const d = new Date(start + 'T00:00:00Z');
-    const first = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + delta, 1));
-    const last = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0));
-    go(first.toISOString().slice(0, 10), last.toISOString().slice(0, 10));
+  function setYear(y: number) {
+    go(`${y}-01-01`, `${y}-12-31`);
   }
   function thisMonth() {
     const now = new Date();
@@ -41,16 +38,22 @@ export function ReportView({ data }: { data: ReportData }) {
     <div className="flex flex-col gap-5">
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-card p-2.5">
-        <button onClick={() => shiftMonth(-1)} className="inline-flex items-center justify-center size-8 rounded-lg border hover:bg-muted/50" title="Bulan sebelumnya">
-          <ChevronLeft className="size-4" />
-        </button>
+        <div className="inline-flex items-center rounded-lg border bg-background h-8">
+          <button onClick={() => setYear(data.range.year - 1)} className="inline-flex items-center justify-center size-8 hover:bg-muted/50 rounded-l-lg" title="Tahun sebelumnya">
+            <ChevronLeft className="size-4" />
+          </button>
+          <span className="px-2 text-xs font-semibold tabular-nums">{data.range.year}</span>
+          <button onClick={() => setYear(data.range.year + 1)} className="inline-flex items-center justify-center size-8 hover:bg-muted/50 rounded-r-lg" title="Tahun berikutnya">
+            <ChevronRight className="size-4" />
+          </button>
+        </div>
+        <button onClick={() => setYear(new Date().getUTCFullYear())} className="h-8 px-3 rounded-lg border text-xs hover:bg-muted/50">Tahun ini</button>
+        <button onClick={() => setYear(new Date().getUTCFullYear() - 1)} className="h-8 px-3 rounded-lg border text-xs hover:bg-muted/50">Tahun lalu</button>
+        <button onClick={thisMonth} className="h-8 px-3 rounded-lg border text-xs hover:bg-muted/50">Bulan ini</button>
+        <div className="mx-1 h-5 w-px bg-border" />
         <input type="date" value={start} onChange={(e) => go(e.target.value, end)} className="h-8 rounded-lg border bg-background px-2 text-xs" />
         <span className="text-xs text-muted-foreground">s/d</span>
         <input type="date" value={end} onChange={(e) => go(start, e.target.value)} className="h-8 rounded-lg border bg-background px-2 text-xs" />
-        <button onClick={() => shiftMonth(1)} className="inline-flex items-center justify-center size-8 rounded-lg border hover:bg-muted/50" title="Bulan berikutnya">
-          <ChevronRight className="size-4" />
-        </button>
-        <button onClick={thisMonth} className="h-8 px-3 rounded-lg border text-xs hover:bg-muted/50">Bulan ini</button>
         <a
           href={`/api/laporan/pdf?start=${start}&end=${end}`}
           className="ml-auto inline-flex items-center gap-1.5 h-8 px-3.5 rounded-lg text-xs font-semibold"
@@ -62,35 +65,46 @@ export function ReportView({ data }: { data: ReportData }) {
 
       {/* ─────────────  REPORT SHEET  ───────────── */}
       <article className="overflow-hidden rounded-2xl border bg-card shadow-sm report-reveal">
-        {/* Masthead (ink) */}
-        <header className="bg-foreground text-background px-6 sm:px-10 pt-9 pb-8">
+        {/* Masthead (ink) — annual cover */}
+        <header className="bg-foreground text-background px-6 sm:px-10 pt-9 pb-9 relative overflow-hidden">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <p className="text-[10px] uppercase tracking-[0.28em] text-background/55">PT Millenials Farm Abadi</p>
-              <h1 className="mt-2 text-4xl sm:text-5xl leading-[0.95]" style={{ fontFamily: SERIF }}>
-                Laporan<br />Kinerja
-              </h1>
+              <p className="mt-1.5 text-[11px] uppercase tracking-[0.22em] text-background/75">Laporan Tahunan</p>
             </div>
             <div className="text-right">
               <p className="text-sm" style={{ fontFamily: SERIF }}>{data.range.label}</p>
               <p className="text-[11px] text-background/55 mt-1">{data.range.days} hari</p>
-              <p className="text-[10px] text-background/45 mt-3 uppercase tracking-wider">vs {data.range.prevLabel}</p>
+              <p className="text-[10px] text-background/45 mt-3 uppercase tracking-wider">{data.range.compareLabel}</p>
             </div>
           </div>
 
-          {/* Hero figures */}
-          <div className="mt-9 grid grid-cols-2 lg:grid-cols-4 gap-y-6">
+          {/* BIG YEAR — magazine cover focal */}
+          <p
+            className="mt-3 leading-[0.78] tracking-[-0.04em] tabular-nums"
+            style={{ fontFamily: SERIF, fontSize: 'clamp(96px, 18vw, 220px)' }}
+          >
+            {data.range.year}
+          </p>
+          {data.finance.peakMonth && data.range.isYearly && (
+            <p className="-mt-2 text-[11px] uppercase tracking-[0.2em] text-background/55">
+              Puncak {data.finance.peakMonth.label} · {rpShort(data.finance.peakMonth.penjualan)}
+            </p>
+          )}
+
+          {/* Capaian tiles */}
+          <div className="mt-8 grid grid-cols-2 lg:grid-cols-4 gap-y-6">
             <Hero label="Penjualan" delta={f.deltas.penjualan} first>
               <CountUp value={f.penjualan} format={rpShort} />
             </Hero>
+            <Hero label="Hewan Terjual" sub={f.itemCount ? `Rp ${Math.round(f.penjualan / Math.max(f.itemCount, 1)).toLocaleString('id-ID')} / ekor` : undefined}>
+              <CountUp value={f.itemCount} format={(v) => Math.round(v).toLocaleString('id-ID')} />
+            </Hero>
+            <Hero label="Pelanggan Unik" sub={f.entryCount ? `${f.entryCount} transaksi` : undefined}>
+              <CountUp value={f.uniqueBuyers} format={(v) => Math.round(v).toLocaleString('id-ID')} />
+            </Hero>
             <Hero label="Profit" delta={f.deltas.profit} sub={`margin ${(f.margin * 100).toFixed(1)}%`}>
               <CountUp value={f.profit} format={rpShort} />
-            </Hero>
-            <Hero label="Pengiriman" delta={data.delivery.deltas.terkirim} sub={`${(data.delivery.successRate * 100).toFixed(0)}% sukses`}>
-              <CountUp value={data.delivery.terkirim} format={(v) => `${Math.round(v)}/${data.delivery.total}`} />
-            </Hero>
-            <Hero label="Stok Tersedia" sub={`senilai ${rpShort(data.stock.inventoryValueModal)}`}>
-              <CountUp value={data.stock.available} format={(v) => String(Math.round(v))} />
             </Hero>
           </div>
         </header>
@@ -135,12 +149,45 @@ export function ReportView({ data }: { data: ReportData }) {
               ]}
             />
 
-            <Block label="Penjualan & Profit harian" className="text-foreground/80">
-              <ComboDaily
-                data={f.perDay.map((d) => ({ label: d.date.slice(8), bar: d.penjualan, line: Math.max(d.profit, 0) }))}
-                format={formatRupiah}
-              />
-            </Block>
+            {data.range.isYearly ? (
+              <>
+                <Block label={`Penjualan bulanan ${data.range.year}`} className="text-foreground/80">
+                  <MonthlyTimeline
+                    data={f.perMonth.map((m) => ({ label: m.label, value: m.penjualan, isFuture: m.isFuture }))}
+                    format={formatRupiah}
+                  />
+                </Block>
+
+                <Block label="Per kuartal" className="text-foreground/80">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {f.quarters.map((q) => (
+                      <div
+                        key={q.label}
+                        className={`relative rounded-xl border p-4 ${q.isPeak ? 'border-success-ring/40 bg-success-bg/30' : 'bg-muted/20'}`}
+                      >
+                        <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{q.label}</p>
+                        <p className="mt-1.5 text-xl leading-none tabular-nums" style={{ fontFamily: SERIF }}>
+                          {rpShort(q.penjualan)}
+                        </p>
+                        <p className="mt-1 text-[11px] text-muted-foreground">
+                          {q.itemCount} ekor · profit {rpShort(q.profit)}
+                        </p>
+                        {q.isPeak && (
+                          <span className="absolute top-2 right-2 text-[9px] uppercase tracking-wider text-success-fg font-semibold">Puncak</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </Block>
+              </>
+            ) : (
+              <Block label="Penjualan & Profit harian" className="text-foreground/80">
+                <ComboDaily
+                  data={f.perDay.map((d) => ({ label: d.date.slice(8), bar: d.penjualan, line: Math.max(d.profit, 0) }))}
+                  format={formatRupiah}
+                />
+              </Block>
+            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-x-12 gap-y-8 items-start">
               {f.paymentMix.length > 0 && (
@@ -233,8 +280,50 @@ export function ReportView({ data }: { data: ReportData }) {
             )}
           </Section>
 
-          {/* 03 — Stok */}
-          <Section no="03" title="Stok Hewan" meta="Snapshot saat ini" delay={320}>
+          {/* 03 — Fee Reseller */}
+          <Section
+            no="03"
+            title="Fee Reseller"
+            meta={`${formatRupiah(data.reseller.fee)} · ${(data.reseller.feeRate * 100).toFixed(1)}% dari penjualan`}
+            delay={320}
+          >
+            <DataGrid
+              items={[
+                ['Total fee dibayarkan', formatRupiah(data.reseller.fee)],
+                ['Persentase dari penjualan', `${(data.reseller.feeRate * 100).toFixed(2)}%`],
+                ['Rata-rata / transaksi', formatRupiah(data.reseller.avgPerTxn)],
+                ['Reseller aktif', `${data.reseller.perSales.length}`],
+              ]}
+            />
+
+            {data.reseller.perSales.length > 0 ? (
+              <>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-12 gap-y-8">
+                  <Block label="Fee per reseller" className="text-foreground/80">
+                    <HorizontalBars data={data.reseller.perSales.map((s) => ({ label: s.name, value: s.fee }))} format={formatRupiah} />
+                  </Block>
+                  {data.reseller.byType.length > 0 && (
+                    <Block label="Fee per jenis hewan" className="text-success-fg">
+                      <HorizontalBars data={data.reseller.byType.map((t) => ({ label: `${t.label} · ${t.qty}`, value: t.fee }))} format={formatRupiah} />
+                    </Block>
+                  )}
+                </div>
+
+                <Block label="Papan peringkat reseller">
+                  <Table
+                    head={['#', 'Reseller', 'Txn', 'Fee', 'Bagian']}
+                    align={['left', 'left', 'right', 'right', 'right']}
+                    rows={data.reseller.perSales.map((r, i) => [`${i + 1}`, r.name, String(r.count), formatRupiah(r.fee), `${(r.share * 100).toFixed(1)}%`])}
+                  />
+                </Block>
+              </>
+            ) : (
+              <p className="text-xs text-muted-foreground py-4">Belum ada fee reseller di periode ini.</p>
+            )}
+          </Section>
+
+          {/* 04 — Stok */}
+          <Section no="04" title="Stok Hewan" meta="Snapshot saat ini" delay={400}>
             <DataGrid
               items={[
                 ['Total ternak', String(data.stock.total)],
@@ -260,7 +349,7 @@ export function ReportView({ data }: { data: ReportData }) {
           </Section>
         </div>
 
-        <footer className="px-6 sm:px-10 py-5 border-t flex items-center justify-between text-[10px] uppercase tracking-[0.2em] text-muted-foreground report-reveal" style={{ animationDelay: '420ms' }}>
+        <footer className="px-6 sm:px-10 py-5 border-t flex items-center justify-between text-[10px] uppercase tracking-[0.2em] text-muted-foreground report-reveal" style={{ animationDelay: '500ms' }}>
           <span>Millenials Farm</span>
           <span>{data.range.label}</span>
         </footer>

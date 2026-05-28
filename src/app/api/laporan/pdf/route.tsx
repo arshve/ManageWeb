@@ -19,8 +19,8 @@ export async function GET(request: Request) {
     end = new Date(endStr + 'T00:00:00Z');
   } else {
     const now = new Date();
-    start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-    end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0));
+    start = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
+    end = new Date(Date.UTC(now.getUTCFullYear(), 11, 31));
   }
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) {
     return NextResponse.json({ error: 'Rentang tanggal tidak valid' }, { status: 400 });

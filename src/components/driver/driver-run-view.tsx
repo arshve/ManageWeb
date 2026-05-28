@@ -6,7 +6,7 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { compressImage, addWatermark } from '@/lib/image';
+import { compressImage, addWatermark, toThumbnailUrl } from '@/lib/image';
 import { getLastDriverCoords } from '@/components/driver/location-pinger';
 
 import { cn } from '@/lib/utils';
@@ -887,8 +887,10 @@ function StopCard({
                 className="block rounded-lg overflow-hidden border relative group"
               >
                 <img
-                  src={stop.proofPhotoUrl}
+                  src={toThumbnailUrl(stop.proofPhotoUrl, 600)}
                   alt="Bukti kirim"
+                  loading="lazy"
+                  decoding="async"
                   className="w-full max-h-48 object-cover"
                 />
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />

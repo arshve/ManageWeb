@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import { Scale, ArrowRight, Beef } from 'lucide-react';
 import { formatRupiah, formatWeight } from '@/lib/format';
+import { toThumbnailUrl } from '@/lib/image';
 import type { AvailableLivestock } from '@/app/actions/livestock';
 import { StatusToken } from '@/components/ui/status-token';
 
@@ -73,7 +74,7 @@ export function AnimalCard({ item, priority = false, isSold = false }: AnimalCar
       <div className="relative aspect-[4/3] bg-muted overflow-hidden">
         {item.photoUrl ? (
           <Image
-            src={item.photoUrl}
+            src={toThumbnailUrl(item.photoUrl, 600)}
             alt={`${typeInfo.label}${item.grade ? ` Grade ${item.grade}` : ''} — ${item.sku}`}
             fill
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"

@@ -331,3 +331,36 @@
     @apply font-sans;
   }
 }
+
+/* ── Laporan (report) animations — pure CSS, no JS dep ─────────────── */
+@keyframes report-reveal {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes report-grow-x {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+@keyframes report-grow-y {
+  from { transform: scaleY(0); }
+  to   { transform: scaleY(1); }
+}
+@keyframes report-fade-scale {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes report-draw-line {
+  from { stroke-dashoffset: 1000; }
+  to   { stroke-dashoffset: 0; }
+}
+.report-reveal { animation: report-reveal 0.55s cubic-bezier(0.2, 0.6, 0.2, 1) both; }
+.report-fade   { animation: report-fade-scale 0.6s cubic-bezier(0.2, 0.6, 0.2, 1) both; }
+.report-bar-x  { transform-origin: left center; animation: report-grow-x 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.report-bar-y  { transform-box: fill-box; transform-origin: bottom; animation: report-grow-y 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.report-line   { stroke-dasharray: 1000; animation: report-draw-line 1s ease-out 0.2s both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .report-reveal, .report-fade, .report-bar-x, .report-bar-y, .report-line {
+    animation: none !important;
+  }
+}

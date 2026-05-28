@@ -32,6 +32,7 @@ import {
   Truck,
   Wallet,
   ListChecks,
+  FileBarChart,
 } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -55,6 +56,7 @@ const adminLinks = [
 const superAdminExtras = [
   { href: '/admin/pricing', label: 'Harga', icon: DollarSign },
   { href: '/admin/finance', label: 'Keuangan', icon: Wallet },
+  { href: '/admin/laporan', label: 'Laporan', icon: FileBarChart },
   { href: '/admin/logs', label: 'Log Aktivitas', icon: History },
 ];
 

@@ -1260,7 +1260,7 @@ export function DeliveriesAdminView({
                                   className="group relative block size-14 rounded-lg overflow-hidden border hover:ring-2 ring-info-ring transition-all"
                                 >
                                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                                  <img src={s.delivery.proofPhotoUrl} alt="bukti kirim" className="w-full h-full object-cover" />
+                                  <img src={toThumbnailUrl(s.delivery.proofPhotoUrl, 120)} alt="bukti kirim" loading="lazy" decoding="async" className="w-full h-full object-cover" />
                                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
                                     <span className="opacity-0 group-hover:opacity-100 text-white text-[10px] font-semibold transition-opacity">buka</span>
                                   </div>
@@ -1364,7 +1364,7 @@ export function DeliveriesAdminView({
                                 className="group relative mt-1 block size-12 rounded-lg overflow-hidden border hover:ring-2 ring-info-ring transition-all"
                               >
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={s.delivery.proofPhotoUrl} alt="bukti kirim" className="w-full h-full object-cover" />
+                                <img src={toThumbnailUrl(s.delivery.proofPhotoUrl, 120)} alt="bukti kirim" loading="lazy" decoding="async" className="w-full h-full object-cover" />
                               </button>
                             )}
                             {s.delivery?.status === 'FAILED' && s.delivery.notes && (
@@ -1540,7 +1540,7 @@ function LivestockTagPreview({ item }: { item: LivestockPreviewItem }) {
           </DialogHeader>
           {item.photoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={item.photoUrl} alt={tag} className="w-full aspect-square object-cover" />
+            <img src={toThumbnailUrl(item.photoUrl, 480)} alt={tag} loading="lazy" decoding="async" className="w-full aspect-square object-cover" />
           ) : (
             <div className="w-full aspect-square bg-muted flex items-center justify-center">
               <span className="text-muted-foreground text-sm">Tidak ada foto</span>

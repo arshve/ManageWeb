@@ -46,11 +46,22 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Pre-establish the TLS connection to Supabase Storage so the first image
+  // request doesn't pay the DNS + TLS handshake cost (~100–400 ms saved).
+  const supabaseOrigin = (() => {
+    const u = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    try { return u ? new URL(u).origin : null; } catch { return null; }
+  })();
+
   return (
     <html
       lang="id"
       className={`${geistSans.variable} ${geistMono.variable} ${dmSerif.variable} h-full antialiased`}
     >
+      <head>
+        {supabaseOrigin && <link rel="preconnect" href={supabaseOrigin} crossOrigin="anonymous" />}
+        {supabaseOrigin && <link rel="dns-prefetch" href={supabaseOrigin} />}
+      </head>
       <body className="min-h-full flex flex-col">
         {children}
         <Toaster />

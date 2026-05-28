@@ -11,6 +11,7 @@ import { useCallback, useState } from 'react';
 import Image from 'next/image';
 import { Beef } from 'lucide-react';
 import { Lightbox } from '@/components/ui/lightbox';
+import { toThumbnailUrl } from '@/lib/image';
 
 export function LivestockPhoto({
   photoUrl,
@@ -38,9 +39,11 @@ export function LivestockPhoto({
     );
   }
 
+  // 200 covers both the 40 px and 96 px (w-24) variants at 2x retina without
+  // overfetching the original (≤0.6 MB / 1280 px) on every list row.
   const imgEl = (
     <Image
-      src={photoUrl}
+      src={toThumbnailUrl(photoUrl, 200)}
       alt={alt}
       fill
       sizes={thumbnailClassName.includes('w-24') ? '96px' : '40px'}

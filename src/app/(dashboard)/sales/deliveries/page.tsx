@@ -8,6 +8,7 @@ import { buttonVariants } from '@/components/ui/button';
 import { StatusToken, DELIVERY_STATUS } from '@/components/ui/status-token';
 import { cn } from '@/lib/utils';
 import { navigationUrl } from '@/lib/delivery/maps';
+import { toThumbnailUrl } from '@/lib/image';
 import {
   DeliveryMap,
   type MapStop,
@@ -308,10 +309,11 @@ export default async function SalesDeliveriesPage({
                                 {s.delivery?.proofPhotoUrl ? (
                                   <a href={s.delivery.proofPhotoUrl} target="_blank" rel="noreferrer">
                                     <Image
-                                      src={s.delivery.proofPhotoUrl}
+                                      src={toThumbnailUrl(s.delivery.proofPhotoUrl, 140)}
                                       alt="Bukti kirim"
                                       width={56}
                                       height={56}
+                                      loading="lazy"
                                       className="size-14 object-cover rounded-md border mx-auto"
                                     />
                                   </a>
@@ -423,10 +425,11 @@ export default async function SalesDeliveriesPage({
                           {s.delivery?.proofPhotoUrl && (
                             <a href={s.delivery.proofPhotoUrl} target="_blank" rel="noreferrer" className="block">
                               <Image
-                                src={s.delivery.proofPhotoUrl}
+                                src={toThumbnailUrl(s.delivery.proofPhotoUrl, 240)}
                                 alt="Bukti kirim"
                                 width={120}
                                 height={120}
+                                loading="lazy"
                                 className="rounded-md border object-cover"
                               />
                             </a>

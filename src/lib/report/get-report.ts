@@ -15,6 +15,8 @@ export type ReportData = {
     days: number;
     year: number;
     isYearly: boolean;
+    /** True when the prior comparison window actually has data to compare against. */
+    hasComparison: boolean;
   };
   insights: string[];
   finance: {
@@ -375,7 +377,11 @@ export async function getReportData(start: Date, end: Date): Promise<ReportData>
   const resellerAvgPerTxn = entries.length > 0 ? Math.round(fee / entries.length) : 0;
 
   const uniqueBuyers = buyerMap.size;
-  const compareLabel = isYearly ? `vs ${year - 1}` : `vs ${rangeLabel(prevStart, prevEnd)}`;
+  // Only show YoY/period-over-period if the prior window has any data to compare against.
+  const hasComparison = prevEntries.length > 0 || prevDeliveries.length > 0;
+  const compareLabel = hasComparison
+    ? (isYearly ? `vs ${year - 1}` : `vs ${rangeLabel(prevStart, prevEnd)}`)
+    : '';
 
   // ── Auto insights (narrative) ──
   const compareSuffix = isYearly ? `vs ${year - 1}` : 'vs periode sebelumnya';
@@ -383,10 +389,21 @@ export async function getReportData(start: Date, end: Date): Promise<ReportData>
   if (isYearly) {
     insights.push(`Tahun ${year} · ${itemCount} ekor terjual ke ${uniqueBuyers} pelanggan dari ${entries.length} transaksi.`);
   }
-  insights.push(`Penjualan ${formatRupiah(penjualan)} (${pctStr(dPenjualan)} ${compareSuffix}).`);
-  insights.push(`Profit ${formatRupiah(profit)} — margin ${(margin * 100).toFixed(1)}% (${pctStr(dProfit)}).`);
-  insights.push(`Fee reseller ${formatRupiah(fee)} (${(resellerFeeRate * 100).toFixed(1)}% dari penjualan, ${pctStr(dFee)}).`);
-  if (isYearly && peakMonth) insights.push(`Bulan puncak: ${peakMonth.label} ${year} (${formatRupiah(peakMonth.penjualan)}).`);
+  insights.push(
+    hasComparison
+      ? `Penjualan ${formatRupiah(penjualan)} (${pctStr(dPenjualan)} ${compareSuffix}).`
+      : `Penjualan ${formatRupiah(penjualan)} dari ${entries.length} transaksi.`,
+  );
+  insights.push(
+    hasComparison
+      ? `Profit ${formatRupiah(profit)} — margin ${(margin * 100).toFixed(1)}% (${pctStr(dProfit)}).`
+      : `Profit ${formatRupiah(profit)} — margin ${(margin * 100).toFixed(1)}%.`,
+  );
+  insights.push(
+    hasComparison
+      ? `Fee reseller ${formatRupiah(fee)} (${(resellerFeeRate * 100).toFixed(1)}% dari penjualan, ${pctStr(dFee)}).`
+      : `Fee reseller ${formatRupiah(fee)} (${(resellerFeeRate * 100).toFixed(1)}% dari penjualan).`,
+  );
   if (perSales[0]) insights.push(`Sales terbaik: ${perSales[0].name} (${formatRupiah(perSales[0].penjualan)} dari ${perSales[0].count} transaksi).`);
   if (byType[0]) insights.push(`Jenis terlaris: ${byType[0].label} — ${byType[0].qty} ekor, ${formatRupiah(byType[0].penjualan)}.`);
   if (biggestTxn) insights.push(`Transaksi terbesar: ${biggestTxn.buyer} — ${formatRupiah(biggestTxn.penjualan)} (${fmtDay(new Date(biggestTxn.date + 'T00:00:00Z'))}).`);
@@ -401,7 +418,7 @@ export async function getReportData(start: Date, end: Date): Promise<ReportData>
       label: rangeLabel(start, end),
       prevLabel: rangeLabel(prevStart, prevEnd),
       compareLabel,
-      days, year, isYearly,
+      days, year, isYearly, hasComparison,
     },
     insights,
     finance: {

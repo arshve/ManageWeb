@@ -102,31 +102,6 @@ function PerDayChart({ data }: { data: { date: string; penjualan: number }[] }) 
   );
 }
 
-function PerMonthChart({ data }: { data: { label: string; penjualan: number; isFuture: boolean }[] }) {
-  const W = 535, H = 110, gap = 8, bw = (W - gap * 11) / 12;
-  const max = Math.max(...data.map((d) => d.penjualan), 1);
-  const peakIdx = data.reduce((bi, d, i) => (d.penjualan > data[bi].penjualan ? i : bi), 0);
-  return (
-    <Svg width={W} height={H}>
-      {data.map((d, i) => {
-        const h = Math.max((d.penjualan / max) * (H - 18), d.penjualan > 0 ? 2 : 1);
-        const x = i * (bw + gap);
-        const y = H - 14 - h;
-        const isPeak = i === peakIdx && d.penjualan > 0;
-        const color = d.isFuture ? '#cbd5e1' : isPeak ? C.green : C.blue;
-        return (
-          <View key={i}>
-            <Rect x={x} y={y} width={bw} height={h} fill={color} rx={2} opacity={d.isFuture ? 0.4 : 1} />
-            <Text style={{ position: 'absolute', left: x, top: H - 12, width: bw, fontSize: 6.5, color: d.isFuture ? C.muted : C.ink, textAlign: 'center' }}>
-              {d.label}
-            </Text>
-          </View>
-        );
-      })}
-    </Svg>
-  );
-}
-
 function Table({ head, rows, widths, rightFrom }: { head: string[]; rows: string[][]; widths: (number | 'flex')[]; rightFrom: number }) {
   const cell = (txt: string, i: number, base: typeof s.th | typeof s.td) => {
     const w = widths[i];
@@ -166,7 +141,7 @@ export function ReportDocument({ data }: { data: ReportData }) {
           <View>
             <Text style={s.title}>{data.range.isYearly ? `LAPORAN TAHUNAN ${data.range.year}` : 'LAPORAN RINGKASAN'}</Text>
             <Text style={s.period}>Periode {data.range.label} · {data.range.days} hari</Text>
-            <Text style={s.period}>{data.range.compareLabel}</Text>
+            {data.range.hasComparison && <Text style={s.period}>{data.range.compareLabel}</Text>}
           </View>
         </View>
 
@@ -178,8 +153,18 @@ export function ReportDocument({ data }: { data: ReportData }) {
 
         {/* Headline KPIs */}
         <View style={s.kpiRow}>
-          <View style={s.kpi}><Text style={s.kpiLabel}>Penjualan</Text><Text style={[s.kpiValue, { color: C.blue }]}>{formatRupiah(f.penjualan)}</Text><Text style={s.kpiSub}>{deltaText(f.deltas.penjualan)}</Text></View>
-          <View style={s.kpi}><Text style={s.kpiLabel}>Profit</Text><Text style={[s.kpiValue, { color: f.profit >= 0 ? C.green : C.red }]}>{formatRupiah(f.profit)}</Text><Text style={s.kpiSub}>Margin {(f.margin * 100).toFixed(1)}% {deltaText(f.deltas.profit)}</Text></View>
+          <View style={s.kpi}>
+            <Text style={s.kpiLabel}>Penjualan</Text>
+            <Text style={[s.kpiValue, { color: C.blue }]}>{formatRupiah(f.penjualan)}</Text>
+            {data.range.hasComparison && <Text style={s.kpiSub}>{deltaText(f.deltas.penjualan)}</Text>}
+          </View>
+          <View style={s.kpi}>
+            <Text style={s.kpiLabel}>Profit</Text>
+            <Text style={[s.kpiValue, { color: f.profit >= 0 ? C.green : C.red }]}>{formatRupiah(f.profit)}</Text>
+            <Text style={s.kpiSub}>
+              Margin {(f.margin * 100).toFixed(1)}%{data.range.hasComparison ? ` ${deltaText(f.deltas.profit)}` : ''}
+            </Text>
+          </View>
           <View style={s.kpi}><Text style={s.kpiLabel}>Terkirim</Text><Text style={s.kpiValue}>{data.delivery.terkirim} / {data.delivery.total}</Text><Text style={s.kpiSub}>{(data.delivery.successRate * 100).toFixed(0)}% sukses</Text></View>
           <View style={s.kpi}><Text style={s.kpiLabel}>Stok Tersedia</Text><Text style={s.kpiValue}>{data.stock.available}</Text><Text style={s.kpiSub}>Nilai {formatRupiah(data.stock.inventoryValueModal)}</Text></View>
         </View>
@@ -205,17 +190,8 @@ export function ReportDocument({ data }: { data: ReportData }) {
             <Stat label="Cashflow keluar" value={formatRupiah(f.cashflow.pengeluaran)} />
           </View>
 
-          {data.range.isYearly ? (
-            <>
-              <Text style={s.subHead}>Penjualan per bulan {data.range.year}</Text>
-              <PerMonthChart data={f.perMonth.map((m) => ({ label: m.label, penjualan: m.penjualan, isFuture: m.isFuture }))} />
-            </>
-          ) : (
-            <>
-              <Text style={s.subHead}>Penjualan per hari</Text>
-              <PerDayChart data={f.perDay} />
-            </>
-          )}
+          <Text style={s.subHead}>Penjualan per hari</Text>
+          <PerDayChart data={f.perDay} />
 
           <Text style={s.subHead}>Penjualan per sales</Text>
           {f.perSales.map((x) => <Bar key={x.name} label={x.name} value={x.penjualan} max={salesMax} color={C.blue} fmt={formatRupiah} />)}

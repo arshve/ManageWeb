@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { Download, ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { formatRupiah } from '@/lib/format';
 import type { ReportData, Delta } from '@/lib/report/get-report';
-import { ComboDaily, HorizontalBars, Donut, CountUp, MonthlyTimeline } from '@/components/admin/report/charts';
+import { ComboDaily, HorizontalBars, Donut, CountUp } from '@/components/admin/report/charts';
 
 const SERIF = "var(--font-dm-serif), 'DM Serif Display', serif";
 // compact rupiah for big hero figures: Rp 12,3 jt / Rp 1,2 M
@@ -75,7 +75,9 @@ export function ReportView({ data }: { data: ReportData }) {
             <div className="text-right">
               <p className="text-sm" style={{ fontFamily: SERIF }}>{data.range.label}</p>
               <p className="text-[11px] text-background/55 mt-1">{data.range.days} hari</p>
-              <p className="text-[10px] text-background/45 mt-3 uppercase tracking-wider">{data.range.compareLabel}</p>
+              {data.range.hasComparison && (
+                <p className="text-[10px] text-background/45 mt-3 uppercase tracking-wider">{data.range.compareLabel}</p>
+              )}
             </div>
           </div>
 
@@ -86,15 +88,15 @@ export function ReportView({ data }: { data: ReportData }) {
           >
             {data.range.year}
           </p>
-          {data.finance.peakMonth && data.range.isYearly && (
+          {data.finance.bestDay && (
             <p className="-mt-2 text-[11px] uppercase tracking-[0.2em] text-background/55">
-              Puncak {data.finance.peakMonth.label} · {rpShort(data.finance.peakMonth.penjualan)}
+              Hari puncak · {rpShort(data.finance.bestDay.penjualan)}
             </p>
           )}
 
           {/* Capaian tiles */}
           <div className="mt-8 grid grid-cols-2 lg:grid-cols-4 gap-y-6">
-            <Hero label="Penjualan" delta={f.deltas.penjualan} first>
+            <Hero label="Penjualan" delta={data.range.hasComparison ? f.deltas.penjualan : undefined} first>
               <CountUp value={f.penjualan} format={rpShort} />
             </Hero>
             <Hero label="Hewan Terjual" sub={f.itemCount ? `Rp ${Math.round(f.penjualan / Math.max(f.itemCount, 1)).toLocaleString('id-ID')} / ekor` : undefined}>
@@ -103,7 +105,7 @@ export function ReportView({ data }: { data: ReportData }) {
             <Hero label="Pelanggan Unik" sub={f.entryCount ? `${f.entryCount} transaksi` : undefined}>
               <CountUp value={f.uniqueBuyers} format={(v) => Math.round(v).toLocaleString('id-ID')} />
             </Hero>
-            <Hero label="Profit" delta={f.deltas.profit} sub={`margin ${(f.margin * 100).toFixed(1)}%`}>
+            <Hero label="Profit" delta={data.range.hasComparison ? f.deltas.profit : undefined} sub={`margin ${(f.margin * 100).toFixed(1)}%`}>
               <CountUp value={f.profit} format={rpShort} />
             </Hero>
           </div>
@@ -149,45 +151,12 @@ export function ReportView({ data }: { data: ReportData }) {
               ]}
             />
 
-            {data.range.isYearly ? (
-              <>
-                <Block label={`Penjualan bulanan ${data.range.year}`} className="text-foreground/80">
-                  <MonthlyTimeline
-                    data={f.perMonth.map((m) => ({ label: m.label, value: m.penjualan, isFuture: m.isFuture }))}
-                    format={formatRupiah}
-                  />
-                </Block>
-
-                <Block label="Per kuartal" className="text-foreground/80">
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    {f.quarters.map((q) => (
-                      <div
-                        key={q.label}
-                        className={`relative rounded-xl border p-4 ${q.isPeak ? 'border-success-ring/40 bg-success-bg/30' : 'bg-muted/20'}`}
-                      >
-                        <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{q.label}</p>
-                        <p className="mt-1.5 text-xl leading-none tabular-nums" style={{ fontFamily: SERIF }}>
-                          {rpShort(q.penjualan)}
-                        </p>
-                        <p className="mt-1 text-[11px] text-muted-foreground">
-                          {q.itemCount} ekor · profit {rpShort(q.profit)}
-                        </p>
-                        {q.isPeak && (
-                          <span className="absolute top-2 right-2 text-[9px] uppercase tracking-wider text-success-fg font-semibold">Puncak</span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </Block>
-              </>
-            ) : (
-              <Block label="Penjualan & Profit harian" className="text-foreground/80">
-                <ComboDaily
-                  data={f.perDay.map((d) => ({ label: d.date.slice(8), bar: d.penjualan, line: Math.max(d.profit, 0) }))}
-                  format={formatRupiah}
-                />
-              </Block>
-            )}
+            <Block label="Penjualan & Profit harian" className="text-foreground/80">
+              <ComboDaily
+                data={f.perDay.map((d) => ({ label: d.date.slice(8), bar: d.penjualan, line: Math.max(d.profit, 0) }))}
+                format={formatRupiah}
+              />
+            </Block>
 
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-x-12 gap-y-8 items-start">
               {f.paymentMix.length > 0 && (

@@ -147,6 +147,14 @@ export interface EntryData {
   delivery: {
     status: string;
     driverName: string | null;
+    proofPhotoUrl?: string | null;
+    /** Queue position info — present only when the delivery is on a driver's route. */
+    progress?: {
+      position: number;
+      totalStops: number;
+      /** Every stop on the route, in delivery order, with its real status. */
+      stops: { status: string }[];
+    } | null;
   } | null;
   items: EntryItemData[];
   livestock: {
@@ -2077,6 +2085,40 @@ const MobileEntryCard = memo(function MobileEntryCard({
               </div>
             </div>
 
+            {/* Pengiriman — timing + queue position */}
+            {(entry.pengiriman || entry.delivery) && (
+              <div className="px-3 py-2.5">
+                <BandLabel>Pengiriman</BandLabel>
+                <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+                  {entry.pengiriman && (
+                    <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-info-bg text-info-fg">
+                      {formatPengiriman(entry.pengiriman)}
+                    </span>
+                  )}
+                  {entry.delivery?.driverName && (
+                    <span className="text-[11px] text-muted-foreground">
+                      <span className="font-medium text-foreground">{entry.delivery.driverName}</span>
+                      {' · '}{entry.delivery.status}
+                    </span>
+                  )}
+                  {entry.delivery && !entry.delivery.driverName && (
+                    <span className="text-[11px] text-muted-foreground">Belum di-assign driver</span>
+                  )}
+                </div>
+                {entry.delivery?.progress && (
+                  <div className="mt-2.5">
+                    <DeliveryProgress progress={entry.delivery.progress} />
+                  </div>
+                )}
+                {entry.delivery?.proofPhotoUrl && (
+                  <div className="mt-2.5 flex items-center gap-2">
+                    <ProofThumb url={entry.delivery.proofPhotoUrl} />
+                    <span className="text-[11px] text-muted-foreground">Foto bukti pengiriman</span>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Sales + Harga Jual */}
             <div className={`grid gap-3 px-3 py-2.5 ${isAdmin ? 'grid-cols-2' : 'grid-cols-1'}`}>
               {isAdmin && (
@@ -2272,6 +2314,115 @@ function KirimIcon({ isSent }: { isSent: boolean }) {
   );
 }
 
+// Renders one dot per stop on a driver's route — covers the WHOLE route, not
+// just up to the user's stop. `compact` shrinks dots/text for desktop cells.
+function DeliveryProgress({
+  progress,
+  compact = false,
+}: {
+  progress: NonNullable<NonNullable<EntryData['delivery']>['progress']>;
+  compact?: boolean;
+}) {
+  const { position, totalStops, stops } = progress;
+  const myIdx = position - 1;
+
+  type DotKind = 'done' | 'onway' | 'pending' | 'me';
+  const kindOf = (s: string, isMe: boolean): DotKind => {
+    if (isMe) return 'me';
+    if (s === 'DELIVERED' || s === 'FAILED') return 'done';
+    if (s === 'ON_DELIVERY') return 'onway';
+    return 'pending';
+  };
+
+  const colorClass = (k: DotKind, status: string): string => {
+    if (k === 'me') {
+      const base =
+        status === 'DELIVERED' || status === 'FAILED' ? 'bg-success-ring'
+        : status === 'ON_DELIVERY' ? 'bg-info-ring'
+        : 'bg-foreground';
+      return `${base} ring-2 ring-foreground/40 ring-offset-1 ring-offset-card`;
+    }
+    if (k === 'done') return 'bg-success-ring';
+    if (k === 'onway') return 'bg-info-ring';
+    return 'bg-muted-foreground/25';
+  };
+
+  // Compact-mode aggregates (whole route): done, onway, pending.
+  const doneTotal = stops.reduce((n, s) => n + (s.status === 'DELIVERED' || s.status === 'FAILED' ? 1 : 0), 0);
+  const onwayTotal = stops.reduce((n, s) => n + (s.status === 'ON_DELIVERY' ? 1 : 0), 0);
+  // Verbose-mode "ahead-of-me" aggregates (stops before this entry on the route).
+  const ahead = stops.slice(0, myIdx);
+  const aheadDone = ahead.reduce((n, s) => n + (s.status === 'DELIVERED' || s.status === 'FAILED' ? 1 : 0), 0);
+  const aheadOnway = ahead.reduce((n, s) => n + (s.status === 'ON_DELIVERY' ? 1 : 0), 0);
+  const aheadPending = ahead.length - aheadDone - aheadOnway;
+
+  const dotSize = compact ? 'size-1.5' : 'size-2';
+  const gap = compact ? 'gap-[3px]' : 'gap-1';
+
+  return (
+    <div className={`flex flex-col ${compact ? 'gap-1' : 'gap-1.5'}`}>
+      <div className={`flex items-center ${gap} flex-wrap`}>
+        {stops.map((s, i) => {
+          const kind = kindOf(s.status, i === myIdx);
+          return (
+            <span
+              key={i}
+              className={`block ${dotSize} rounded-full shrink-0 ${colorClass(kind, s.status)}`}
+              title={
+                i === myIdx
+                  ? `Anda · stop #${position}`
+                  : `Stop #${i + 1} · ${
+                      s.status === 'DELIVERED' ? 'terkirim'
+                      : s.status === 'FAILED' ? 'gagal'
+                      : s.status === 'ON_DELIVERY' ? 'dalam perjalanan'
+                      : 'menunggu'
+                    }`
+              }
+            />
+          );
+        })}
+      </div>
+      {compact ? (
+        <p className="text-[10px] text-muted-foreground leading-tight">
+          <span className="font-medium text-foreground">{position}</span>/{totalStops}
+          {doneTotal > 0 && <span> · <span className="text-success-fg">{doneTotal}</span>✓</span>}
+          {onwayTotal > 0 && <span> · <span className="text-info-fg">{onwayTotal}</span>↗</span>}
+        </p>
+      ) : (
+        <p className="text-[11px] text-muted-foreground">
+          Stop <span className="font-medium text-foreground">{position}</span> dari {totalStops}
+          {aheadDone > 0 && <span> · <span className="text-success-fg">{aheadDone} sebelumnya terkirim</span></span>}
+          {aheadOnway > 0 && <span> · <span className="text-info-fg">{aheadOnway} dalam perjalanan</span></span>}
+          {aheadPending > 0 && <span> · {aheadPending} menunggu</span>}
+          {totalStops > position && (
+            <span className="text-muted-foreground/70"> · {totalStops - position} stop sesudah</span>
+          )}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// Small clickable proof-of-delivery thumbnail. Opens Lightbox on click.
+function ProofThumb({ url, size = 'md' }: { url: string; size?: 'sm' | 'md' }) {
+  const [open, setOpen] = useState(false);
+  const sizeClass = size === 'sm' ? 'size-8' : 'size-12';
+  return (
+    <>
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); setOpen(true); }}
+        className={`${sizeClass} rounded-md overflow-hidden border bg-muted hover:ring-2 hover:ring-info-ring transition-all shrink-0 cursor-zoom-in`}
+        title="Lihat foto bukti pengiriman"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={toThumbnailUrl(url, 120)} alt="bukti kirim" loading="lazy" decoding="async" className="w-full h-full object-cover" />
+      </button>
+      <Lightbox src={url} alt="Bukti pengiriman" open={open} onClose={() => setOpen(false)} />
+    </>
+  );
+}
+
 function DeliveryIcon({
   delivery,
 }: {
@@ -2300,19 +2451,25 @@ function StatusCell({
 }: {
   status: string;
   isSent: boolean;
-  delivery: { status: string; driverName: string | null } | null;
+  delivery: EntryData['delivery'];
 }) {
   return (
-    <div className="flex flex-col items-center gap-0.5">
+    <div className="flex flex-col items-center gap-1">
       <div className="flex items-center gap-1.5">
         <StatusIcon status={status} />
         <KirimIcon isSent={isSent} />
         <DeliveryIcon delivery={delivery} />
+        {delivery?.proofPhotoUrl && <ProofThumb url={delivery.proofPhotoUrl} size="sm" />}
       </div>
       {delivery?.driverName && (
-        <span className="text-[10px] leading-tight text-muted-foreground max-w-[90px] truncate">
+        <span className="text-[10px] leading-tight text-muted-foreground max-w-[110px] truncate">
           {delivery.driverName}
         </span>
+      )}
+      {delivery?.progress && (
+        <div className="mt-0.5 w-full max-w-[140px] flex justify-center">
+          <DeliveryProgress progress={delivery.progress} compact />
+        </div>
       )}
     </div>
   );

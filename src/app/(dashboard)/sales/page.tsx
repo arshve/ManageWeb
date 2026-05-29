@@ -7,6 +7,7 @@ import { Plus, Phone, MapPin, Map, Route } from 'lucide-react';
 import Link from 'next/link';
 import { EntryTable } from '@/components/dashboard/entry-table';
 import { StatCard } from '@/components/ui/stat-card';
+import { getDeliveryProgressMap } from '@/lib/delivery/progress';
 
 const SERIF = "var(--font-dm-serif), 'DM Serif Display', serif";
 
@@ -28,11 +29,20 @@ export default async function SalesPage() {
         },
         sales: { select: { id: true, name: true } },
         delivery: {
-          select: { status: true, driver: { select: { name: true } } },
+          select: {
+            id: true,
+            status: true,
+            driverId: true,
+            sequence: true,
+            proofPhotoUrl: true,
+            driver: { select: { name: true } },
+          },
         },
       },
     }),
   ]);
+
+  const progressMap = await getDeliveryProgressMap(entries);
 
   const pendingEditLivestockIds = entries
     .flatMap((e) => e.editRequests)
@@ -93,7 +103,12 @@ export default async function SalesPage() {
       deleteRequestedAt: entry.deleteRequestedAt?.toISOString() ?? null,
       deleteRequestedById: entry.deleteRequestedById ?? null,
       delivery: entry.delivery
-        ? { status: entry.delivery.status, driverName: entry.delivery.driver?.name ?? null }
+        ? {
+            status: entry.delivery.status,
+            driverName: entry.delivery.driver?.name ?? null,
+            proofPhotoUrl: entry.delivery.proofPhotoUrl ?? null,
+            progress: progressMap.get(entry.delivery.id) ?? null,
+          }
         : null,
       items: entry.items.map((i) => ({
         id: i.id,

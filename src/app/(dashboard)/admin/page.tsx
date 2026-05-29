@@ -9,6 +9,7 @@ import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { StatCard } from '@/components/ui/stat-card';
 import { Phone, MapPin, Map, Receipt, Route, Truck, PackageCheck, Banknote, CheckCircle2 } from 'lucide-react';
+import { getDeliveryProgressMap } from '@/lib/delivery/progress';
 
 
 export default async function AdminDashboardPage() {
@@ -66,7 +67,14 @@ export default async function AdminDashboardPage() {
         },
         sales: { select: { id: true, name: true } },
         delivery: {
-          select: { status: true, driver: { select: { name: true } } },
+          select: {
+            id: true,
+            status: true,
+            driverId: true,
+            sequence: true,
+            proofPhotoUrl: true,
+            driver: { select: { name: true } },
+          },
         },
       },
     }),
@@ -90,6 +98,8 @@ export default async function AdminDashboardPage() {
 
   const totalRevenue = revenueAgg._sum.hargaJual ?? 0;
   const totalModal = revenueAgg._sum.hargaModal ?? 0;
+
+  const progressMap = await getDeliveryProgressMap(allEntries);
 
   const sortedEntries = [...allEntries].sort((a, b) => {
     const priority = (e: typeof a) =>
@@ -131,7 +141,12 @@ export default async function AdminDashboardPage() {
       deleteRequestedAt: entry.deleteRequestedAt?.toISOString() ?? null,
       deleteRequestedById: entry.deleteRequestedById ?? null,
       delivery: entry.delivery
-        ? { status: entry.delivery.status, driverName: entry.delivery.driver?.name ?? null }
+        ? {
+            status: entry.delivery.status,
+            driverName: entry.delivery.driver?.name ?? null,
+            proofPhotoUrl: entry.delivery.proofPhotoUrl ?? null,
+            progress: progressMap.get(entry.delivery.id) ?? null,
+          }
         : null,
       items: entry.items.map((i) => ({
         id: i.id,

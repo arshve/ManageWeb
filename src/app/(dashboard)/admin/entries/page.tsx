@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { DashboardShell } from '@/components/dashboard/dashboard-shell';
 import { EntryTable } from '@/components/dashboard/entry-table';
 import { Card, CardContent } from '@/components/ui/card';
+import { getDeliveryProgressMap } from '@/lib/delivery/progress';
 
 export default async function AdminEntriesPage() {
   const [entries, salesUsers] = await Promise.all([
@@ -22,7 +23,11 @@ export default async function AdminEntriesPage() {
         sales: { select: { id: true, name: true } },
         delivery: {
           select: {
+            id: true,
             status: true,
+            driverId: true,
+            sequence: true,
+            proofPhotoUrl: true,
             driver: { select: { name: true } },
           },
         },
@@ -47,6 +52,9 @@ export default async function AdminEntriesPage() {
       })
     : [];
   const pendingLivestockMap = Object.fromEntries(pendingLivestocks.map((l) => [l.id, l]));
+
+  // Queue progression per delivery (1 round-trip total for all routes touched).
+  const progressMap = await getDeliveryProgressMap(entries);
 
   const serialized = entries.map((entry) => {
     const first = entry.items[0]?.livestock;
@@ -75,7 +83,12 @@ export default async function AdminEntriesPage() {
       deleteRequestedAt: entry.deleteRequestedAt?.toISOString() ?? null,
       deleteRequestedById: entry.deleteRequestedById ?? null,
       delivery: entry.delivery
-        ? { status: entry.delivery.status, driverName: entry.delivery.driver?.name ?? null }
+        ? {
+            status: entry.delivery.status,
+            driverName: entry.delivery.driver?.name ?? null,
+            proofPhotoUrl: entry.delivery.proofPhotoUrl ?? null,
+            progress: progressMap.get(entry.delivery.id) ?? null,
+          }
         : null,
       items: entry.items.map((i) => ({
         id: i.id,

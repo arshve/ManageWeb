@@ -18,6 +18,7 @@ import {
   Plus,
   TrendingUp,
   TrendingDown,
+  FileStack,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -503,6 +504,10 @@ function SalesCard({
   onToggle: () => void;
 }) {
   const hex = getAvatarHex(record.user.name);
+  // Outstanding = anyone the sales still owes us money on (BELUM_BAYAR + DP).
+  const outstandingCount = record.entries.filter(
+    (e) => e.paymentStatus === 'BELUM_BAYAR' || e.paymentStatus === 'DP',
+  ).length;
 
   return (
     <div className="rounded-xl border bg-card overflow-hidden">
@@ -559,6 +564,23 @@ function SalesCard({
               </p>
             </div>
           </div>
+
+          {/* Batch invoice (outstanding piutang only) */}
+          {outstandingCount > 0 && (
+            <button
+              onClick={(e) => { e.stopPropagation(); window.open(`/api/batch-invoice/${record.user.id}`, '_blank'); }}
+              title={`Batch invoice (${outstandingCount} tagihan terbuka)`}
+              className="relative size-8 rounded-lg border border-border bg-muted flex items-center justify-center shrink-0 cursor-pointer transition-colors hover:bg-accent text-muted-foreground"
+            >
+              <FileStack className="h-3.5 w-3.5" />
+              <span
+                className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 rounded-full text-[9px] font-bold inline-flex items-center justify-center"
+                style={{ background: 'var(--danger-ring)', color: 'var(--background)' }}
+              >
+                {outstandingCount}
+              </span>
+            </button>
+          )}
 
           {/* Payslip */}
           <button

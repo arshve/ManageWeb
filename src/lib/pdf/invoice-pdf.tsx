@@ -145,15 +145,19 @@ const styles = StyleSheet.create({
   signerName: { fontSize: 10, fontWeight: 'bold' },
 });
 
-export function InvoiceDocument({ data }: { data: InvoiceData }) {
+/**
+ * The invoice page body, exported so other documents (e.g. batch invoice)
+ * can render multiple invoice pages in a single PDF without duplicating
+ * the layout. Stays self-contained — no shared state, just the data prop.
+ */
+export function InvoicePageContent({ data }: { data: InvoiceData }) {
   const totalHargaJual = data.items.reduce((s, i) => s + i.hargaJual, 0);
   const paidAmount = data.dp ?? 0;
   const sisa = Math.max(0, totalHargaJual - paidAmount);
 
   return (
-    <Document>
-      <Page size="A4" style={styles.page}>
-        <View style={styles.headerRow}>
+    <>
+      <View style={styles.headerRow}>
           <View style={styles.titleBlock}>
             <Image src={logoSrc} style={styles.logo} />
             <Text style={styles.title}>INVOICE</Text>
@@ -255,7 +259,18 @@ export function InvoiceDocument({ data }: { data: InvoiceData }) {
             <Text style={styles.signerName}>{COMPANY.signer}</Text>
           </View>
         </View>
+    </>
+  );
+}
+
+export function InvoiceDocument({ data }: { data: InvoiceData }) {
+  return (
+    <Document>
+      <Page size="A4" style={styles.page}>
+        <InvoicePageContent data={data} />
       </Page>
     </Document>
   );
 }
+
+export const invoicePageStyle = styles.page;

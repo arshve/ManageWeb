@@ -15,6 +15,7 @@ import {
   type MapDriver,
 } from '@/components/admin/delivery-map-loader';
 import { getDefaultDepot } from '@/lib/delivery/depot';
+import { DeliverySearchBar, type DeliverySearchRow } from '@/components/admin/delivery-search-bar';
 
 type SearchParams = { date?: string };
 
@@ -131,6 +132,19 @@ export default async function SalesDeliveriesPage({
     );
   }
 
+  // Lightweight index for the client-side search bar — invoice/buyer/sales/driver/SKU/tag.
+  const searchRows: DeliverySearchRow[] = scheduled.map((s) => ({
+    id: s.id,
+    invoiceNo: s.invoiceNo,
+    buyerName: s.buyerName,
+    salesName: s.sales?.name ?? null,
+    driverName: s.delivery?.driver?.name ?? null,
+    sequence: s.delivery?.sequence ?? null,
+    status: s.delivery?.status ?? 'PENDING',
+    skus: s.items.map((i) => i.livestock?.sku ?? '').filter(Boolean),
+    tags: s.items.map((i) => i.livestock?.tag ?? '').filter(Boolean),
+  }));
+
   return (
     <DashboardShell
       title="Rute Pengiriman"
@@ -146,23 +160,28 @@ export default async function SalesDeliveriesPage({
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4 flex flex-wrap items-center gap-2">
-            <Link
-              href={`/sales/deliveries?date=${dateOffset(dateStr, -1)}`}
-              className={buttonVariants({ size: 'sm', variant: 'outline' })}
-            >
-              ← Hari sebelum
-            </Link>
-            <Link
-              href={`/sales/deliveries?date=${dateOffset(dateStr, 1)}`}
-              className={buttonVariants({ size: 'sm', variant: 'outline' })}
-            >
-              Hari sesudah →
-            </Link>
-            <span className="ml-auto text-xs text-muted-foreground">
-              {scheduled.length} dijadwalkan
-            </span>
+        {/* Allow overflow so the search dropdown isn't clipped by Card's
+            default `overflow-hidden`. */}
+        <Card style={{ overflow: 'visible' }}>
+          <CardContent className="p-4 flex flex-col gap-3 overflow-visible">
+            <div className="flex flex-wrap items-center gap-2">
+              <Link
+                href={`/sales/deliveries?date=${dateOffset(dateStr, -1)}`}
+                className={buttonVariants({ size: 'sm', variant: 'outline' })}
+              >
+                ← Hari sebelum
+              </Link>
+              <Link
+                href={`/sales/deliveries?date=${dateOffset(dateStr, 1)}`}
+                className={buttonVariants({ size: 'sm', variant: 'outline' })}
+              >
+                Hari sesudah →
+              </Link>
+              <span className="ml-auto text-xs text-muted-foreground">
+                {scheduled.length} dijadwalkan
+              </span>
+            </div>
+            {searchRows.length > 0 && <DeliverySearchBar rows={searchRows} />}
           </CardContent>
         </Card>
 
@@ -236,7 +255,8 @@ export default async function SalesDeliveriesPage({
                           return (
                             <tr
                               key={s.id}
-                              className="hover:bg-muted/30 transition-colors"
+                              data-stop-id={s.id}
+                              className="hover:bg-muted/30 transition-colors scroll-mt-20"
                             >
                               <td className="px-4 py-3 text-xs text-muted-foreground font-mono">
                                 {(s.delivery?.sequence ?? 0) + 1}
@@ -354,7 +374,8 @@ export default async function SalesDeliveriesPage({
                       return (
                         <div
                           key={s.id}
-                          className="p-4 flex flex-col gap-3 hover:bg-muted/30 transition-colors"
+                          data-stop-id={s.id}
+                          className="p-4 flex flex-col gap-3 hover:bg-muted/30 transition-colors scroll-mt-20"
                         >
                           <div className="flex items-start justify-between">
                             <div className="flex items-center gap-2">

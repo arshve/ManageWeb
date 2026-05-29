@@ -56,6 +56,7 @@ import { Input } from '@/components/ui/input';
 import { StatusToken, DELIVERY_STATUS } from '@/components/ui/status-token';
 import { StatCard } from '@/components/ui/stat-card';
 import { Printer, Trash2, CheckCircle2, ChevronDown, ChevronUp, ChevronRight, Pencil } from 'lucide-react';
+import { DeliverySearchBar, type DeliverySearchRow } from '@/components/admin/delivery-search-bar';
 
 // Heavy dialogs lazy-loaded — fetched only when admin opens them.
 const InsertEntryDialog = dynamic(
@@ -74,6 +75,7 @@ const SERIF = "var(--font-dm-serif), 'DM Serif Display', serif";
 
 export type ScheduledEntry = {
   id: string;
+  invoiceNo: string;
   sku: string | undefined;
   animalType?: string;
   animalGrade?: string | null;
@@ -357,6 +359,23 @@ export function DeliveriesAdminView({
 
   // ─── Manual route builder (pick entries → driver → arrange order, no TSP) ──
   const scheduledById = useMemo(() => new Map(scheduled.map((e) => [e.id, e])), [scheduled]);
+
+  // Lightweight search index for the delivery search bar.
+  const searchRows = useMemo<DeliverySearchRow[]>(
+    () =>
+      scheduled.map((s) => ({
+        id: s.id,
+        invoiceNo: s.invoiceNo,
+        buyerName: s.buyerName,
+        salesName: s.salesName ?? null,
+        driverName: s.delivery?.driver?.name ?? null,
+        sequence: s.delivery?.sequence ?? null,
+        status: s.delivery?.status ?? 'PENDING',
+        skus: s.items.map((i) => i.sku ?? '').filter(Boolean),
+        tags: s.items.map((i) => i.tag ?? '').filter(Boolean),
+      })),
+    [scheduled],
+  );
   function openManual() {
     const ids = selectableScheduledIds.filter((id) => selectedScheduled.has(id));
     if (!ids.length) { toast.error('Pilih entry dulu'); return; }
@@ -569,6 +588,30 @@ export function DeliveriesAdminView({
           {scheduled.length} dijadwalkan · {unscheduled.length} belum dijadwal
         </span>
       </div>
+
+      {/* ── Jump-to-stop search ── */}
+      {searchRows.length > 0 && (
+        <div className="rounded-xl border bg-card p-3">
+          <DeliverySearchBar
+            rows={searchRows}
+            onBeforeJump={(stopId) => {
+              // Make sure the row is actually mounted before the scroll-and-
+              // highlight: expand its group (Semua tab) + focus its driver
+              // (Per Driver tab) so the data-stop-id node is visible.
+              const stop = scheduledById.get(stopId);
+              if (!stop) return;
+              const driverId = stop.delivery?.driverId ?? '__unassigned__';
+              setOpenGroups((prev) => {
+                if (prev.has(driverId)) return prev;
+                const next = new Set(prev);
+                next.add(driverId);
+                return next;
+              });
+              if (driverId !== '__unassigned__') setFocusDriver(driverId);
+            }}
+          />
+        </div>
+      )}
 
       {/* ── View mode toggle ── */}
       <div className="flex gap-1 p-0.5 rounded-lg bg-muted w-fit">
@@ -1174,7 +1217,7 @@ export function DeliveriesAdminView({
                         const href = navigationUrl({ buyerMaps: s.buyerMaps, buyerLat: s.buyerLat, buyerLng: s.buyerLng, buyerAddress: s.buyerAddress });
                         const ds = DELIVERY_STATUS[s.delivery?.status ?? 'PENDING'] ?? DELIVERY_STATUS.PENDING;
                         return (
-                          <tr key={s.id} className="hover:bg-muted/20 transition-colors">
+                          <tr key={s.id} data-stop-id={s.id} className="hover:bg-muted/20 transition-colors scroll-mt-24">
                             {isUnassigned && (
                               <td className={cn(td, 'pl-4')}>
                                 {s.buyerLat != null && s.buyerLng != null ? (
@@ -1332,7 +1375,7 @@ export function DeliveriesAdminView({
                     const href = navigationUrl({ buyerMaps: s.buyerMaps, buyerLat: s.buyerLat, buyerLng: s.buyerLng, buyerAddress: s.buyerAddress });
                     const dsMob = DELIVERY_STATUS[s.delivery?.status ?? 'PENDING'] ?? DELIVERY_STATUS.PENDING;
                     return (
-                      <div key={s.id} className="px-4 py-3 flex flex-col gap-1.5">
+                      <div key={s.id} data-stop-id={s.id} className="px-4 py-3 flex flex-col gap-1.5 scroll-mt-24">
                         {/* Header: seq + full name + info chips */}
                         <div className="flex items-start gap-2">
                           {isUnassigned && (
@@ -1884,7 +1927,7 @@ function PerDriverPanel({
                 .filter(Boolean)
                 .join(', ');
               return (
-                <li key={s.id} className="flex items-start gap-3 px-4 py-3">
+                <li key={s.id} data-stop-id={s.id} className="flex items-start gap-3 px-4 py-3 scroll-mt-24">
                   <span
                     className="size-5 shrink-0 mt-0.5 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
                     style={{ background: `var(--${ds.intent}-ring)` }}

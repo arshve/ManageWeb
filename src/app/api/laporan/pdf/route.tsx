@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { getReportData } from '@/lib/report/get-report';
 import { ReportDocument } from '@/lib/pdf/report-pdf';
+import { BriefingDocument } from '@/lib/pdf/briefing-pdf';
 
 const RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -12,6 +13,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const startStr = searchParams.get('start');
   const endStr = searchParams.get('end');
+  const view = searchParams.get('view') === 'briefing' ? 'briefing' : 'sampul';
 
   let start: Date, end: Date;
   if (startStr && endStr && RE.test(startStr) && RE.test(endStr)) {
@@ -27,13 +29,14 @@ export async function GET(request: Request) {
   }
 
   const data = await getReportData(start, end);
-  const pdfBuffer = await renderToBuffer(<ReportDocument data={data} />);
+  const doc = view === 'briefing' ? <BriefingDocument data={data} /> : <ReportDocument data={data} />;
+  const pdfBuffer = await renderToBuffer(doc);
 
   return new NextResponse(new Uint8Array(pdfBuffer), {
     status: 200,
     headers: {
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="laporan-${data.range.start}_${data.range.end}.pdf"`,
+      'Content-Disposition': `attachment; filename="laporan-${view}-${data.range.start}_${data.range.end}.pdf"`,
       'Cache-Control': 'no-store',
     },
   });

@@ -33,7 +33,8 @@ export function CatalogueGrid({ livestock }: CatalogueGridProps) {
 
   /* ── Availability-filtered base (for counts + weight options) ─────────── */
   const availFiltered = useMemo(() => {
-    if (availability === 'AVAIL') return livestock.filter((l) => !l.isSold);
+    // "Tersedia" = not sold AND sehat — sakit/mati are liability, not sellable.
+    if (availability === 'AVAIL') return livestock.filter((l) => !l.isSold && l.condition === 'SEHAT');
     return livestock;
   }, [livestock, availability]);
 

@@ -338,13 +338,22 @@ export function ReportDocument({ data }: { data: ReportData }) {
           </View>
           <View style={s.statGrid}>
             <Stat label="Total" value={String(data.stock.total)} />
-            <Stat label="Tersedia" value={String(data.stock.available)} />
+            <Stat label="Tersedia (sehat)" value={String(data.stock.available)} />
             <Stat label="Terjual (total)" value={String(data.stock.sold)} />
             <Stat label="Terjual (periode)" value={String(data.stock.soldInPeriod)} />
             <Stat label="Nilai modal stok" value={formatRupiah(data.stock.inventoryValueModal)} />
             <Stat label="Nilai jual stok" value={formatRupiah(data.stock.inventoryValueJual)} />
             <Stat label="Potensi profit" value={formatRupiah(data.stock.inventoryValueJual - data.stock.inventoryValueModal)} />
+            <Stat label="Kerugian stok · modal" value={formatRupiah(data.stock.lossModal)} />
           </View>
+          {data.stock.liabilityCount > 0 && (
+            <Text style={{ marginTop: 6, fontSize: 8, color: C.red }}>
+              Liabilitas: {data.stock.sakitCount > 0 ? `${data.stock.sakitCount} sakit` : ''}
+              {data.stock.sakitCount > 0 && data.stock.matiCount > 0 ? ' · ' : ''}
+              {data.stock.matiCount > 0 ? `${data.stock.matiCount} mati` : ''}
+              {' '}— modal hilang {formatRupiah(data.stock.lossModal)}
+            </Text>
+          )}
           <Text style={s.subHead}>Tersedia per jenis</Text>
           {data.stock.byType.map((x) => <Bar key={x.label} label={x.label} value={x.value} max={typeMax} color={C.green} fmt={(v) => String(v)} />)}
           <Text style={s.subHead}>Tersedia per grade</Text>

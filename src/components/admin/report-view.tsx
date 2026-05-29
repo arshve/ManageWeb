@@ -83,13 +83,13 @@ export function ReportView({ data }: { data: ReportData }) {
 
           {/* BIG YEAR — magazine cover focal */}
           <p
-            className="mt-3 leading-[0.78] tracking-[-0.04em] tabular-nums"
+            className="mt-3 leading-none tracking-[-0.04em] tabular-nums"
             style={{ fontFamily: SERIF, fontSize: 'clamp(96px, 18vw, 220px)' }}
           >
             {data.range.year}
           </p>
           {data.finance.bestDay && (
-            <p className="-mt-2 text-[11px] uppercase tracking-[0.2em] text-background/55">
+            <p className="mt-3 text-[11px] uppercase tracking-[0.2em] text-background/55">
               Hari puncak · {rpShort(data.finance.bestDay.penjualan)}
             </p>
           )}
@@ -292,18 +292,41 @@ export function ReportView({ data }: { data: ReportData }) {
           </Section>
 
           {/* 04 — Stok */}
-          <Section no="04" title="Stok Hewan" meta="Snapshot saat ini" delay={400}>
+          <Section
+            no="04"
+            title="Stok Hewan"
+            meta={data.stock.liabilityCount > 0
+              ? `Snapshot saat ini · ${data.stock.liabilityCount} liabilitas`
+              : 'Snapshot saat ini'}
+            delay={400}
+          >
             <DataGrid
               items={[
                 ['Total ternak', String(data.stock.total)],
-                ['Tersedia', String(data.stock.available)],
+                ['Tersedia · sehat', String(data.stock.available)],
                 ['Terjual · total', String(data.stock.sold)],
                 ['Terjual · periode', String(data.stock.soldInPeriod)],
                 ['Nilai modal stok', formatRupiah(data.stock.inventoryValueModal)],
                 ['Nilai jual stok', formatRupiah(data.stock.inventoryValueJual)],
                 ['Potensi profit', formatRupiah(data.stock.inventoryValueJual - data.stock.inventoryValueModal)],
+                ['Kerugian stok · modal', formatRupiah(data.stock.lossModal)],
               ]}
             />
+            {data.stock.liabilityCount > 0 && (
+              <div className="rounded-xl border border-danger-ring/40 bg-danger-bg/30 px-4 py-3 flex flex-wrap items-baseline justify-between gap-2">
+                <div className="flex items-baseline gap-3">
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-danger-fg">Liabilitas Stok</p>
+                  <p className="text-sm text-foreground">
+                    {data.stock.sakitCount > 0 && <span>{data.stock.sakitCount} sakit</span>}
+                    {data.stock.sakitCount > 0 && data.stock.matiCount > 0 && <span className="text-muted-foreground"> · </span>}
+                    {data.stock.matiCount > 0 && <span>{data.stock.matiCount} mati</span>}
+                  </p>
+                </div>
+                <p className="text-lg tabular-nums text-danger-fg" style={{ fontFamily: SERIF }}>
+                  − {formatRupiah(data.stock.lossModal)}
+                </p>
+              </div>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-12 gap-y-8">
               <Block label="Tersedia per jenis" className="text-success-fg">
                 <HorizontalBars data={data.stock.byType} format={(v) => String(v)} />

@@ -32,7 +32,8 @@ export default async function AntrianPage() {
       orderBy: [{ entry: { createdAt: 'asc' } }, { isFulfilled: 'asc' }, { createdAt: 'asc' }],
     }),
     prisma.livestock.findMany({
-      where: { isSold: false, condition: { not: 'MATI' } },
+      // Match requests only against sehat livestock — sakit/mati are liability, not sellable.
+      where: { isSold: false, condition: 'SEHAT' },
       select: {
         id: true,
         sku: true,

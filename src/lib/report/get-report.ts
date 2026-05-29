@@ -75,11 +75,16 @@ export type ReportData = {
   };
   stock: {
     total: number;
-    available: number;
+    available: number; // SEHAT + not sold only
     sold: number;
     soldInPeriod: number;
     inventoryValueModal: number;
     inventoryValueJual: number;
+    // SAKIT + MATI livestock that are not sold — counted as loss/liability.
+    sakitCount: number;
+    matiCount: number;
+    liabilityCount: number;
+    lossModal: number;
     byType: { label: string; value: number }[];
     byGrade: { label: string; value: number }[];
     byCondition: { label: string; value: number }[];
@@ -334,18 +339,27 @@ export async function getReportData(start: Date, end: Date): Promise<ReportData>
   const successRate = deliveries.length ? terkirim / deliveries.length : 0;
 
   // ── Stock snapshot ──
-  const availableLs = livestock.filter((l) => !l.isSold);
+  // Available = NOT sold AND condition SEHAT. SAKIT/MATI livestock that aren't
+  // sold are tracked separately as liability (sunk modal cost, no revenue).
+  const availableLs = livestock.filter((l) => !l.isSold && l.condition === 'SEHAT');
+  let sakitCount = 0, matiCount = 0, lossModal = 0;
   const byTypeS = new Map<string, number>(), byGradeS = new Map<string, number>(), byCondS = new Map<string, number>();
   let invModal = 0, invJual = 0;
   for (const l of livestock) {
     byCondS.set(l.condition, (byCondS.get(l.condition) ?? 0) + 1);
-    if (!l.isSold) {
+    if (l.isSold) continue;
+    if (l.condition === 'SEHAT') {
       byTypeS.set(l.type, (byTypeS.get(l.type) ?? 0) + 1);
       byGradeS.set(l.grade ?? '—', (byGradeS.get(l.grade ?? '—') ?? 0) + 1);
       invModal += l.hargaModal ?? 0;
       invJual += l.hargaJual ?? 0;
+    } else {
+      if (l.condition === 'SAKIT') sakitCount++;
+      else if (l.condition === 'MATI') matiCount++;
+      lossModal += l.hargaModal ?? 0;
     }
   }
+  const liabilityCount = sakitCount + matiCount;
   const toArr = (m: Map<string, number>, tc = true) =>
     Array.from(m.entries()).map(([label, value]) => ({ label: tc ? titleCase(label) : label, value })).sort((a, b) => b.value - a.value);
 
@@ -410,7 +424,13 @@ export async function getReportData(start: Date, end: Date): Promise<ReportData>
   if (bestDay) insights.push(`Hari tertinggi: ${fmtDay(new Date(bestDay.date + 'T00:00:00Z'))} (${formatRupiah(bestDay.penjualan)}).`);
   if (piutang > 0) insights.push(`Piutang ${formatRupiah(piutang)} dari ${countBelum + countDp} transaksi belum lunas (tertagih ${(collectionRate * 100).toFixed(0)}%).`);
   if (deliveries.length) insights.push(`Pengiriman: ${terkirim}/${deliveries.length} terkirim (${(successRate * 100).toFixed(0)}%${gagal ? `, ${gagal} gagal` : ''}).`);
-  insights.push(`Stok tersedia ${availableLs.length} ekor — nilai modal ${formatRupiah(invModal)}.`);
+  insights.push(`Stok tersedia ${availableLs.length} ekor (sehat) — nilai modal ${formatRupiah(invModal)}.`);
+  if (liabilityCount > 0) {
+    const parts: string[] = [];
+    if (sakitCount > 0) parts.push(`${sakitCount} sakit`);
+    if (matiCount > 0) parts.push(`${matiCount} mati`);
+    insights.push(`Kerugian stok: ${liabilityCount} ekor (${parts.join(', ')}) — modal hilang ${formatRupiah(lossModal)}.`);
+  }
 
   return {
     range: {
@@ -445,6 +465,7 @@ export async function getReportData(start: Date, end: Date): Promise<ReportData>
     stock: {
       total: livestock.length, available: availableLs.length, sold: livestock.filter((l) => l.isSold).length,
       soldInPeriod: itemCount, inventoryValueModal: invModal, inventoryValueJual: invJual,
+      sakitCount, matiCount, liabilityCount, lossModal,
       byType: toArr(byTypeS), byGrade: toArr(byGradeS, false), byCondition: toArr(byCondS),
     },
   };

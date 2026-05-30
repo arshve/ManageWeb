@@ -1,7 +1,7 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
-import { requireAuth, requireRole } from '@/lib/auth';
+import { requireAuth, requireRole, isAdminRole } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
 import { logAudit } from '@/lib/audit';
 import { solveTSP } from '@/lib/delivery/tsp';
@@ -481,7 +481,7 @@ async function requireDriverOwnership(deliveryId: string) {
     include: { entry: { select: { invoiceNo: true } } },
   });
   if (!delivery) return { error: 'Delivery tidak ditemukan' as const };
-  if (profile.role !== 'ADMIN' && profile.role !== 'SUPER_ADMIN' && delivery.driverId !== profile.id) {
+  if (!isAdminRole(profile.role) && delivery.driverId !== profile.id) {
     return { error: 'Bukan delivery Anda' as const };
   }
   return { profile, delivery } as const;
@@ -508,7 +508,7 @@ export async function toggleItemLoaded(itemId: string, loaded: boolean) {
   if (!delivery) return { error: 'Delivery tidak ditemukan' };
   if (delivery.status !== 'ASSIGNED') return { error: 'Tidak bisa ubah checklist setelah perjalanan dimulai' };
 
-  const isAdmin = profile.role === 'ADMIN' || profile.role === 'SUPER_ADMIN';
+  const isAdmin = isAdminRole(profile.role);
   if (!isAdmin && delivery.driverId !== profile.id) return { error: 'Bukan delivery Anda' };
 
   await prisma.entryItem.update({
@@ -544,7 +544,7 @@ export async function bulkToggleItemsLoaded(deliveryId: string, loaded: boolean)
   if (!delivery) return { error: 'Delivery tidak ditemukan' };
   if (delivery.status !== 'ASSIGNED') return { error: 'Tidak bisa ubah checklist setelah perjalanan dimulai' };
 
-  const isAdmin = profile.role === 'ADMIN' || profile.role === 'SUPER_ADMIN';
+  const isAdmin = isAdminRole(profile.role);
   if (!isAdmin && delivery.driverId !== profile.id) return { error: 'Bukan delivery Anda' };
 
   await prisma.entryItem.updateMany({
@@ -685,7 +685,7 @@ export async function bulkToggleItemsForDriver(
   loaded: boolean,
 ) {
   const profile = await requireAuth();
-  const isAdmin = profile.role === 'ADMIN' || profile.role === 'SUPER_ADMIN';
+  const isAdmin = isAdminRole(profile.role);
   if (!isAdmin && driverId !== profile.id) return { error: 'Bukan delivery Anda' };
   const date = parseDateOnly(deliveryDate);
   if (!date) return { error: 'Tanggal tidak valid' };

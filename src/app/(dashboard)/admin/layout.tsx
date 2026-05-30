@@ -1,6 +1,7 @@
 import { requireRole } from "@/lib/auth";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { Footer } from "@/components/footer";
+import { getAppConfig } from "@/lib/config/get-config";
 
 export default async function AdminLayout({
   children,
@@ -8,10 +9,16 @@ export default async function AdminLayout({
   children: React.ReactNode;
 }) {
   const profile = await requireRole("ADMIN", "SUPER_ADMIN");
+  const cfg = await getAppConfig();
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar role={profile.role as 'ADMIN' | 'SUPER_ADMIN'} userName={profile.name} />
+      <Sidebar
+        role={profile.role as 'OWNER' | 'ADMIN' | 'SUPER_ADMIN'}
+        userName={profile.name}
+        brandName={cfg.brandName}
+        logoUrl={cfg.logoUrl}
+      />
       <main className="flex-1 overflow-auto flex flex-col">
         <div className="flex-1">{children}</div>
         <Footer />

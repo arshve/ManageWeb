@@ -3,15 +3,17 @@ import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { ArrowRight } from 'lucide-react';
 import { HeroCarousel } from '@/components/landing/hero-carousel';
+import { getAppConfig } from '@/lib/config/get-config';
 
-export default function HomePage() {
+export default async function HomePage() {
+  const cfg = await getAppConfig();
   return (
     <main>
       {/* New Hero — Balanced visibility and readability */}
       <section className="relative w-full h-[100svh] min-h-[700px] flex items-center justify-center overflow-hidden bg-[#1a2f1a]">
         {/* Background Image Carousel */}
         <div className="absolute inset-0 z-0">
-          <HeroCarousel />
+          <HeroCarousel slides={cfg.carouselSlides} />
         </div>
 
         {/* 1. Lighter Green Gradient + Softer Blur */}

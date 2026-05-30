@@ -1,16 +1,21 @@
 import { prisma } from "@/lib/prisma";
-import { requireAuth, isSuperAdmin } from "@/lib/auth";
+import { requireAuth, isSuperAdmin, isOwner } from "@/lib/auth";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { UserForm } from "@/components/dashboard/user-form";
 import { UsersAdminView } from "@/components/dashboard/users-admin-view";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
+import type { Role } from "@/generated/prisma";
 
 export default async function UsersPage() {
   const profile = await requireAuth();
   const superAdmin = isSuperAdmin(profile.role);
+  const owner = isOwner(profile.role);
+  // Owner sees everyone; super-admin sees all except OWNER; others hide both
+  // OWNER and SUPER_ADMIN rows.
+  const hiddenRoles: Role[] = owner ? [] : superAdmin ? ['OWNER'] : ['OWNER', 'SUPER_ADMIN'];
   const users = await prisma.profile.findMany({
-    where: superAdmin ? undefined : { role: { not: 'SUPER_ADMIN' } },
+    where: hiddenRoles.length ? { role: { notIn: hiddenRoles } } : undefined,
     orderBy: { createdAt: "desc" },
     include: {
       _count: { select: { entries: true } },
@@ -24,6 +29,7 @@ export default async function UsersPage() {
       actions={
         <UserForm
           isSuperAdmin={superAdmin}
+          isOwner={owner}
           trigger={
             <Button>
               <Plus className="size-4 mr-2" />
@@ -33,7 +39,7 @@ export default async function UsersPage() {
         />
       }
     >
-      <UsersAdminView users={users} isSuperAdmin={superAdmin} />
+      <UsersAdminView users={users} isSuperAdmin={superAdmin} isOwner={owner} />
     </DashboardShell>
   );
 }

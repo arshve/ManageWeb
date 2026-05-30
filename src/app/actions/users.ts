@@ -41,10 +41,13 @@ export async function createUser(formData: FormData) {
     const phone = (formData.get('phone') as string) || null;
     const rekBank = (formData.get('rekBank') as string) || null;
     const role =
-      (formData.get('role') as 'SUPER_ADMIN' | 'ADMIN' | 'SALES' | 'MANAGE' | 'DRIVER') ||
+      (formData.get('role') as 'OWNER' | 'SUPER_ADMIN' | 'ADMIN' | 'SALES' | 'MANAGE' | 'DRIVER') ||
       'SALES';
 
-    if (role === 'SUPER_ADMIN' && actor.role !== 'SUPER_ADMIN') {
+    if (role === 'OWNER' && actor.role !== 'OWNER') {
+      return { error: 'Hanya Owner yang bisa membuat user Owner' };
+    }
+    if (role === 'SUPER_ADMIN' && actor.role !== 'SUPER_ADMIN' && actor.role !== 'OWNER') {
       return { error: 'Hanya Super Admin yang bisa membuat user Super Admin' };
     }
 
@@ -95,8 +98,11 @@ export async function updateUser(id: string, formData: FormData) {
     const name = formData.get('name') as string;
     const phone = (formData.get('phone') as string) || null;
     const rekBank = (formData.get('rekBank') as string) || null;
-    const role = formData.get('role') as 'SUPER_ADMIN' | 'ADMIN' | 'SALES' | 'MANAGE' | 'DRIVER';
-    if ((role === 'SUPER_ADMIN' || before.role === 'SUPER_ADMIN') && actor.role !== 'SUPER_ADMIN') {
+    const role = formData.get('role') as 'OWNER' | 'SUPER_ADMIN' | 'ADMIN' | 'SALES' | 'MANAGE' | 'DRIVER';
+    if ((role === 'OWNER' || before.role === 'OWNER') && actor.role !== 'OWNER') {
+      return { error: 'Hanya Owner yang bisa mengubah user Owner' };
+    }
+    if ((role === 'SUPER_ADMIN' || before.role === 'SUPER_ADMIN') && actor.role !== 'SUPER_ADMIN' && actor.role !== 'OWNER') {
       return { error: 'Hanya Super Admin yang bisa mengubah user Super Admin' };
     }
     const isActive = formData.get('isActive') === 'true';

@@ -9,7 +9,7 @@ import {
   Rect,
   StyleSheet,
 } from '@react-pdf/renderer';
-import { COMPANY } from './company';
+import { COMPANY, type CompanyInfo } from './company';
 import { formatRupiah } from '@/lib/format';
 import type { ReportData, Delta } from '@/lib/report/get-report';
 
@@ -116,7 +116,7 @@ function Table({ head, rows, widths, rightFrom }: { head: string[]; rows: string
   );
 }
 
-export function ReportDocument({ data }: { data: ReportData }) {
+export function ReportDocument({ data, company = COMPANY }: { data: ReportData; company?: CompanyInfo }) {
   const f = data.finance;
   const salesMax = Math.max(...f.perSales.map((x) => x.penjualan), 1);
   const typeRevMax = Math.max(...f.byType.map((x) => x.penjualan), 1);
@@ -132,10 +132,10 @@ export function ReportDocument({ data }: { data: ReportData }) {
         <View style={s.headerRow}>
           <View style={s.logoBlock}>
             {/* eslint-disable-next-line jsx-a11y/alt-text */}
-            <Image src={logoSrc} style={s.logo} />
+            <Image src={company.logoUrl || logoSrc} style={s.logo} />
             <View>
-              <Text style={s.companyName}>{COMPANY.name}</Text>
-              <Text style={s.companyTagline}>{COMPANY.tagline}</Text>
+              <Text style={s.companyName}>{company.name}</Text>
+              <Text style={s.companyTagline}>{company.tagline}</Text>
             </View>
           </View>
           <View>
@@ -362,7 +362,7 @@ export function ReportDocument({ data }: { data: ReportData }) {
           {data.stock.byCondition.map((x) => <Bar key={x.label} label={x.label} value={x.value} max={condMax} color={C.amber} fmt={(v) => String(v)} />)}
         </View>
 
-        <Text style={s.footer}>Dibuat otomatis oleh Millenials Farm · Periode {data.range.label}</Text>
+        <Text style={s.footer}>Dibuat otomatis oleh {company.name} · Periode {data.range.label}</Text>
       </Page>
     </Document>
   );

@@ -6,7 +6,7 @@ import path from 'node:path';
 import {
   Document, Page, View, Text, Image, Svg, Rect, StyleSheet,
 } from '@react-pdf/renderer';
-import { COMPANY } from './company';
+import { COMPANY, type CompanyInfo } from './company';
 import { formatRupiah } from '@/lib/format';
 import type { ReportData, Delta } from '@/lib/report/get-report';
 
@@ -141,7 +141,7 @@ function Table({ head, rows, widths, rightFrom }: { head: string[]; rows: string
   );
 }
 
-export function BriefingDocument({ data }: { data: ReportData }) {
+export function BriefingDocument({ data, company = COMPANY }: { data: ReportData; company?: CompanyInfo }) {
   const f = data.finance;
   const d = data.delivery;
   const weekly = toWeekly(f.perDay);
@@ -158,7 +158,7 @@ export function BriefingDocument({ data }: { data: ReportData }) {
         <View style={s.head}>
           <View style={s.brand}>
             {/* eslint-disable-next-line jsx-a11y/alt-text */}
-            <Image src={logoSrc} style={s.logo} />
+            <Image src={company.logoUrl || logoSrc} style={s.logo} />
             <View>
               <Text style={s.title}>Laporan Musim Qurban {data.range.year}</Text>
               <Text style={s.sub}>Idul Adha · {data.range.label}</Text>
@@ -303,7 +303,7 @@ export function BriefingDocument({ data }: { data: ReportData }) {
         </View>
 
         <View style={s.foot}>
-          <Text>{COMPANY.name}</Text>
+          <Text>{company.name}</Text>
           <Text>Laporan Musim Qurban {data.range.year}</Text>
         </View>
       </Page>

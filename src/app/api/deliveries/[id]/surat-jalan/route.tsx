@@ -1,8 +1,9 @@
 import { prisma } from '@/lib/prisma';
-import { requireAuth } from '@/lib/auth';
+import { requireAuth, isAdminRole } from '@/lib/auth';
 import { NextResponse } from 'next/server';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { SuratJalanDocument } from '@/lib/pdf/surat-jalan-pdf';
+import { getCompanyInfo } from '@/lib/config/get-config';
 
 export async function GET(
   _request: Request,
@@ -42,8 +43,7 @@ export async function GET(
   }
 
   const allowed =
-    profile.role === 'ADMIN' ||
-    profile.role === 'SUPER_ADMIN' ||
+    isAdminRole(profile.role) ||
     (profile.role === 'DRIVER' && delivery.driverId === profile.id);
 
   if (!allowed) {
@@ -51,9 +51,11 @@ export async function GET(
   }
 
   const entry = delivery.entry;
+  const company = await getCompanyInfo();
 
   const pdfBuffer = await renderToBuffer(
     <SuratJalanDocument
+      company={company}
       data={{
         noSuratJalan: `SJ/${entry.invoiceNo}`,
         tanggal: entry.deliveryDate ?? new Date(),

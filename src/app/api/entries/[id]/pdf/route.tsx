@@ -1,9 +1,10 @@
 import { prisma } from '@/lib/prisma';
-import { requireAuth } from '@/lib/auth';
+import { requireAuth, isAdminRole } from '@/lib/auth';
 import { NextResponse } from 'next/server';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { InvoiceDocument } from '@/lib/pdf/invoice-pdf';
 import { KwitansiDocument } from '@/lib/pdf/kwitansi-pdf';
+import { getCompanyInfo } from '@/lib/config/get-config';
 
 export async function GET(
   request: Request,
@@ -31,7 +32,7 @@ export async function GET(
     return NextResponse.json({ error: 'Entry tidak ditemukan' }, { status: 404 });
   }
 
-  if (profile.role !== 'ADMIN' && profile.role !== 'SUPER_ADMIN' && entry.salesId !== profile.id) {
+  if (!isAdminRole(profile.role) && entry.salesId !== profile.id) {
     return NextResponse.json({ error: 'Tidak berhak' }, { status: 403 });
   }
 
@@ -43,11 +44,13 @@ export async function GET(
   }
 
   const totalHargaJual = entry.items.reduce((s, i) => s + i.hargaJual, 0);
+  const company = await getCompanyInfo();
 
   const pdfBuffer =
     type === 'invoice'
       ? await renderToBuffer(
           <InvoiceDocument
+            company={company}
             data={{
               invoiceNo: entry.invoiceNo,
               createdAt: entry.createdAt,
@@ -68,6 +71,7 @@ export async function GET(
         )
       : await renderToBuffer(
           <KwitansiDocument
+            company={company}
             data={{
               invoiceNo: entry.invoiceNo,
               createdAt: entry.createdAt,

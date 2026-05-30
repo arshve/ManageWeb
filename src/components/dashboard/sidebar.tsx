@@ -33,6 +33,8 @@ import {
   Wallet,
   ListChecks,
   FileBarChart,
+  Palette,
+  DatabaseBackup,
 } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -40,8 +42,10 @@ import { useRouter } from 'next/navigation';
 import { ChangePasswordButton } from '@/components/dashboard/change-password-form';
 
 interface SidebarProps {
-  role: 'SUPER_ADMIN' | 'ADMIN' | 'SALES' | 'MANAGE' | 'DRIVER';
+  role: 'OWNER' | 'SUPER_ADMIN' | 'ADMIN' | 'SALES' | 'MANAGE' | 'DRIVER';
   userName: string;
+  brandName?: string;
+  logoUrl?: string | null;
 }
 
 // Navigation links for each role
@@ -60,6 +64,12 @@ const superAdminExtras = [
   { href: '/admin/logs', label: 'Log Aktivitas', icon: History },
 ];
 
+// OWNER-only — white-label configuration + data tools.
+const ownerExtras = [
+  { href: '/admin/owner/branding', label: 'Branding', icon: Palette },
+  { href: '/admin/owner/data', label: 'Data', icon: DatabaseBackup },
+];
+
 const salesLinks = [
   { href: '/sales', label: 'Entry Saya', icon: ClipboardList },
   { href: '/sales/new', label: 'Tambah Entry', icon: Beef },
@@ -73,20 +83,36 @@ const driverLinks = [
   { href: '/driver', label: 'Rute Hari Ini', icon: Truck },
 ];
 
-export function Sidebar({ role, userName }: SidebarProps) {
+type NavLink = { href: string; label: string; icon: typeof LayoutDashboard };
+type NavSection = { label?: string; items: NavLink[] };
+
+const ROLE_LABEL: Record<SidebarProps['role'], string> = {
+  OWNER: 'Owner',
+  SUPER_ADMIN: 'Super Admin',
+  ADMIN: 'Admin',
+  SALES: 'Sales',
+  MANAGE: 'Manage',
+  DRIVER: 'Driver',
+};
+
+export function Sidebar({ role, userName, brandName = 'Millenials Farm', logoUrl }: SidebarProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false); // Mobile menu state
   const router = useRouter();
-  const links =
-    role === 'SUPER_ADMIN'
-      ? [...adminLinks, ...superAdminExtras]
-      : role === 'ADMIN'
-        ? adminLinks
-        : role === 'MANAGE'
-          ? manageLinks
-          : role === 'DRIVER'
-            ? driverLinks
-            : salesLinks;
+  // Owner-only links sit in their own labelled section below the admin links,
+  // so OWNER is visually distinct from SUPER_ADMIN (who shares the top group).
+  const sections: NavSection[] =
+    role === 'OWNER'
+      ? [{ items: [...adminLinks, ...superAdminExtras] }, { label: 'Owner', items: ownerExtras }]
+      : role === 'SUPER_ADMIN'
+        ? [{ items: [...adminLinks, ...superAdminExtras] }]
+        : role === 'ADMIN'
+          ? [{ items: adminLinks }]
+          : role === 'MANAGE'
+            ? [{ items: manageLinks }]
+            : role === 'DRIVER'
+              ? [{ items: driverLinks }]
+              : [{ items: salesLinks }];
 
   /**
    * Handles logout: calls the logout API to clear the session cookie,
@@ -125,10 +151,10 @@ export function Sidebar({ role, userName }: SidebarProps) {
       >
         {/* Header with brand name */}
         <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
-          <Link href="/" className="flex items-center gap-2">
-            <Image src="/logo.png" alt="Millenials Farm" width={32} height={32} />
-            <span className="text-lg font-bold text-sidebar-primary">
-              Millenials Farm
+          <Link href="/" className="flex items-center gap-2 min-w-0">
+            <Image src={logoUrl || '/logo.png'} alt={brandName} width={32} height={32} className="object-contain shrink-0" />
+            <span className="text-lg font-bold text-sidebar-primary truncate">
+              {brandName}
             </span>
           </Link>
           <button onClick={() => setOpen(false)} className="md:hidden">
@@ -136,38 +162,57 @@ export function Sidebar({ role, userName }: SidebarProps) {
           </button>
         </div>
 
-        {/* Navigation links — different links based on role */}
+        {/* Navigation links — grouped into sections; labelled sections (e.g.
+            Owner) get a heading + divider to set them apart. */}
         <nav className="flex-1 p-3 flex flex-col gap-1 overflow-y-auto">
-          {links.map((link) => {
-            // Determine if this link is active (current page)
-            const isActive =
-              pathname === link.href ||
-              (link.href !== '/admin' &&
-                link.href !== '/sales' &&
-                pathname.startsWith(link.href));
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={() => setOpen(false)}
-                className={cn(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
-                  isActive
-                    ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                    : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
-                )}
-              >
-                <link.icon className="size-4" />
-                {link.label}
-              </Link>
-            );
-          })}
+          {sections.map((section, si) => (
+            <div key={section.label ?? si} className={cn('flex flex-col gap-1', section.label && 'mt-3 pt-3 border-t border-sidebar-border')}>
+              {section.label && (
+                <span className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-sidebar-primary/70">
+                  {section.label}
+                </span>
+              )}
+              {section.items.map((link) => {
+                const isActive =
+                  pathname === link.href ||
+                  (link.href !== '/admin' &&
+                    link.href !== '/sales' &&
+                    pathname.startsWith(link.href));
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setOpen(false)}
+                    className={cn(
+                      'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                      isActive
+                        ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                        : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
+                    )}
+                  >
+                    <link.icon className="size-4" />
+                    {link.label}
+                  </Link>
+                );
+              })}
+            </div>
+          ))}
         </nav>
 
         {/* Footer: user info + navigation + logout */}
         <div className="p-3 border-t border-sidebar-border">
-          <div className="px-3 py-2 text-xs text-sidebar-foreground/50 truncate">
-            {userName}
+          <div className="px-3 py-2 flex items-center gap-2 min-w-0">
+            <span className="text-xs text-sidebar-foreground/50 truncate">{userName}</span>
+            <span
+              className={cn(
+                'shrink-0 text-[9px] font-bold uppercase tracking-[0.1em] px-1.5 py-0.5 rounded',
+                role === 'OWNER'
+                  ? 'bg-sidebar-primary text-sidebar-primary-foreground'
+                  : 'border border-sidebar-border text-sidebar-foreground/60',
+              )}
+            >
+              {ROLE_LABEL[role]}
+            </span>
           </div>
           {/* <Link
             href="/"

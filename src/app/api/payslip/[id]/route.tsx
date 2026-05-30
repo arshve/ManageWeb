@@ -3,6 +3,7 @@ import { requireRole } from '@/lib/auth';
 import { NextResponse } from 'next/server';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { PayslipDocument, type PayslipData } from '@/lib/pdf/payslip-pdf';
+import { getCompanyInfo } from '@/lib/config/get-config';
 
 export async function GET(
   request: Request,
@@ -80,7 +81,8 @@ export async function GET(
       recapItems,
     };
 
-    const pdfBuffer = await renderToBuffer(<PayslipDocument data={data} />);
+    const company = await getCompanyInfo();
+    const pdfBuffer = await renderToBuffer(<PayslipDocument data={data} company={company} />);
     const filename = `Payslip_${sales.name.replace(/\s+/g, '_')}_${new Date().getTime()}.pdf`;
 
     return new NextResponse(new Uint8Array(pdfBuffer), {

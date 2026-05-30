@@ -7,7 +7,7 @@ import {
   Image,
   StyleSheet,
 } from '@react-pdf/renderer';
-import { COMPANY } from './company';
+import { COMPANY, type CompanyInfo } from './company';
 
 const logoSrc = path.join(process.cwd(), 'public', 'logo.png');
 
@@ -280,20 +280,20 @@ function RecapTable({ items }: { items: RecapItem[] }) {
 
 // ─── Main Document ────────────────────────────────────────────────────────────
 
-export function PayslipDocument({ data }: { data: PayslipData }) {
+export function PayslipDocument({ data, company = COMPANY }: { data: PayslipData; company?: CompanyInfo }) {
   return (
     <Document>
       <Page size="A4" style={S.page}>
         {/* INVOICE-STYLE HEADER */}
         <View style={S.headerRow}>
           <View style={S.titleBlock}>
-            <Image src={logoSrc} style={S.logoImg} />
+            <Image src={company.logoUrl || logoSrc} style={S.logoImg} />
             <Text style={S.pageTitle}>Pay Slip</Text>
           </View>
           <View style={S.companyBlock}>
-            <Text style={S.coName}>{COMPANY.name}</Text>
-            <Text style={S.coTag}>{COMPANY.tagline}</Text>
-            <Text style={S.coAddr}>{COMPANY.address}</Text>
+            <Text style={S.coName}>{company.name}</Text>
+            <Text style={S.coTag}>{company.tagline}</Text>
+            <Text style={S.coAddr}>{company.address}</Text>
           </View>
         </View>
 

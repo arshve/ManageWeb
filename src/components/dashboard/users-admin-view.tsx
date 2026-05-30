@@ -24,6 +24,7 @@ interface UserRow {
 }
 
 const ROLE_LABELS: Record<string, string> = {
+  OWNER: 'Owner',
   SUPER_ADMIN: 'Super Admin',
   ADMIN: 'Admin',
   SALES: 'Sales',
@@ -31,9 +32,11 @@ const ROLE_LABELS: Record<string, string> = {
   DRIVER: 'Driver',
 };
 
-const ROLES = ['SUPER_ADMIN', 'ADMIN', 'SALES', 'MANAGE', 'DRIVER'] as const;
+const ROLES = ['OWNER', 'SUPER_ADMIN', 'ADMIN', 'SALES', 'MANAGE', 'DRIVER'] as const;
 
-function UserCard({ user, isSuperAdmin }: { user: UserRow; isSuperAdmin: boolean }) {
+const ELEVATED_ROLES = new Set(['OWNER', 'SUPER_ADMIN', 'ADMIN']);
+
+function UserCard({ user, isSuperAdmin, isOwner }: { user: UserRow; isSuperAdmin: boolean; isOwner: boolean }) {
   return (
     <div className={cn(
       'border rounded-lg',
@@ -43,7 +46,7 @@ function UserCard({ user, isSuperAdmin }: { user: UserRow; isSuperAdmin: boolean
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-medium truncate">{user.name}</span>
-            <Badge variant={user.role === 'ADMIN' || user.role === 'SUPER_ADMIN' ? 'default' : 'secondary'}>
+            <Badge variant={ELEVATED_ROLES.has(user.role) ? 'default' : 'secondary'}>
               {ROLE_LABELS[user.role] ?? user.role}
             </Badge>
           </div>
@@ -62,6 +65,7 @@ function UserCard({ user, isSuperAdmin }: { user: UserRow; isSuperAdmin: boolean
           <UserForm
             user={user}
             isSuperAdmin={isSuperAdmin}
+            isOwner={isOwner}
             trigger={
               <Button variant="ghost" size="icon" className="size-8">
                 <Pencil className="h-3.5 w-3.5" />
@@ -77,9 +81,11 @@ function UserCard({ user, isSuperAdmin }: { user: UserRow; isSuperAdmin: boolean
 export function UsersAdminView({
   users,
   isSuperAdmin,
+  isOwner,
 }: {
   users: UserRow[];
   isSuperAdmin: boolean;
+  isOwner: boolean;
 }) {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<Set<string>>(new Set());
@@ -113,7 +119,11 @@ export function UsersAdminView({
     return list;
   }, [users, search, roleFilter, showInactive]);
 
-  const visibleRoles = isSuperAdmin ? ROLES : ROLES.filter((r) => r !== 'SUPER_ADMIN');
+  const visibleRoles = ROLES.filter((r) => {
+    if (r === 'OWNER') return isOwner;
+    if (r === 'SUPER_ADMIN') return isSuperAdmin;
+    return true;
+  });
 
   function resetAll() {
     setSearch('');
@@ -229,7 +239,7 @@ export function UsersAdminView({
                 <td className="p-3 text-muted-foreground">{user.username}</td>
                 <td className="p-3">{user.phone || '-'}</td>
                 <td className="p-3">
-                  <Badge variant={user.role === 'ADMIN' || user.role === 'SUPER_ADMIN' ? 'default' : 'secondary'}>
+                  <Badge variant={ELEVATED_ROLES.has(user.role) ? 'default' : 'secondary'}>
                     {ROLE_LABELS[user.role] ?? user.role}
                   </Badge>
                 </td>
@@ -242,6 +252,7 @@ export function UsersAdminView({
                   <UserForm
                     user={user}
                     isSuperAdmin={isSuperAdmin}
+                    isOwner={isOwner}
                     trigger={
                       <Button variant="ghost" size="icon" className="size-8">
                         <Pencil className="h-3.5 w-3.5" />
@@ -265,7 +276,7 @@ export function UsersAdminView({
       {/* Mobile cards */}
       <div className="md:hidden p-3 flex flex-col gap-2">
         {filtered.map((user) => (
-          <UserCard key={user.id} user={user} isSuperAdmin={isSuperAdmin} />
+          <UserCard key={user.id} user={user} isSuperAdmin={isSuperAdmin} isOwner={isOwner} />
         ))}
         {filtered.length === 0 && (
           <div className="py-8 text-center text-sm text-muted-foreground">

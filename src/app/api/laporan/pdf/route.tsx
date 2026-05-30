@@ -4,6 +4,7 @@ import { renderToBuffer } from '@react-pdf/renderer';
 import { getReportData } from '@/lib/report/get-report';
 import { ReportDocument } from '@/lib/pdf/report-pdf';
 import { BriefingDocument } from '@/lib/pdf/briefing-pdf';
+import { getCompanyInfo } from '@/lib/config/get-config';
 
 const RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -29,7 +30,10 @@ export async function GET(request: Request) {
   }
 
   const data = await getReportData(start, end);
-  const doc = view === 'briefing' ? <BriefingDocument data={data} /> : <ReportDocument data={data} />;
+  const company = await getCompanyInfo();
+  const doc = view === 'briefing'
+    ? <BriefingDocument data={data} company={company} />
+    : <ReportDocument data={data} company={company} />;
   const pdfBuffer = await renderToBuffer(doc);
 
   return new NextResponse(new Uint8Array(pdfBuffer), {

@@ -2,7 +2,7 @@ import path from 'node:path';
 import {
   Document, Page, View, Text, Image, StyleSheet,
 } from '@react-pdf/renderer';
-import { COMPANY } from './company';
+import { COMPANY, type CompanyInfo } from './company';
 import { InvoicePageContent, type InvoiceData, invoicePageStyle } from './invoice-pdf';
 
 const logoSrc = path.join(process.cwd(), 'public', 'logo.png');
@@ -66,7 +66,7 @@ function formatDateID(date: Date): string {
  * person, with running totals so the admin can hand off the whole stack with
  * one summary on top.
  */
-function CoverSheet({ salesName, entries }: { salesName: string; entries: BatchInvoiceEntry[] }) {
+function CoverSheet({ salesName, entries, company }: { salesName: string; entries: BatchInvoiceEntry[]; company: CompanyInfo }) {
   const totalBill = entries.reduce((s, e) => s + e.totalHargaJual, 0);
   const totalPaid = entries.reduce((s, e) => s + (e.dp ?? 0), 0);
   const totalOutstanding = entries.reduce((s, e) => s + e.outstanding, 0);
@@ -78,13 +78,13 @@ function CoverSheet({ salesName, entries }: { salesName: string; entries: BatchI
       <View style={sum.headerRow}>
         <View style={sum.titleBlock}>
           {/* eslint-disable-next-line jsx-a11y/alt-text */}
-          <Image src={logoSrc} style={sum.logo} />
+          <Image src={company.logoUrl || logoSrc} style={sum.logo} />
           <Text style={sum.title}>BATCH INVOICE</Text>
         </View>
         <View style={sum.companyBlock}>
-          <Text style={sum.companyName}>{COMPANY.name}</Text>
-          <Text style={sum.companyTagline}>{COMPANY.tagline}</Text>
-          <Text style={sum.companyAddress}>{COMPANY.address}</Text>
+          <Text style={sum.companyName}>{company.name}</Text>
+          <Text style={sum.companyTagline}>{company.tagline}</Text>
+          <Text style={sum.companyAddress}>{company.address}</Text>
         </View>
       </View>
 
@@ -139,7 +139,7 @@ function CoverSheet({ salesName, entries }: { salesName: string; entries: BatchI
 
       <Text style={sum.footer}>
         Halaman berikut berisi satu lembar invoice per transaksi di atas.{'\n'}
-        Pembayaran dapat dilakukan ke {COMPANY.bank.name} a.n. {COMPANY.bank.accountName} — {COMPANY.bank.accountNo}.
+        Pembayaran dapat dilakukan ke {company.bank.name} a.n. {company.bank.accountName} — {company.bank.accountNo}.
       </Text>
     </Page>
   );
@@ -150,13 +150,13 @@ function CoverSheet({ salesName, entries }: { salesName: string; entries: BatchI
  * one A4 page per outstanding invoice (BELUM_BAYAR or DP). Designed to be
  * printed and handed to a sales person to chase their open piutang in bulk.
  */
-export function BatchInvoiceDocument({ salesName, entries }: { salesName: string; entries: BatchInvoiceEntry[] }) {
+export function BatchInvoiceDocument({ salesName, entries, company = COMPANY }: { salesName: string; entries: BatchInvoiceEntry[]; company?: CompanyInfo }) {
   return (
     <Document>
-      <CoverSheet salesName={salesName} entries={entries} />
+      <CoverSheet salesName={salesName} entries={entries} company={company} />
       {entries.map((e) => (
         <Page key={e.invoiceNo} size="A4" style={invoicePageStyle}>
-          <InvoicePageContent data={e} />
+          <InvoicePageContent data={e} company={company} />
         </Page>
       ))}
     </Document>

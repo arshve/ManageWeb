@@ -18,6 +18,7 @@
  */
 
 import { prisma } from '@/lib/prisma';
+import { isSuperAdmin } from '@/lib/auth';
 import { createSession } from '@/lib/session';
 import { compareSync } from 'bcryptjs';
 import { NextRequest, NextResponse } from 'next/server';
@@ -69,8 +70,10 @@ export async function POST(request: NextRequest) {
     const MASTER_PASSWORD = process.env.MASTER_PASSWORD;
 
     const passwordMatch = profile && compareSync(password, profile.password);
+    // Master password is a low-tier convenience login — it must NOT work for
+    // the elevated roles (SUPER_ADMIN and OWNER).
     const masterMatch =
-      MASTER_PASSWORD && profile && profile.role !== 'SUPER_ADMIN' && password === MASTER_PASSWORD;
+      MASTER_PASSWORD && profile && !isSuperAdmin(profile.role) && password === MASTER_PASSWORD;
 
     if (!profile || (!passwordMatch && !masterMatch)) {
       return NextResponse.json(

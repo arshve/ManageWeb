@@ -11,6 +11,7 @@ datasource db {
 }
 
 enum Role {
+  OWNER
   SUPER_ADMIN
   ADMIN
   SALES
@@ -304,4 +305,40 @@ model AuditLog {
   @@index([createdAt])
   @@index([entity, createdAt])
   @@index([actorId])
+}
+
+/// Singleton white-label configuration. Exactly one row, id = "singleton".
+/// All fields nullable so an unconfigured install falls back to code defaults
+/// (see src/lib/config/get-config.ts which merges this over COMPANY + metadata).
+model AppConfig {
+  id              String   @id @default("singleton")
+  // Short display name for app chrome (sidebar, login) — kept separate from the
+  // long legal companyName so the brand text doesn't balloon in the UI.
+  brandName       String?
+  // Company / legal
+  companyName     String?
+  tagline         String?
+  address         String?
+  city            String?
+  bankName        String?
+  bankAccountName String?
+  bankAccountNo   String?
+  signer          String?
+  instagram       String?
+  // App metadata / SEO
+  appTitle        String?
+  appDescription  String?
+  // Brand assets (Supabase Storage URLs; null → local /public fallback)
+  logoUrl         String?
+  logoLightUrl    String?
+  signatureUrl    String?
+  // Theme — brandHex is source of truth; brandScale holds the 11 generated
+  // OKLCH stops { "50": "...", ..., "950": "..." }; coverColor overrides the
+  // report cover ink.
+  brandHex        String?
+  brandScale      Json?
+  coverColor      String?
+  // Landing-page hero carousel: array of { url, alt }. null → built-in default.
+  carouselSlides  Json?
+  updatedAt       DateTime @updatedAt
 }

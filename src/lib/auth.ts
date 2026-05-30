@@ -47,12 +47,19 @@ export async function requireAuth() {
  */
 export async function requireRole(...roles: Role[]) {
   const profile = await requireAuth();
+  // OWNER is the top role — it inherits every ADMIN / SUPER_ADMIN gate so we
+  // don't have to add 'OWNER' to ~30 call sites. (OWNER is intentionally NOT
+  // granted SALES/MANAGE/DRIVER-only routes.)
+  if (profile.role === 'OWNER' && (roles.includes('SUPER_ADMIN') || roles.includes('ADMIN'))) {
+    return profile;
+  }
   if (!roles.includes(profile.role)) redirect('/unauthorized');
   return profile;
 }
 
 export function dashboardUrlForRole(role: Role | string): string {
   switch (role) {
+    case 'OWNER':
     case 'SUPER_ADMIN':
     case 'ADMIN':
       return '/admin';
@@ -66,9 +73,13 @@ export function dashboardUrlForRole(role: Role | string): string {
 }
 
 export function isAdminRole(role: Role | string): boolean {
-  return role === 'ADMIN' || role === 'SUPER_ADMIN';
+  return role === 'ADMIN' || role === 'SUPER_ADMIN' || role === 'OWNER';
 }
 
 export function isSuperAdmin(role: Role | string): boolean {
-  return role === 'SUPER_ADMIN';
+  return role === 'SUPER_ADMIN' || role === 'OWNER';
+}
+
+export function isOwner(role: Role | string): boolean {
+  return role === 'OWNER';
 }

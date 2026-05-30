@@ -7,7 +7,7 @@ import {
   Image,
   StyleSheet,
 } from '@react-pdf/renderer';
-import { COMPANY } from './company';
+import { COMPANY, type CompanyInfo } from './company';
 import { terbilang } from './terbilang';
 import { formatPengiriman } from '@/lib/format';
 
@@ -150,7 +150,7 @@ const styles = StyleSheet.create({
  * can render multiple invoice pages in a single PDF without duplicating
  * the layout. Stays self-contained — no shared state, just the data prop.
  */
-export function InvoicePageContent({ data }: { data: InvoiceData }) {
+export function InvoicePageContent({ data, company = COMPANY }: { data: InvoiceData; company?: CompanyInfo }) {
   const totalHargaJual = data.items.reduce((s, i) => s + i.hargaJual, 0);
   const paidAmount = data.dp ?? 0;
   const sisa = Math.max(0, totalHargaJual - paidAmount);
@@ -159,13 +159,13 @@ export function InvoicePageContent({ data }: { data: InvoiceData }) {
     <>
       <View style={styles.headerRow}>
           <View style={styles.titleBlock}>
-            <Image src={logoSrc} style={styles.logo} />
+            <Image src={company.logoUrl || logoSrc} style={styles.logo} />
             <Text style={styles.title}>INVOICE</Text>
           </View>
           <View style={styles.companyBlock}>
-            <Text style={styles.companyName}>{COMPANY.name}</Text>
-            <Text style={styles.companyTagline}>{COMPANY.tagline}</Text>
-            <Text style={styles.companyAddress}>{COMPANY.address}</Text>
+            <Text style={styles.companyName}>{company.name}</Text>
+            <Text style={styles.companyTagline}>{company.tagline}</Text>
+            <Text style={styles.companyAddress}>{company.address}</Text>
           </View>
         </View>
 
@@ -244,30 +244,30 @@ export function InvoicePageContent({ data }: { data: InvoiceData }) {
             <Text style={styles.bankTitle}>
               Pembayaran dapat dilakukan ke Rekening Penampungan berikut :
             </Text>
-            <Text style={styles.bankName}>{COMPANY.bank.name}</Text>
+            <Text style={styles.bankName}>{company.bank.name}</Text>
             <Text style={styles.bankLine}>
-              A.n. {COMPANY.bank.accountName}
+              A.n. {company.bank.accountName}
             </Text>
-            <Text style={styles.bankLine}>{COMPANY.bank.accountNo}</Text>
+            <Text style={styles.bankLine}>{company.bank.accountNo}</Text>
           </View>
           <View style={styles.signBlock}>
             <Text style={styles.signCity}>
-              {COMPANY.city}, {formatDateID(new Date())}
+              {company.city}, {formatDateID(new Date())}
             </Text>
             <Text style={styles.signGreeting}>Hormat Kami,</Text>
-            <Image src={signatureSrc} style={styles.signature} />
-            <Text style={styles.signerName}>{COMPANY.signer}</Text>
+            <Image src={company.signatureUrl || signatureSrc} style={styles.signature} />
+            <Text style={styles.signerName}>{company.signer}</Text>
           </View>
         </View>
     </>
   );
 }
 
-export function InvoiceDocument({ data }: { data: InvoiceData }) {
+export function InvoiceDocument({ data, company = COMPANY }: { data: InvoiceData; company?: CompanyInfo }) {
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        <InvoicePageContent data={data} />
+        <InvoicePageContent data={data} company={company} />
       </Page>
     </Document>
   );

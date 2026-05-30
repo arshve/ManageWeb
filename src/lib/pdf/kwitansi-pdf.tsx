@@ -7,7 +7,7 @@ import {
   Image,
   StyleSheet,
 } from '@react-pdf/renderer';
-import { COMPANY } from './company';
+import { COMPANY, type CompanyInfo } from './company';
 import { terbilang } from './terbilang';
 
 const logoSrc = path.join(process.cwd(), 'public', 'logo.png');
@@ -114,7 +114,7 @@ const styles = StyleSheet.create({
   signerName: { fontSize: 10, fontWeight: 'bold' },
 });
 
-export function KwitansiDocument({ data }: { data: KwitansiData }) {
+export function KwitansiDocument({ data, company = COMPANY }: { data: KwitansiData; company?: CompanyInfo }) {
   const paidAmount =
     data.variant === 'full'
       ? data.totalBayar ?? data.hargaJual
@@ -135,13 +135,13 @@ export function KwitansiDocument({ data }: { data: KwitansiData }) {
       <Page size="A4" style={styles.page}>
         <View style={styles.headerRow}>
           <View style={styles.titleBlock}>
-            <Image src={logoSrc} style={styles.logo} />
+            <Image src={company.logoUrl || logoSrc} style={styles.logo} />
             <Text style={styles.title}>KWITANSI</Text>
           </View>
           <View style={styles.companyBlock}>
-            <Text style={styles.companyName}>{COMPANY.name}</Text>
-            <Text style={styles.companyTagline}>{COMPANY.tagline}</Text>
-            <Text style={styles.companyAddress}>{COMPANY.address}</Text>
+            <Text style={styles.companyName}>{company.name}</Text>
+            <Text style={styles.companyTagline}>{company.tagline}</Text>
+            <Text style={styles.companyAddress}>{company.address}</Text>
           </View>
         </View>
 
@@ -178,11 +178,11 @@ export function KwitansiDocument({ data }: { data: KwitansiData }) {
         <View style={styles.footerRow}>
           <View style={styles.signBlock}>
             <Text style={styles.signCity}>
-              {COMPANY.city}, {formatDateID(new Date())}
+              {company.city}, {formatDateID(new Date())}
             </Text>
             <Text style={styles.signGreeting}>Hormat Kami,</Text>
-            <Image src={signatureSrc} style={styles.signature} />
-            <Text style={styles.signerName}>{COMPANY.signer}</Text>
+            <Image src={company.signatureUrl || signatureSrc} style={styles.signature} />
+            <Text style={styles.signerName}>{company.signer}</Text>
           </View>
         </View>
       </Page>

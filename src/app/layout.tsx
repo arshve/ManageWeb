@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
 import { PwaRegister } from "@/components/pwa-register";
+import { getAppConfig, brandThemeCss } from "@/lib/config/get-config";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -22,26 +23,28 @@ const dmSerif = DM_Serif_Display({
   weight: "400",
 });
 
-export const metadata: Metadata = {
-  title: "Millenials Farm - Qurban Terpercaya",
-  description:
-    "Millenials Farm menyediakan hewan qurban berkualitas. Kambing, Domba, dan Sapi pilihan terbaik untuk ibadah qurban Anda.",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "black-translucent",
-    title: "MF Farm",
-  },
-  icons: {
-    icon: "/icon.png",
-    apple: "/apple-touch-icon.png",
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const cfg = await getAppConfig();
+  return {
+    title: cfg.appTitle,
+    description: cfg.appDescription,
+    appleWebApp: {
+      capable: true,
+      statusBarStyle: "black-translucent",
+      title: cfg.brandName,
+    },
+    icons: {
+      icon: "/icon.png",
+      apple: "/apple-touch-icon.png",
+    },
+  };
+}
 
 export const viewport: Viewport = {
   themeColor: "#1a2e1d",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
@@ -53,6 +56,11 @@ export default function RootLayout({
     try { return u ? new URL(u).origin : null; } catch { return null; }
   })();
 
+  // White-label theme: inject the configured brand scale to override the
+  // build-time --brand-* mapping in globals.css (retheme light + dark).
+  const cfg = await getAppConfig();
+  const themeCss = brandThemeCss(cfg);
+
   return (
     <html
       lang="id"
@@ -61,6 +69,7 @@ export default function RootLayout({
       <head>
         {supabaseOrigin && <link rel="preconnect" href={supabaseOrigin} crossOrigin="anonymous" />}
         {supabaseOrigin && <link rel="dns-prefetch" href={supabaseOrigin} />}
+        {themeCss && <style id="brand-theme" dangerouslySetInnerHTML={{ __html: themeCss }} />}
       </head>
       <body className="min-h-full flex flex-col">
         {children}

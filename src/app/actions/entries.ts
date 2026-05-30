@@ -2,7 +2,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { Prisma } from '@/generated/prisma/client';
-import { requireAuth, requireRole } from '@/lib/auth';
+import { requireAuth, requireRole, isAdminRole, isSuperAdmin } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
 import { generateInvoiceNo } from '@/lib/format';
 import { supabaseAdmin } from '@/lib/supabase';
@@ -67,7 +67,7 @@ async function resolveRoleFields(profile: { id: string; role: string }, formData
   let approvedAt: Date | null = null;
   let approvedBy: string | null = null;
 
-  if (profile.role === 'ADMIN' || profile.role === 'SUPER_ADMIN') {
+  if (isAdminRole(profile.role)) {
     const adminSelectedSalesId = formData.get('salesId')?.toString().trim();
     if (adminSelectedSalesId) {
       const salesExists = await prisma.profile.findUnique({ where: { id: adminSelectedSalesId } });
@@ -305,7 +305,7 @@ export async function updateEntry(id: string, formData: FormData) {
 
   if (
     profile.role !== 'ADMIN' &&
-    profile.role !== 'SUPER_ADMIN' &&
+    !isSuperAdmin(profile.role) &&
     entry.salesId !== profile.id
   ) {
     return { error: 'Anda tidak berhak mengubah entry ini' };
@@ -349,7 +349,7 @@ export async function updateEntry(id: string, formData: FormData) {
         notes: (formData.get('notes') as string) || null,
         isSent: formData.get('isSent') === 'true',
         buktiTransfer,
-        ...((profile.role === 'ADMIN' || profile.role === 'SUPER_ADMIN') && formData.get('salesId')
+        ...((isAdminRole(profile.role)) && formData.get('salesId')
           ? { salesId: formData.get('salesId') as string }
           : {}),
       },
@@ -412,7 +412,7 @@ export async function deleteEntry(id: string) {
 
     if (
       profile.role !== 'ADMIN' &&
-      profile.role !== 'SUPER_ADMIN' &&
+      !isSuperAdmin(profile.role) &&
       entry.salesId !== profile.id
     ) {
       return { error: 'Anda tidak berhak mengubah entry ini' };
@@ -450,7 +450,7 @@ export async function deleteEntry(id: string) {
 
 export async function requestDeleteEntry(id: string) {
   const profile = await requireAuth();
-  if (profile.role === 'ADMIN' || profile.role === 'SUPER_ADMIN') {
+  if (isAdminRole(profile.role)) {
     return { error: 'Admin langsung hapus entry' };
   }
   try {
@@ -488,7 +488,7 @@ export async function cancelDeleteRequest(id: string) {
     if (!entry) return { error: 'Entry tidak ditemukan' };
     if (
       profile.role !== 'ADMIN' &&
-      profile.role !== 'SUPER_ADMIN' &&
+      !isSuperAdmin(profile.role) &&
       entry.salesId !== profile.id
     ) return { error: 'Anda tidak berhak mengubah entry ini' };
 
@@ -577,7 +577,7 @@ export async function updateEntryRequests(entryId: string, requestsJson: string)
 
   const entry = await prisma.entry.findUnique({ where: { id: entryId } });
   if (!entry) return { error: 'Entry tidak ditemukan' };
-  if (profile.role !== 'ADMIN' && profile.role !== 'SUPER_ADMIN' && entry.salesId !== profile.id) {
+  if (!isAdminRole(profile.role) && entry.salesId !== profile.id) {
     return { error: 'Anda tidak berhak mengubah entry ini' };
   }
 
@@ -656,7 +656,7 @@ export async function proposeEntryEdit(entryId: string, formData: FormData) {
 
   if (
     profile.role !== 'ADMIN' &&
-    profile.role !== 'SUPER_ADMIN' &&
+    !isSuperAdmin(profile.role) &&
     entry.salesId !== profile.id
   ) {
     return { error: 'Anda tidak berhak mengubah entry ini' };
@@ -918,7 +918,7 @@ export async function cancelEntryEdit(requestId: string) {
 
   if (
     profile.role !== 'ADMIN' &&
-    profile.role !== 'SUPER_ADMIN' &&
+    !isSuperAdmin(profile.role) &&
     request.proposedById !== profile.id
   ) {
     return { error: 'Anda tidak berhak membatalkan permintaan ini' };

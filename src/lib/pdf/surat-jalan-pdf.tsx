@@ -7,7 +7,7 @@ import {
   Image,
   StyleSheet,
 } from '@react-pdf/renderer'
-import { COMPANY } from './company'
+import { COMPANY, type CompanyInfo } from './company'
 
 const logoSrc = path.join(process.cwd(), 'public', 'logo.png')
 
@@ -169,18 +169,18 @@ const styles = StyleSheet.create({
   },
 })
 
-export function SuratJalanDocument({ data }: { data: SuratJalanData }) {
+export function SuratJalanDocument({ data, company = COMPANY }: { data: SuratJalanData; company?: CompanyInfo }) {
   return (
     <Document>
       <Page size='A4' style={styles.page}>
         {/* ── Header ── */}
         <View style={styles.headerRow}>
           <View style={styles.logoBlock}>
-            <Image src={logoSrc} style={styles.logo} />
+            <Image src={company.logoUrl || logoSrc} style={styles.logo} />
             <View style={styles.companyBlock}>
-              <Text style={styles.companyName}>{COMPANY.name}</Text>
-              <Text style={styles.companyTagline}>{COMPANY.tagline}</Text>
-              <Text style={styles.companyAddress}>{COMPANY.address}</Text>
+              <Text style={styles.companyName}>{company.name}</Text>
+              <Text style={styles.companyTagline}>{company.tagline}</Text>
+              <Text style={styles.companyAddress}>{company.address}</Text>
             </View>
           </View>
           <Text style={styles.title}>SURAT JALAN</Text>

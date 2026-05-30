@@ -14,7 +14,9 @@ type LogInput = {
     | 'Pricing'
     | 'Delivery'
     | 'DriverAvailability'
-    | 'EntryEditRequest';
+    | 'EntryEditRequest'
+    | 'AppConfig'
+    | 'DataImport';
   entityId: string;
   label?: string | null;
   before?: unknown;

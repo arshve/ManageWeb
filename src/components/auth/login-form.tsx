@@ -11,6 +11,7 @@ import { ArrowLeft } from 'lucide-react';
 
 function dashboardUrlForRole(role: string): string {
   switch (role) {
+    case 'OWNER':
     case 'SUPER_ADMIN':
     case 'ADMIN':
       return '/admin';
@@ -23,7 +24,16 @@ function dashboardUrlForRole(role: string): string {
   }
 }
 
-export function LoginForm() {
+interface LoginBrand {
+  brandName: string;
+  appDescription: string;
+  logoUrl: string | null;
+}
+
+export function LoginForm({ brand }: { brand?: LoginBrand } = {}) {
+  const brandName = brand?.brandName ?? 'Millenials Farm';
+  const appDescription = brand?.appDescription ?? 'Sistem manajemen penjualan hewan qurban berkualitas — kambing, domba, dan sapi pilihan terbaik.';
+  const logoSrc = brand?.logoUrl || '/logo.png';
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -74,23 +84,23 @@ export function LoginForm() {
         />
 
         <div className="relative z-10">
-          <Image src="/logo.png" alt="Millenials Farm" width={44} height={44} className="mb-10" />
+          <Image src={logoSrc} alt={brandName} width={44} height={44} className="mb-10 object-contain" />
           <h1
-            className="text-[3.25rem] leading-[1.15] text-sidebar-primary"
-            style={{ fontFamily: 'var(--font-dm-serif)' }}
+            className="leading-[1.1] text-sidebar-primary break-words"
+            style={{ fontFamily: 'var(--font-dm-serif)', fontSize: 'clamp(2rem, 4.5vw, 3.25rem)' }}
           >
-            Millenials<br />Farm
+            {brandName}
           </h1>
           <p
             className="mt-5 text-sm leading-relaxed max-w-[260px]"
             style={{ color: 'oklch(0.92 0 0 / 0.50)' }}
           >
-            Sistem manajemen penjualan hewan qurban berkualitas — kambing, domba, dan sapi pilihan terbaik.
+            {appDescription}
           </p>
         </div>
 
         <div className="relative z-10 text-xs" style={{ color: 'oklch(0.92 0 0 / 0.28)' }}>
-          © {new Date().getFullYear()} Millenials Farm
+          © {new Date().getFullYear()} {brandName}
         </div>
       </div>
 
@@ -98,9 +108,9 @@ export function LoginForm() {
       <div className="flex-1 flex flex-col justify-center items-center bg-background px-6 py-16">
         <div className="w-full max-w-[340px]">
           <div className="lg:hidden flex items-center gap-3 mb-10">
-            <Image src="/logo.png" alt="Millenials Farm" width={36} height={36} />
+            <Image src={logoSrc} alt={brandName} width={36} height={36} className="object-contain" />
             <span className="text-xl" style={{ fontFamily: 'var(--font-dm-serif)' }}>
-              Millenials Farm
+              {brandName}
             </span>
           </div>
 

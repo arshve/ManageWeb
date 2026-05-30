@@ -23,7 +23,7 @@ export function SampulView({ data }: { data: ReportData }) {
       {/* ╔═════════════ COVER (always ink) ═════════════╗ */}
       <header
         className="relative overflow-hidden text-background"
-        style={{ background: '#14201d', padding: 'clamp(28px, 4.5vw, 52px) clamp(20px, 5vw, 56px) clamp(28px, 3.6vw, 40px)' }}
+        style={{ background: 'var(--report-cover, #14201d)', padding: 'clamp(28px, 4.5vw, 52px) clamp(20px, 5vw, 56px) clamp(28px, 3.6vw, 40px)' }}
       >
         <div
           aria-hidden

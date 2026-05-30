@@ -101,46 +101,98 @@ export function AreaChart({
   const peakIdx = vals.reduce((bi, v, i) => (v > vals[bi] ? i : bi), 0);
   const labelEvery = Math.max(1, Math.ceil(n / 8));
 
+  // SVG uses preserveAspectRatio="none" so the path stretches to fill any
+  // container width. That same stretch deforms native <text> elements (peak
+  // label gets squashed on narrow viewports), so labels are rendered as HTML
+  // overlays positioned in % of container — they stay correctly proportioned
+  // regardless of the SVG's horizontal scale factor.
+  const peakLeftPct = (pts[peakIdx][0] / w) * 100;
+  const peakTopPct = (pts[peakIdx][1] / height) * 100;
   return (
-    <svg viewBox={`0 0 ${w} ${height}`} width="100%" height={height} preserveAspectRatio="none" style={{ display: 'block', overflow: 'visible' }}>
-      <defs>
-        <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="currentColor" stopOpacity={0.22} />
-          <stop offset="100%" stopColor="currentColor" stopOpacity={0} />
-        </linearGradient>
-      </defs>
-      <line x1={pad.l} y1={pad.t + ch + 0.5} x2={w - pad.r} y2={pad.t + ch + 0.5} stroke="currentColor" strokeOpacity={0.18} strokeWidth={1} />
-      <path d={area} fill={`url(#${gid})`} className="report-fade" />
-      <path
-        d={path}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={strokeW}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="report-line"
-        style={{ vectorEffect: 'non-scaling-stroke' }}
+    <div className="relative w-full" style={{ height }}>
+      <svg
+        viewBox={`0 0 ${w} ${height}`}
+        width="100%"
+        height={height}
+        preserveAspectRatio="none"
+        className="absolute inset-0"
+        style={{ display: 'block', overflow: 'visible' }}
+      >
+        <defs>
+          <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="currentColor" stopOpacity={0.22} />
+            <stop offset="100%" stopColor="currentColor" stopOpacity={0} />
+          </linearGradient>
+        </defs>
+        <line x1={pad.l} y1={pad.t + ch + 0.5} x2={w - pad.r} y2={pad.t + ch + 0.5} stroke="currentColor" strokeOpacity={0.18} strokeWidth={1} />
+        <path d={area} fill={`url(#${gid})`} className="report-fade" />
+        <path
+          d={path}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={strokeW}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="report-line"
+          style={{ vectorEffect: 'non-scaling-stroke' }}
+        />
+      </svg>
+
+      {/* peak dot — small absolute element so it stays round, not an SVG circle
+          that turns into an ellipse under the horizontal stretch */}
+      <span
+        className="absolute pointer-events-none rounded-full report-fade"
+        style={{
+          left: `${peakLeftPct}%`,
+          top: `${peakTopPct}%`,
+          width: 8,
+          height: 8,
+          background: 'var(--success-fg)',
+          transform: 'translate(-50%, -50%)',
+          animationDelay: '300ms',
+        }}
       />
-      <circle cx={pts[peakIdx][0]} cy={pts[peakIdx][1]} r={4} fill="var(--success-fg)" className="report-fade" style={{ animationDelay: '300ms' }} />
-      <text
-        x={pts[peakIdx][0]}
-        y={pts[peakIdx][1] - 12}
-        textAnchor="middle"
-        fontSize="20"
-        fill="var(--success-fg)"
-        className="report-fade"
-        style={{ fontFamily: SERIF, animationDelay: '400ms' }}
+
+      {/* peak value label */}
+      <span
+        className="absolute pointer-events-none whitespace-nowrap report-fade"
+        style={{
+          left: `${peakLeftPct}%`,
+          top: `${peakTopPct}%`,
+          transform: 'translate(-50%, calc(-100% - 8px))',
+          fontFamily: SERIF,
+          fontSize: 'clamp(13px, 3.4vw, 20px)',
+          color: 'var(--success-fg)',
+          lineHeight: 1,
+          animationDelay: '400ms',
+        }}
       >
         {peakLabel ?? format(vals[peakIdx])}
-      </text>
-      {data.map((d, i) =>
-        i % labelEvery === 0 || i === n - 1 ? (
-          <text key={i} x={pts[i][0]} y={height - 6} textAnchor="middle" fontSize="13" fill="currentColor" fillOpacity={0.45}>
-            {d.label}
-          </text>
-        ) : null,
-      )}
-    </svg>
+      </span>
+
+      {/* axis labels along the bottom — also HTML so they don't squash */}
+      <div className="absolute left-0 right-0 pointer-events-none" style={{ bottom: 0, height: 14 }}>
+        {data.map((d, i) =>
+          i % labelEvery === 0 || i === n - 1 ? (
+            <span
+              key={i}
+              className="absolute whitespace-nowrap"
+              style={{
+                left: `${(pts[i][0] / w) * 100}%`,
+                bottom: 0,
+                transform: 'translateX(-50%)',
+                fontSize: 'clamp(9px, 2.4vw, 12px)',
+                color: 'currentColor',
+                opacity: 0.45,
+                lineHeight: 1,
+              }}
+            >
+              {d.label}
+            </span>
+          ) : null,
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -339,18 +391,19 @@ export function MonthlyBars({
         const h = Math.max((d.value / max) * (height - 40), 3);
         const isPeak = i === peakIdx && d.value > 0;
         return (
-          <div key={i} className="flex-1 flex flex-col items-center justify-end gap-2 h-full">
+          <div key={i} className="flex-1 flex flex-col items-center justify-end gap-2 h-full min-w-0">
             {isPeak && (
-              <span className="text-[13px] leading-none whitespace-nowrap" style={{ fontFamily: SERIF, color: accent }}>
+              <span
+                className="leading-none whitespace-nowrap truncate max-w-full px-0.5"
+                style={{ fontFamily: SERIF, color: accent, fontSize: 'clamp(10px, 2.4vw, 13px)' }}
+              >
                 {format(d.value)}
               </span>
             )}
             <div
-              className="report-bar-y"
+              className="report-bar-y w-[62%] max-w-[30px]"
               title={`${d.label}: ${format(d.value)}`}
               style={{
-                width: '62%',
-                maxWidth: 30,
                 height: h,
                 borderRadius: 5,
                 background: isPeak ? accent : color,
@@ -358,7 +411,12 @@ export function MonthlyBars({
                 animationDelay: `${i * 45}ms`,
               }}
             />
-            <span className={`text-[11px] leading-none ${isPeak ? 'font-bold' : 'font-normal'} text-muted-foreground`}>{d.label}</span>
+            <span
+              className={`leading-none truncate max-w-full ${isPeak ? 'font-bold' : 'font-normal'} text-muted-foreground`}
+              style={{ fontSize: 'clamp(9.5px, 2.4vw, 11px)' }}
+            >
+              {d.label}
+            </span>
           </div>
         );
       })}
@@ -430,19 +488,35 @@ export function HorizontalBars({
   data,
   color = 'currentColor',
   format = (v: number) => Math.round(v).toLocaleString('id-ID'),
+  labelW = 116,
+  valueW = 96,
 }: {
   data: { label: string; value: number }[];
   color?: string;
   format?: (v: number) => string;
+  /** Max width in px for the label column; column shrinks below this on
+   * narrow viewports via clamp(60px, 32%, labelW). */
+  labelW?: number;
+  /** Max width in px for the value column; same clamp behaviour. */
+  valueW?: number;
 }) {
   if (!data.length) return <Empty />;
   const max = Math.max(...data.map((d) => d.value), 1);
+  // Grid columns shrink with container so labels/values never crush the bar
+  // out of existence on a 360px mobile viewport.
+  const cols = `clamp(60px, 32%, ${labelW}px) minmax(0, 1fr) clamp(54px, 28%, ${valueW}px)`;
   return (
     <div className="flex flex-col gap-2.5">
       {data.map((d, i) => (
-        <div key={i} className="flex items-center gap-3 text-xs">
-          <span className="w-28 shrink-0 truncate text-[11px] text-muted-foreground" title={d.label}>{d.label}</span>
-          <div className="flex-1 h-2 rounded-full bg-muted/60 overflow-hidden">
+        <div key={i} className="grid items-center gap-2 sm:gap-3" style={{ gridTemplateColumns: cols }}>
+          <span
+            className="truncate text-muted-foreground"
+            style={{ fontSize: 'clamp(10.5px, 2.6vw, 12.5px)' }}
+            title={d.label}
+          >
+            {d.label}
+          </span>
+          <div className="h-2 rounded-full bg-muted/60 overflow-hidden">
             <div
               className="h-full rounded-full report-bar-x"
               style={{
@@ -452,7 +526,13 @@ export function HorizontalBars({
               }}
             />
           </div>
-          <span className="w-24 shrink-0 text-right text-[13px] tabular-nums" style={{ fontFamily: SERIF }}>{format(d.value)}</span>
+          <span
+            className="text-right tabular-nums truncate"
+            style={{ fontFamily: SERIF, fontSize: 'clamp(12px, 3vw, 16px)' }}
+            title={format(d.value)}
+          >
+            {format(d.value)}
+          </span>
         </div>
       ))}
     </div>
@@ -490,8 +570,8 @@ export function Donut({
   const segOp = (i: number) => (mono ? monoOps[Math.min(i, monoOps.length - 1)] : 1);
 
   return (
-    <div className="flex items-center gap-6 report-fade">
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+    <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 report-fade">
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="shrink-0">
         <circle cx={r} cy={r} r={radius} fill="none" stroke="currentColor" strokeOpacity={0.08} strokeWidth={stroke} />
         <g transform={`rotate(-90 ${r} ${r})`}>
           {data.map((d, i) => {

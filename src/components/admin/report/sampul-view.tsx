@@ -72,6 +72,10 @@ export function SampulView({ data }: { data: ReportData }) {
             </div>
           </div>
 
+          {/* Hero curve — daily resolution so the day-to-day flow is visible.
+              Peak label + axis dates render as HTML overlays inside the chart
+              component so they stay correctly proportioned on narrow viewports
+              (the SVG itself uses preserveAspectRatio="none" to fill width). */}
           {f.perDay.length > 1 && (
             <div className="mt-1.5 text-background">
               <AreaChart
@@ -85,16 +89,16 @@ export function SampulView({ data }: { data: ReportData }) {
           )}
 
           <div className="grid grid-cols-2 sm:grid-cols-4 mt-[26px]" style={{ borderTop: '1px solid rgba(255,255,255,0.16)' }}>
-            <Kpi label="Penjualan" delta={data.range.hasComparison ? f.deltas.penjualan : undefined} first>
+            <Kpi index={0} label="Penjualan" delta={data.range.hasComparison ? f.deltas.penjualan : undefined}>
               <CountUp value={f.penjualan} format={rpShort} />
             </Kpi>
-            <Kpi label="Hewan Terjual" sub={f.itemCount ? `${formatRupiah(Math.round(f.penjualan / Math.max(f.itemCount, 1)))} / ekor` : undefined}>
+            <Kpi index={1} label="Hewan Terjual" sub={f.itemCount ? `${formatRupiah(Math.round(f.penjualan / Math.max(f.itemCount, 1)))} / ekor` : undefined}>
               <CountUp value={f.itemCount} format={(v) => Math.round(v).toLocaleString('id-ID')} />
             </Kpi>
-            <Kpi label="Pelanggan" sub={f.entryCount ? `${f.entryCount} transaksi` : undefined}>
+            <Kpi index={2} label="Pelanggan" sub={f.entryCount ? `${f.entryCount} transaksi` : undefined}>
               <CountUp value={f.uniqueBuyers} format={(v) => Math.round(v).toLocaleString('id-ID')} />
             </Kpi>
-            <Kpi label="Profit" delta={data.range.hasComparison ? f.deltas.profit : undefined} sub={`margin ${(f.margin * 100).toFixed(1)}%`}>
+            <Kpi index={3} label="Profit" delta={data.range.hasComparison ? f.deltas.profit : undefined} sub={`margin ${(f.margin * 100).toFixed(1)}%`}>
               <CountUp value={f.profit} format={rpShort} />
             </Kpi>
           </div>
@@ -107,7 +111,7 @@ export function SampulView({ data }: { data: ReportData }) {
         {data.insights.length > 0 && (
           <section className="report-reveal" style={{ padding: '46px 0 8px', maxWidth: 880, animationDelay: '80ms' }}>
             <p className="uppercase" style={{ fontSize: 11, letterSpacing: '0.28em', color: 'var(--muted-foreground)' }}>Sorotan</p>
-            <p className="mt-4 text-foreground" style={{ fontFamily: SERIF, fontSize: 'clamp(22px, 3.3vw, 31px)', lineHeight: 1.28, letterSpacing: '-0.01em' }}>
+            <p className="mt-4 text-foreground" style={{ fontFamily: SERIF, fontSize: 'clamp(18px, 4.4vw, 31px)', lineHeight: 1.28, letterSpacing: '-0.01em' }}>
               {data.insights[1] ?? data.insights[0]}
             </p>
             {data.insights.length > 2 && (
@@ -319,20 +323,36 @@ export function SampulView({ data }: { data: ReportData }) {
 
 /* ── pieces ────────────────────────────────────────────────────────── */
 
-function Kpi({ label, children, sub, delta, first }: { label: string; children: React.ReactNode; sub?: string; delta?: Delta; first?: boolean }) {
+// 2-col on phone, 4-col on sm+. Borders depend on (col, row) which differs
+// between the two breakpoints — compute from index for both and let the
+// `max-sm:` / `sm:` Tailwind variants pick the right rule per viewport.
+//   Phone (2-col):   col = index % 2;  row = floor(index / 2)
+//   Desktop (4-col): col = index;      row = 0
+function Kpi({ index, label, children, sub, delta }: { index: number; label: string; children: React.ReactNode; sub?: string; delta?: Delta }) {
+  const mobileLeftBorder = index % 2 !== 0;      // odd index = right column on phone
+  const mobileTopBorder = index >= 2;            // row 2+ on phone
+  const desktopLeftBorder = index !== 0;
+  const cls = [
+    'min-w-0',
+    mobileLeftBorder ? 'max-sm:border-l max-sm:border-white/15' : '',
+    mobileTopBorder ? 'max-sm:border-t max-sm:border-white/15' : '',
+    desktopLeftBorder ? 'sm:border-l sm:border-white/15' : '',
+  ].filter(Boolean).join(' ');
   return (
     <div
-      style={{
-        padding: '20px 22px',
-        paddingLeft: first ? 0 : 22,
-        borderLeft: first ? 'none' : '1px solid rgba(255,255,255,0.13)',
-      }}
+      className={cls}
+      style={{ padding: 'clamp(14px, 3vw, 20px) clamp(14px, 3vw, 22px)' }}
     >
-      <p className="uppercase" style={{ fontSize: 10.5, letterSpacing: '0.16em', color: 'rgba(243,242,236,0.58)' }}>{label}</p>
-      <p className="mt-[11px] tabular-nums" style={{ fontFamily: SERIF, fontSize: 33, lineHeight: 1 }}>{children}</p>
-      <div className="mt-[9px] flex items-center gap-2" style={{ minHeight: 14 }}>
+      <p className="uppercase truncate" style={{ fontSize: 'clamp(9.5px, 2.4vw, 10.5px)', letterSpacing: '0.16em', color: 'rgba(243,242,236,0.58)' }}>{label}</p>
+      <p
+        className="mt-[11px] tabular-nums whitespace-nowrap"
+        style={{ fontFamily: SERIF, fontSize: 'clamp(22px, 6.4vw, 33px)', lineHeight: 1 }}
+      >
+        {children}
+      </p>
+      <div className="mt-[9px] flex flex-wrap items-center gap-x-2 gap-y-1" style={{ minHeight: 14 }}>
         {delta && <DeltaChip d={delta} onDark />}
-        {sub && <span style={{ fontSize: 11.5, color: 'rgba(243,242,236,0.58)' }}>{sub}</span>}
+        {sub && <span className="truncate" style={{ fontSize: 'clamp(10px, 2.6vw, 11.5px)', color: 'rgba(243,242,236,0.58)' }}>{sub}</span>}
       </div>
     </div>
   );
@@ -362,7 +382,7 @@ function Section({ no, title, meta, children, delay = 0 }: { no: string; title: 
     >
       <div className="flex flex-wrap items-baseline gap-x-[14px] sm:gap-x-[18px] gap-y-2">
         <span className="text-muted-foreground" style={{ fontFamily: SERIF, fontSize: 20 }}>{no}</span>
-        <h2 className="m-0" style={{ fontFamily: SERIF, fontSize: 'clamp(27px, 4.6vw, 38px)', lineHeight: 1, letterSpacing: '-0.01em' }}>{title}</h2>
+        <h2 className="m-0" style={{ fontFamily: SERIF, fontSize: 'clamp(22px, 5vw, 38px)', lineHeight: 1, letterSpacing: '-0.01em' }}>{title}</h2>
         {meta && <span className="text-muted-foreground sm:ml-auto max-sm:basis-full" style={{ fontSize: 12.5 }}>{meta}</span>}
       </div>
       {children}
@@ -374,9 +394,22 @@ function DataGrid({ items }: { items: [string, string][] }) {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4" style={{ borderTop: '1px solid var(--border)', borderLeft: '1px solid var(--border)' }}>
       {items.map(([label, value], i) => (
-        <div key={i} style={{ borderRight: '1px solid var(--border)', borderBottom: '1px solid var(--border)', padding: '16px 18px' }}>
-          <p className="uppercase text-muted-foreground" style={{ fontSize: 11, letterSpacing: '0.1em', lineHeight: 1.2 }}>{label}</p>
-          <p className="mt-[9px] tabular-nums" style={{ fontFamily: SERIF, fontSize: 25, lineHeight: 1 }}>{value}</p>
+        <div
+          key={i}
+          style={{
+            borderRight: '1px solid var(--border)',
+            borderBottom: '1px solid var(--border)',
+            padding: 'clamp(10px, 2.4vw, 16px) clamp(11px, 2.6vw, 18px)',
+            minWidth: 0,
+          }}
+        >
+          <p className="uppercase text-muted-foreground" style={{ fontSize: 'clamp(9.5px, 2.3vw, 11px)', letterSpacing: '0.1em', lineHeight: 1.2 }}>{label}</p>
+          <p
+            className="mt-[9px] tabular-nums break-words"
+            style={{ fontFamily: SERIF, fontSize: 'clamp(15px, 4.2vw, 25px)', lineHeight: 1.1, overflowWrap: 'anywhere' }}
+          >
+            {value}
+          </p>
         </div>
       ))}
     </div>
@@ -404,11 +437,16 @@ function TwoCol({ children }: { children: React.ReactNode }) {
 function MiniLi({ label, value, total }: { label: string; value: string; total?: boolean }) {
   return (
     <li
-      className={`flex justify-between items-baseline ${total ? 'text-foreground font-semibold' : 'text-muted-foreground'}`}
-      style={{ padding: '12px 0', borderBottom: '1px solid var(--border)', fontSize: 13 }}
+      className={`flex justify-between items-baseline gap-3 ${total ? 'text-foreground font-semibold' : 'text-muted-foreground'}`}
+      style={{ padding: '12px 0', borderBottom: '1px solid var(--border)', fontSize: 'clamp(11.5px, 2.8vw, 13px)' }}
     >
-      <span>{label}</span>
-      <b style={{ fontFamily: SERIF, fontSize: 17, fontWeight: 400, color: total ? 'inherit' : 'var(--foreground)' }}>{value}</b>
+      <span className="truncate">{label}</span>
+      <b
+        className="shrink-0 tabular-nums"
+        style={{ fontFamily: SERIF, fontSize: 'clamp(13.5px, 3.6vw, 17px)', fontWeight: 400, color: total ? 'inherit' : 'var(--foreground)' }}
+      >
+        {value}
+      </b>
     </li>
   );
 }
@@ -438,9 +476,9 @@ function Table({ head, rows, align }: { head: string[]; rows: string[][]; align:
                 key={ci}
                 className={`${align[ci] === 'right' ? 'text-right' : 'text-left'}`}
                 style={{
-                  padding: '12px 14px',
+                  padding: '10px 12px',
                   borderBottom: ri === rows.length - 1 ? 'none' : '1px solid var(--border)',
-                  fontSize: align[ci] === 'right' ? 15 : 13.5,
+                  fontSize: align[ci] === 'right' ? 'clamp(12px, 3.2vw, 15px)' : 'clamp(11.5px, 3vw, 13.5px)',
                   fontFamily: align[ci] === 'right' ? SERIF : undefined,
                   fontVariantNumeric: 'tabular-nums',
                   color: ci === 0 && align[0] === 'left' ? 'var(--muted-foreground)' : undefined,

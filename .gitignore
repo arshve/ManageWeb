@@ -56,3 +56,9 @@ AGENT.md
 .claude/
 .agents/
 skill-lock.json
+
+# Capability deck — contains real customer data in screenshots; keep local
+presentation/
+
+# neutral deck logo (local capture only)
+public/deck-brand-logo.png

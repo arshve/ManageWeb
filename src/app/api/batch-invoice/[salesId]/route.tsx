@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { BatchInvoiceDocument, type BatchInvoiceEntry } from '@/lib/pdf/batch-invoice-pdf';
 import { getCompanyInfo } from '@/lib/config/get-config';
+import { safeFileName } from '@/lib/format';
 
 export async function GET(
   request: Request,
@@ -59,7 +60,7 @@ export async function GET(
 
     const company = await getCompanyInfo();
     const pdfBuffer = await renderToBuffer(<BatchInvoiceDocument salesName={sales.name} entries={batch} company={company} />);
-    const filename = `BatchInvoice_${sales.name.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
+    const filename = `BatchInvoice_${safeFileName(sales.name)}_${new Date().toISOString().slice(0, 10)}.pdf`;
 
     return new NextResponse(new Uint8Array(pdfBuffer), {
       status: 200,

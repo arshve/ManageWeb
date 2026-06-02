@@ -19,6 +19,7 @@ import {
   TrendingUp,
   TrendingDown,
   FileStack,
+  Search,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -90,6 +91,7 @@ function StatusBadge({ status }: { status: string }) {
 
 export function FinanceView({ entries, salesUsers, cashflows }: FinanceViewProps) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [salesSearch, setSalesSearch] = useState('');
   const [salesPage, setSalesPage] = useState(0);
   const SALES_PAGE_SIZE = 10;
   const [cashflow, setCashflow] = useState<CashflowItem[]>(cashflows);
@@ -154,14 +156,25 @@ export function FinanceView({ entries, salesUsers, cashflows }: FinanceViewProps
     return Array.from(map.values()).filter((r) => r.entries.length > 0);
   }, [entries, salesUsers]);
 
-  const salesPageCount = Math.ceil(perSales.length / SALES_PAGE_SIZE);
-  const pagedSales = perSales.slice(salesPage * SALES_PAGE_SIZE, (salesPage + 1) * SALES_PAGE_SIZE);
+  const filteredSales = useMemo(() => {
+    const q = salesSearch.trim().toLowerCase();
+    if (!q) return perSales;
+    return perSales.filter(
+      (r) =>
+        r.user.name.toLowerCase().includes(q) ||
+        (r.user.phone?.toLowerCase().includes(q) ?? false) ||
+        (r.user.rekBank?.toLowerCase().includes(q) ?? false),
+    );
+  }, [perSales, salesSearch]);
 
-  const allExpanded = perSales.length > 0 && perSales.every((r) => expanded.has(r.user.id));
+  const salesPageCount = Math.ceil(filteredSales.length / SALES_PAGE_SIZE);
+  const pagedSales = filteredSales.slice(salesPage * SALES_PAGE_SIZE, (salesPage + 1) * SALES_PAGE_SIZE);
+
+  const allExpanded = filteredSales.length > 0 && filteredSales.every((r) => expanded.has(r.user.id));
 
   function toggleAll() {
     if (allExpanded) setExpanded(new Set());
-    else setExpanded(new Set(perSales.map((r) => r.user.id)));
+    else setExpanded(new Set(filteredSales.map((r) => r.user.id)));
   }
 
   function toggleOne(id: string) {
@@ -304,26 +317,43 @@ export function FinanceView({ entries, salesUsers, cashflows }: FinanceViewProps
 
       {/* ── 3. Per-Sales ─────────────────────────────────────────────────── */}
       <div>
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
           <div className="flex items-center gap-2">
             <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">Ringkasan Per Sales</p>
-            <span className="text-[10px] font-semibold text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-              {perSales.length}
+            <span className="text-[10px] font-semibold text-muted-foreground bg-muted px-2 py-0.5 rounded-full tabular-nums">
+              {salesSearch.trim() ? `${filteredSales.length}/${perSales.length}` : perSales.length}
             </span>
           </div>
           {perSales.length > 0 && (
-            <button
-              onClick={toggleAll}
-              className="text-[11px] px-3 py-1 rounded-lg border border-border cursor-pointer transition-colors hover:bg-muted/50 text-muted-foreground"
-            >
-              {allExpanded ? 'Tutup semua' : 'Buka semua'}
-            </button>
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+                <Input
+                  value={salesSearch}
+                  onChange={(e) => { setSalesSearch(e.target.value); setSalesPage(0); }}
+                  placeholder="Cari sales…"
+                  className="h-8 w-40 pl-8 text-xs sm:w-56"
+                />
+              </div>
+              {filteredSales.length > 0 && (
+                <button
+                  onClick={toggleAll}
+                  className="text-[11px] px-3 py-1 rounded-lg border border-border cursor-pointer transition-colors hover:bg-muted/50 text-muted-foreground whitespace-nowrap"
+                >
+                  {allExpanded ? 'Tutup semua' : 'Buka semua'}
+                </button>
+              )}
+            </div>
           )}
         </div>
 
         {perSales.length === 0 ? (
           <div className="rounded-xl border bg-card px-5 py-12 text-center text-sm text-muted-foreground">
             Belum ada data penjualan
+          </div>
+        ) : filteredSales.length === 0 ? (
+          <div className="rounded-xl border bg-card px-5 py-12 text-center text-sm text-muted-foreground">
+            Tidak ada sales cocok dengan “{salesSearch}”
           </div>
         ) : (
           <>
@@ -340,7 +370,7 @@ export function FinanceView({ entries, salesUsers, cashflows }: FinanceViewProps
             {salesPageCount > 1 && (
               <div className="flex items-center justify-between mt-3">
                 <span className="text-[11px] text-muted-foreground tabular-nums">
-                  {salesPage * SALES_PAGE_SIZE + 1}–{Math.min((salesPage + 1) * SALES_PAGE_SIZE, perSales.length)} dari {perSales.length}
+                  {salesPage * SALES_PAGE_SIZE + 1}–{Math.min((salesPage + 1) * SALES_PAGE_SIZE, filteredSales.length)} dari {filteredSales.length}
                 </span>
                 <div className="flex items-center gap-1">
                   <button

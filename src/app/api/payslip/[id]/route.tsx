@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { PayslipDocument, type PayslipData } from '@/lib/pdf/payslip-pdf';
 import { getCompanyInfo } from '@/lib/config/get-config';
+import { safeFileName } from '@/lib/format';
 
 export async function GET(
   request: Request,
@@ -75,6 +76,7 @@ export async function GET(
 
     const data: PayslipData = {
       salesName: sales.name,
+      salesRek: sales.rekBank,
       date: new Date().toLocaleDateString('en-US'),
       summaryItems,
       animalCounts,
@@ -83,7 +85,7 @@ export async function GET(
 
     const company = await getCompanyInfo();
     const pdfBuffer = await renderToBuffer(<PayslipDocument data={data} company={company} />);
-    const filename = `Payslip_${sales.name.replace(/\s+/g, '_')}_${new Date().getTime()}.pdf`;
+    const filename = `Payslip_${safeFileName(sales.name)}_${new Date().getTime()}.pdf`;
 
     return new NextResponse(new Uint8Array(pdfBuffer), {
       status: 200,

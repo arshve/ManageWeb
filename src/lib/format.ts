@@ -160,6 +160,16 @@ export function formatPaymentStatus(value: string): string {
   return PAYMENT_LABELS[value] ?? value;
 }
 
+/**
+ * Sanitizes arbitrary text (e.g. a profile name) for safe use inside a
+ * download filename. Collapses any run of non-alphanumeric characters to a
+ * single underscore and trims leading/trailing underscores.
+ * Example: "Budi [VIP] / Sales" → "Budi_VIP_Sales"
+ */
+export function safeFileName(text: string): string {
+  return text.replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'file';
+}
+
 export function generateInvoiceNo(): string {
   const now = new Date();
   const y = now.getFullYear().toString().slice(-2);

@@ -202,6 +202,32 @@ export async function changeOwnPassword(formData: FormData) {
   return { success: true as const };
 }
 
+/** Self-service: a non-admin user updates their own display name + bank account. */
+export async function updateOwnProfile(formData: FormData) {
+  const profile = await requireRole('SALES', 'DRIVER', 'MANAGE', 'OWNER');
+
+  const name = (formData.get('name') as string)?.trim();
+  const rekBank = (formData.get('rekBank') as string)?.trim() || null;
+  if (!name) return { error: 'Nama harus diisi' };
+
+  await prisma.profile.update({
+    where: { id: profile.id },
+    data: { name, rekBank },
+  });
+
+  await logAudit({
+    actor: { id: profile.id, name },
+    action: 'UPDATE',
+    entity: 'Profile',
+    entityId: profile.id,
+    label: 'Perbarui profil sendiri (nama / rekening)',
+  });
+
+  // Sidebar + payslips read name/rek fresh on the next render.
+  revalidatePath('/', 'layout');
+  return { success: true as const };
+}
+
 export async function getActiveSales() {
   await requireRole('ADMIN', 'SUPER_ADMIN');
   return prisma.profile.findMany({

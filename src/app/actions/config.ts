@@ -96,6 +96,7 @@ export async function updateAppConfig(formData: FormData) {
       // [] when cleared — get-config normalizes empty back to the defaults.
       carouselSlides: carouselSlides ?? [],
       paymentEnabled: formData.get('paymentEnabled') === 'true',
+      setoranEnabled: formData.get('setoranEnabled') === 'true',
       publicSalesId: str(formData, 'publicSalesId'),
       midtransClientKey: str(formData, 'midtransClientKey'),
       midtransIsProduction: formData.get('midtransIsProduction') === 'true',

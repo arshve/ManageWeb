@@ -1,13 +1,16 @@
+import { notFound } from 'next/navigation';
 import { requireRole } from '@/lib/auth';
 import { DashboardShell } from '@/components/dashboard/dashboard-shell';
 import { formatRupiah } from '@/lib/format';
 import { getAllSalesBalances } from '@/app/actions/setoran';
+import { getAppConfig } from '@/lib/config/get-config';
 import { MarkSetoran } from '@/components/admin/mark-setoran';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AdminSetoranPage() {
   await requireRole('ADMIN', 'SUPER_ADMIN', 'OWNER');
+  if (!(await getAppConfig()).setoranEnabled) notFound();
   const balances = await getAllSalesBalances();
 
   const totalOutstanding = balances.reduce((s, b) => s + b.outstanding, 0);

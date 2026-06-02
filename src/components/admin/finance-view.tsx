@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useRef, useTransition } from 'react';
+import { useState, useMemo, useRef, useEffect, useTransition, type Dispatch, type SetStateAction } from 'react';
 import { createCashflow, deleteCashflow } from '@/app/actions/cashflow';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,6 +20,10 @@ import {
   TrendingDown,
   FileStack,
   Search,
+  Tag,
+  Layers,
+  X,
+  type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -57,6 +61,9 @@ interface CashflowItem {
   name: string;
   amount: number;
   category: string | null;
+  sourceBank: string | null;
+  description: string | null;
+  tag: string | null;
   date: string;
 }
 
@@ -87,20 +94,228 @@ function StatusBadge({ status }: { status: string }) {
   return <StatusToken intent={ds.intent} size="sm">{ds.label}</StatusToken>;
 }
 
+/* Single pill button used inside PillSelect. */
+function Pill({ active, onClick, icon: Icon, children }: { active?: boolean; onClick: () => void; icon?: LucideIcon; children: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'inline-flex max-w-full items-center gap-1 rounded-full px-2.5 py-1 text-[11px] cursor-pointer transition-all active:scale-95',
+        active
+          ? 'bg-foreground text-background font-medium shadow-sm'
+          : 'bg-muted text-muted-foreground hover:bg-accent hover:text-foreground',
+      )}
+    >
+      {Icon && <Icon className={cn('size-2.5 shrink-0', active ? 'opacity-80' : 'opacity-60')} />}
+      <span className="truncate">{children}</span>
+    </button>
+  );
+}
+
+/**
+ * Creatable single-select shown as pills. Pick an existing option or type a new
+ * value (Enter / "+ tambah") — all in one field. Empty value = none selected.
+ */
+function PillSelect({
+  value,
+  onChange,
+  options,
+  placeholder,
+  icon: Icon,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: string[];
+  placeholder: string;
+  icon?: LucideIcon;
+}) {
+  const [query, setQuery] = useState('');
+  const q = query.trim();
+  const lower = q.toLowerCase();
+  const matches = q ? options.filter((o) => o.toLowerCase().includes(lower)) : options;
+  const canCreate = q.length > 0 && !options.some((o) => o.toLowerCase() === lower);
+  const valueOutside = value !== '' && !matches.some((o) => o.toLowerCase() === value.toLowerCase());
+
+  function pick(v: string) {
+    onChange(v.toLowerCase() === value.toLowerCase() ? '' : v);
+    setQuery('');
+  }
+  function create() {
+    if (canCreate) {
+      onChange(q);
+      setQuery('');
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="relative">
+        {Icon && <Icon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />}
+        <Input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              if (canCreate) create();
+              else if (matches.length === 1) pick(matches[0]);
+            }
+          }}
+          placeholder={placeholder}
+          className={cn('h-8 pr-7 text-xs', Icon && 'pl-8')}
+        />
+        {value !== '' && (
+          <button
+            type="button"
+            onClick={() => onChange('')}
+            title="Hapus pilihan"
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+          >
+            <X className="size-3.5" />
+          </button>
+        )}
+      </div>
+      {(valueOutside || matches.length > 0 || canCreate) && (
+        <div className="flex flex-wrap gap-1.5">
+          {valueOutside && <Pill active icon={Icon} onClick={() => pick(value)}>{value}</Pill>}
+          {matches.map((o) => (
+            <Pill key={o} active={o.toLowerCase() === value.toLowerCase()} icon={Icon} onClick={() => pick(o)}>
+              {o}
+            </Pill>
+          ))}
+          {canCreate && (
+            <button
+              type="button"
+              onClick={create}
+              className="inline-flex items-center gap-1 rounded-full border border-dashed border-border px-2.5 py-1 text-[11px] text-muted-foreground hover:border-foreground/40 hover:text-foreground cursor-pointer transition-colors"
+            >
+              <Plus className="size-3" /> “{q}”
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* Multi-select filter chip with a checkbox dropdown (kategori / tag / bank). */
+function FilterDropdown({
+  label,
+  icon: Icon,
+  options,
+  selected,
+  onToggle,
+  onClear,
+}: {
+  label: string;
+  icon: LucideIcon;
+  options: string[];
+  selected: Set<string>;
+  onToggle: (v: string) => void;
+  onClear: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    function onDoc(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, []);
+  const count = selected.size;
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={cn(
+          'inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-xs text-foreground cursor-pointer transition-colors hover:bg-muted/50 dark:bg-input/30',
+          count > 0 && 'border-foreground/30 font-medium',
+        )}
+      >
+        <Icon className="size-3 text-muted-foreground" />
+        {label}
+        {count > 0 && (
+          <span className="inline-flex min-w-3.5 items-center justify-center rounded-full bg-foreground px-1 text-[9px] font-bold text-background">
+            {count}
+          </span>
+        )}
+        <ChevronDown className={cn('size-3 text-muted-foreground transition-transform', open && 'rotate-180')} />
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full z-50 mt-1 max-h-56 min-w-[170px] overflow-y-auto rounded-lg border bg-card py-1 shadow-lg dark:bg-popover">
+          {options.length === 0 ? (
+            <p className="px-3 py-1.5 text-xs text-muted-foreground">Belum ada data</p>
+          ) : (
+            options.map((opt) => (
+              <label key={opt} className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-xs hover:bg-accent">
+                <input
+                  type="checkbox"
+                  checked={selected.has(opt)}
+                  onChange={() => onToggle(opt)}
+                  className="h-3.5 w-3.5 rounded border-border accent-foreground"
+                />
+                <span className="truncate">{opt}</span>
+              </label>
+            ))
+          )}
+          {count > 0 && (
+            <button
+              type="button"
+              onClick={onClear}
+              className="mt-1 w-full border-t px-3 py-1.5 text-left text-[11px] text-muted-foreground hover:text-foreground cursor-pointer"
+            >
+              Hapus pilihan
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── Main Component ──────────────────────────────────────────────────────── */
 
 export function FinanceView({ entries, salesUsers, cashflows }: FinanceViewProps) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [salesSearch, setSalesSearch] = useState('');
   const [salesPage, setSalesPage] = useState(0);
-  const SALES_PAGE_SIZE = 10;
+  const SALES_PAGE_SIZE = 5;
   const [cashflow, setCashflow] = useState<CashflowItem[]>(cashflows);
   const [cfType, setCfType] = useState<'PENGELUARAN' | 'PEMASUKAN'>('PENGELUARAN');
   const [cfName, setCfName] = useState('');
   const [cfAmount, setCfAmount] = useState('');
   const [cfCategory, setCfCategory] = useState('');
+  const [cfSourceBank, setCfSourceBank] = useState('');
+  const [cfDescription, setCfDescription] = useState('');
+  const [cfTag, setCfTag] = useState('');
+  // Granular filters for the expense list.
+  const [cfSearch, setCfSearch] = useState('');
+  const [cfTypeFilter, setCfTypeFilter] = useState<'ALL' | 'PENGELUARAN' | 'PEMASUKAN'>('ALL');
+  const [cfCatFilter, setCfCatFilter] = useState<Set<string>>(new Set());
+  const [cfTagFilter, setCfTagFilter] = useState<Set<string>>(new Set());
+  const [cfBankFilter, setCfBankFilter] = useState<Set<string>>(new Set());
   const [cfPending, startCfTransition] = useTransition();
   const nameRef = useRef<HTMLInputElement>(null);
+
+  // Distinct existing values → the pickable pills for kategori / tag.
+  const cfCategories = useMemo(() => {
+    const set = new Set<string>();
+    cashflow.forEach((c) => { if (c.category) set.add(c.category); });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [cashflow]);
+  const cfTags = useMemo(() => {
+    const set = new Set<string>();
+    cashflow.forEach((c) => { if (c.tag) set.add(c.tag); });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [cashflow]);
+  const cfBanks = useMemo(() => {
+    const set = new Set<string>();
+    cashflow.forEach((c) => { if (c.sourceBank) set.add(c.sourceBank); });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [cashflow]);
 
   const totals = useMemo(() => {
     let penjualan = 0, modal = 0, fee = 0;
@@ -194,15 +409,19 @@ export function FinanceView({ entries, salesUsers, cashflows }: FinanceViewProps
     fd.set('name', cfName.trim());
     fd.set('amount', String(amount));
     if (cfCategory.trim()) fd.set('category', cfCategory.trim());
+    if (cfSourceBank.trim()) fd.set('sourceBank', cfSourceBank.trim());
+    if (cfDescription.trim()) fd.set('description', cfDescription.trim());
+    if (cfTag.trim()) fd.set('tag', cfTag.trim());
     startCfTransition(async () => {
       const res = await createCashflow(fd);
       if ('error' in res) { toast.error(res.error); return; }
       setCashflow((prev) => [{
         id: res.item.id, type: res.item.type, name: res.item.name,
         amount: res.item.amount, category: res.item.category,
+        sourceBank: res.item.sourceBank, description: res.item.description, tag: res.item.tag,
         date: new Date(res.item.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }),
       }, ...prev]);
-      setCfName(''); setCfAmount(''); setCfCategory('');
+      setCfName(''); setCfAmount(''); setCfCategory(''); setCfSourceBank(''); setCfDescription(''); setCfTag('');
       nameRef.current?.focus();
     });
   }
@@ -213,7 +432,54 @@ export function FinanceView({ entries, salesUsers, cashflows }: FinanceViewProps
   }
 
   const isProfit = totals.profit >= 0;
-  const netCfLabel = cfTotals.pengeluaran - cfTotals.pemasukan;
+
+  // The cashflow form is tinted by money direction: pengeluaran = danger,
+  // pemasukan = success. One accent drives the toggle, amount + top edge.
+  const isPengeluaran = cfType === 'PENGELUARAN';
+  const cfAccent = isPengeluaran ? 'var(--danger-ring)' : 'var(--success-ring)';
+
+  // Apply the granular filters; the list + its NET footer reflect this subset.
+  const filteredCashflow = useMemo(() => {
+    const q = cfSearch.trim().toLowerCase();
+    return cashflow.filter((item) => {
+      if (cfTypeFilter !== 'ALL' && item.type !== cfTypeFilter) return false;
+      if (cfCatFilter.size && !(item.category && cfCatFilter.has(item.category))) return false;
+      if (cfTagFilter.size && !(item.tag && cfTagFilter.has(item.tag))) return false;
+      if (cfBankFilter.size && !(item.sourceBank && cfBankFilter.has(item.sourceBank))) return false;
+      if (q) {
+        const hay = [item.name, item.description, item.category, item.tag, item.sourceBank]
+          .filter(Boolean).join(' ').toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [cashflow, cfSearch, cfTypeFilter, cfCatFilter, cfTagFilter, cfBankFilter]);
+
+  const filteredNet = useMemo(() => {
+    let p = 0, m = 0;
+    filteredCashflow.forEach((i) => { if (i.type === 'PENGELUARAN') p += i.amount; else m += i.amount; });
+    return p - m;
+  }, [filteredCashflow]);
+
+  const cfHasFilter =
+    cfSearch.trim() !== '' || cfTypeFilter !== 'ALL' || cfCatFilter.size > 0 || cfTagFilter.size > 0 || cfBankFilter.size > 0;
+
+  function toggleFilter(setter: Dispatch<SetStateAction<Set<string>>>, v: string) {
+    setter((prev) => {
+      const next = new Set(prev);
+      if (next.has(v)) next.delete(v);
+      else next.add(v);
+      return next;
+    });
+  }
+
+  function resetCfFilters() {
+    setCfSearch('');
+    setCfTypeFilter('ALL');
+    setCfCatFilter(new Set());
+    setCfTagFilter(new Set());
+    setCfBankFilter(new Set());
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -397,36 +663,46 @@ export function FinanceView({ entries, salesUsers, cashflows }: FinanceViewProps
       <div>
         <div className="flex items-center justify-between mb-3">
           <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">Pengeluaran / Pemasukan</p>
-          <div className="flex items-center gap-2 text-[11px]">
-            <span className="font-medium tabular-nums" style={{ color: 'var(--danger-ring)' }}>
-              − {formatRupiah(cfTotals.pengeluaran)}
+          <div className="flex items-center gap-1.5">
+            <span
+              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium tabular-nums"
+              style={{ background: 'var(--danger-bg)', color: 'var(--danger-fg)' }}
+            >
+              <ArrowDown className="size-3" /> {formatRupiah(cfTotals.pengeluaran)}
             </span>
-            <span className="text-border">·</span>
-            <span className="font-medium tabular-nums" style={{ color: 'var(--success-ring)' }}>
-              + {formatRupiah(cfTotals.pemasukan)}
+            <span
+              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium tabular-nums"
+              style={{ background: 'var(--success-bg)', color: 'var(--success-fg)' }}
+            >
+              <ArrowUp className="size-3" /> {formatRupiah(cfTotals.pemasukan)}
             </span>
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-start">
           {/* Input form */}
-          <div className="rounded-xl border bg-card p-4 flex flex-col gap-3">
-            <div className="flex gap-1 p-0.5 rounded-lg bg-muted">
+          <div className="relative flex flex-col gap-3 overflow-hidden rounded-xl border bg-card p-4">
+            {/* Intent edge — recolors with the selected direction */}
+            <span className="absolute inset-x-0 top-0 h-[3px] transition-colors" style={{ background: cfAccent }} />
+
+            <div className="flex gap-1 rounded-xl bg-muted p-1">
               {(['PENGELUARAN', 'PEMASUKAN'] as const).map((tipe) => {
                 const isPel = tipe === 'PENGELUARAN';
                 const active = cfType === tipe;
+                const tint = isPel
+                  ? { background: 'var(--danger-bg)', color: 'var(--danger-fg)' }
+                  : { background: 'var(--success-bg)', color: 'var(--success-fg)' };
                 return (
                   <button
                     key={tipe}
                     onClick={() => setCfType(tipe)}
+                    style={active ? tint : undefined}
                     className={cn(
-                      'flex-1 inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs cursor-pointer transition-all duration-150',
-                      active
-                        ? 'bg-card shadow-sm font-medium text-foreground'
-                        : 'text-muted-foreground hover:text-foreground',
+                      'flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs cursor-pointer transition-all duration-150',
+                      active ? 'font-semibold shadow-sm' : 'text-muted-foreground hover:text-foreground',
                     )}
                   >
-                    {isPel ? <ArrowDown className="size-3" /> : <ArrowUp className="size-3" />}
+                    {isPel ? <ArrowDown className="size-3.5" /> : <ArrowUp className="size-3.5" />}
                     {isPel ? 'Pengeluaran' : 'Pemasukan'}
                   </button>
                 );
@@ -435,27 +711,73 @@ export function FinanceView({ entries, salesUsers, cashflows }: FinanceViewProps
 
             <Input
               ref={nameRef}
-              placeholder="Nama…"
+              placeholder="Nama transaksi…"
               value={cfName}
               onChange={(e) => setCfName(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && addCashflow()}
             />
-            <div className="flex gap-2">
-              <RupiahInput
-                placeholder="Jumlah (Rp)"
-                value={cfAmount}
-                onValueChange={setCfAmount}
-                onKeyDown={(e) => e.key === 'Enter' && addCashflow()}
-                className="flex-1"
-              />
-              <Input
-                placeholder="Kategori"
-                value={cfCategory}
-                onChange={(e) => setCfCategory(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && addCashflow()}
-                className="flex-1"
+
+            {/* Hero amount — tinted by intent as you type */}
+            <RupiahInput
+              placeholder="0"
+              value={cfAmount}
+              onValueChange={setCfAmount}
+              onKeyDown={(e) => e.key === 'Enter' && addCashflow()}
+              className={cn(
+                'h-12 text-xl! font-semibold tabular-nums',
+                cfAmount && (isPengeluaran ? 'text-[color:var(--danger-ring)]' : 'text-[color:var(--success-ring)]'),
+              )}
+            />
+
+            <Input
+              placeholder="Deskripsi (opsional)…"
+              value={cfDescription}
+              onChange={(e) => setCfDescription(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && addCashflow()}
+            />
+
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center gap-1.5 text-muted-foreground">
+                <CreditCard className="size-3" />
+                <p className="text-[10px] font-semibold uppercase tracking-[0.08em]">Bank / Sumber Dana</p>
+              </div>
+              <PillSelect
+                value={cfSourceBank}
+                onChange={setCfSourceBank}
+                options={cfBanks}
+                placeholder="Pilih atau ketik bank baru…"
+                icon={CreditCard}
               />
             </div>
+
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center gap-1.5 text-muted-foreground">
+                <Layers className="size-3" />
+                <p className="text-[10px] font-semibold uppercase tracking-[0.08em]">Kategori</p>
+              </div>
+              <PillSelect
+                value={cfCategory}
+                onChange={setCfCategory}
+                options={cfCategories}
+                placeholder="Pilih atau ketik kategori baru…"
+                icon={Layers}
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center gap-1.5 text-muted-foreground">
+                <Tag className="size-3" />
+                <p className="text-[10px] font-semibold uppercase tracking-[0.08em]">Tag</p>
+              </div>
+              <PillSelect
+                value={cfTag}
+                onChange={setCfTag}
+                options={cfTags}
+                placeholder="Pilih atau ketik tag baru…"
+                icon={Tag}
+              />
+            </div>
+
             <Button onClick={addCashflow} disabled={cfPending} className="w-full gap-1.5">
               <Plus className="size-3.5" /> Tambah
             </Button>
@@ -469,37 +791,105 @@ export function FinanceView({ entries, salesUsers, cashflows }: FinanceViewProps
               </div>
             ) : (
               <>
+                {/* Filter toolbar */}
+                <div className="flex flex-col gap-2 border-b bg-muted/20 p-3">
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      value={cfSearch}
+                      onChange={(e) => setCfSearch(e.target.value)}
+                      placeholder="Cari catatan…"
+                      className="h-8 pl-8 text-xs"
+                    />
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <div className="flex rounded-lg bg-muted p-0.5 text-xs">
+                      {([['ALL', 'Semua'], ['PENGELUARAN', 'Keluar'], ['PEMASUKAN', 'Masuk']] as const).map(([v, l]) => (
+                        <button
+                          key={v}
+                          type="button"
+                          onClick={() => setCfTypeFilter(v)}
+                          className={cn(
+                            'rounded-md px-2.5 py-1 cursor-pointer transition-colors',
+                            cfTypeFilter === v ? 'bg-card shadow-sm font-medium text-foreground' : 'text-muted-foreground hover:text-foreground',
+                          )}
+                        >
+                          {l}
+                        </button>
+                      ))}
+                    </div>
+                    <FilterDropdown label="Kategori" icon={Layers} options={cfCategories} selected={cfCatFilter} onToggle={(v) => toggleFilter(setCfCatFilter, v)} onClear={() => setCfCatFilter(new Set())} />
+                    <FilterDropdown label="Tag" icon={Tag} options={cfTags} selected={cfTagFilter} onToggle={(v) => toggleFilter(setCfTagFilter, v)} onClear={() => setCfTagFilter(new Set())} />
+                    <FilterDropdown label="Bank" icon={CreditCard} options={cfBanks} selected={cfBankFilter} onToggle={(v) => toggleFilter(setCfBankFilter, v)} onClear={() => setCfBankFilter(new Set())} />
+                    {cfHasFilter && (
+                      <button type="button" onClick={resetCfFilters} className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground cursor-pointer">
+                        <X className="size-3" /> Reset
+                      </button>
+                    )}
+                    <span className="ml-auto text-[11px] text-muted-foreground tabular-nums">
+                      {cfHasFilter ? `${filteredCashflow.length}/${cashflow.length}` : cashflow.length}
+                    </span>
+                  </div>
+                </div>
+
+                {filteredCashflow.length === 0 ? (
+                  <div className="py-10 text-center text-sm text-muted-foreground">
+                    Tidak ada catatan yang cocok
+                  </div>
+                ) : (
                 <div className="divide-y max-h-[340px] overflow-y-auto">
-                  {cashflow.map((item) => {
+                  {filteredCashflow.map((item, i) => {
                     const isPemasukan = item.type === 'PEMASUKAN';
+                    const edge = isPemasukan ? 'var(--success-ring)' : 'var(--danger-ring)';
+                    const iconTint = isPemasukan
+                      ? { background: 'var(--success-bg)', color: 'var(--success-fg)' }
+                      : { background: 'var(--danger-bg)', color: 'var(--danger-fg)' };
                     return (
-                      <div key={item.id} className="flex items-center gap-3 px-4 py-3">
-                        <div className="size-6 rounded-md flex items-center justify-center shrink-0 bg-muted">
-                          {isPemasukan
-                            ? <ArrowUp className="size-3 text-muted-foreground" />
-                            : <ArrowDown className="size-3 text-muted-foreground" />
-                          }
+                      <div
+                        key={item.id}
+                        className="relative flex items-start gap-3 py-3 pl-5 pr-4 transition-colors hover:bg-muted/30 animate-in fade-in slide-in-from-bottom-1 fill-mode-both duration-300"
+                        style={{ animationDelay: `${Math.min(i * 25, 250)}ms` }}
+                      >
+                        <span className="absolute inset-y-0 left-0 w-1" style={{ background: edge }} />
+                        <div className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md" style={iconTint}>
+                          {isPemasukan ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />}
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-[13px] font-medium truncate">{item.name}</p>
-                          <div className="flex items-center gap-1.5 mt-0.5">
+                          {item.description && (
+                            <p className="text-[11px] text-muted-foreground truncate mt-0.5">{item.description}</p>
+                          )}
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
                             <span className="text-[10px] text-muted-foreground">{item.date}</span>
+                            {item.sourceBank && (
+                              <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                                <CreditCard className="size-2.5" /> {item.sourceBank}
+                              </span>
+                            )}
                             {item.category && (
                               <span className="text-[9px] uppercase bg-muted text-muted-foreground px-1.5 py-px rounded tracking-[0.04em]">
                                 {item.category}
                               </span>
                             )}
+                            {item.tag && (
+                              <span
+                                className="inline-flex items-center gap-0.5 text-[9px] px-1.5 py-px rounded-full"
+                                style={{ background: 'var(--info-bg)', color: 'var(--info-fg)' }}
+                              >
+                                <Tag className="size-2.5" /> {item.tag}
+                              </span>
+                            )}
                           </div>
                         </div>
                         <span
-                          className="shrink-0 text-sm tabular-nums"
+                          className="shrink-0 text-sm tabular-nums mt-0.5"
                           style={{ fontFamily: SERIF, color: isPemasukan ? 'var(--success-ring)' : 'var(--danger-ring)' }}
                         >
                           {isPemasukan ? '+' : '−'} {formatRupiah(item.amount)}
                         </span>
                         <button
                           onClick={() => removeCashflow(item.id)}
-                          className="size-6 rounded border border-border flex items-center justify-center shrink-0 cursor-pointer text-muted-foreground transition-colors hover:text-destructive hover:bg-destructive/5"
+                          className="size-6 rounded border border-border flex items-center justify-center shrink-0 cursor-pointer text-muted-foreground transition-colors hover:text-destructive hover:bg-destructive/5 mt-0.5"
                         >
                           <Trash2 className="size-3" />
                         </button>
@@ -507,12 +897,18 @@ export function FinanceView({ entries, salesUsers, cashflows }: FinanceViewProps
                     );
                   })}
                 </div>
-                <div className="flex items-center justify-between px-4 py-2.5 border-t bg-muted/30">
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">Net</span>
-                  <span className="tabular-nums" style={{ fontFamily: SERIF, fontSize: 14, color: netCfLabel > 0 ? 'var(--danger-ring)' : 'var(--success-ring)' }}>
-                    {netCfLabel >= 0 ? '−' : '+'} {formatRupiah(Math.abs(netCfLabel))}
-                  </span>
-                </div>
+                )}
+
+                {filteredCashflow.length > 0 && (
+                  <div className="flex items-center justify-between px-4 py-2.5 border-t bg-muted/30">
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                      {cfHasFilter ? `Net · ${filteredCashflow.length} item` : 'Net'}
+                    </span>
+                    <span className="tabular-nums" style={{ fontFamily: SERIF, fontSize: 14, color: filteredNet > 0 ? 'var(--danger-ring)' : 'var(--success-ring)' }}>
+                      {filteredNet >= 0 ? '−' : '+'} {formatRupiah(Math.abs(filteredNet))}
+                    </span>
+                  </div>
+                )}
               </>
             )}
           </div>

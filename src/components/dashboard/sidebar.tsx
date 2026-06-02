@@ -41,12 +41,15 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 import { ChangePasswordButton } from '@/components/dashboard/change-password-form';
+import { EditProfileButton } from '@/components/dashboard/edit-profile-form';
 
 interface SidebarProps {
   role: 'OWNER' | 'SUPER_ADMIN' | 'ADMIN' | 'SALES' | 'MANAGE' | 'DRIVER';
   userName: string;
   brandName?: string;
   logoUrl?: string | null;
+  setoranEnabled?: boolean;
+  rekBank?: string | null;
 }
 
 // Navigation links for each role
@@ -98,24 +101,27 @@ const ROLE_LABEL: Record<SidebarProps['role'], string> = {
   DRIVER: 'Driver',
 };
 
-export function Sidebar({ role, userName, brandName = 'Millenials Farm', logoUrl }: SidebarProps) {
+export function Sidebar({ role, userName, brandName = 'Millenials Farm', logoUrl, setoranEnabled, rekBank }: SidebarProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false); // Mobile menu state
   const router = useRouter();
+  // Drop the Setoran link when the feature is switched off in config.
+  const visible = (items: NavLink[]) =>
+    setoranEnabled ? items : items.filter((l) => l.href !== '/admin/setoran' && l.href !== '/sales/setoran');
   // Owner-only links sit in their own labelled section below the admin links,
   // so OWNER is visually distinct from SUPER_ADMIN (who shares the top group).
   const sections: NavSection[] =
     role === 'OWNER'
-      ? [{ items: [...adminLinks, ...superAdminExtras] }, { label: 'Owner', items: ownerExtras }]
+      ? [{ items: visible([...adminLinks, ...superAdminExtras]) }, { label: 'Owner', items: ownerExtras }]
       : role === 'SUPER_ADMIN'
-        ? [{ items: [...adminLinks, ...superAdminExtras] }]
+        ? [{ items: visible([...adminLinks, ...superAdminExtras]) }]
         : role === 'ADMIN'
-          ? [{ items: adminLinks }]
+          ? [{ items: visible(adminLinks) }]
           : role === 'MANAGE'
             ? [{ items: manageLinks }]
             : role === 'DRIVER'
               ? [{ items: driverLinks }]
-              : [{ items: salesLinks }];
+              : [{ items: visible(salesLinks) }];
 
   /**
    * Handles logout: calls the logout API to clear the session cookie,
@@ -224,7 +230,12 @@ export function Sidebar({ role, userName, brandName = 'Millenials Farm', logoUrl
             <ChevronLeft className="size-4" />
             Ke Website
           </Link> */}
-          {role !== 'ADMIN' && role !== 'SUPER_ADMIN' && <ChangePasswordButton />}
+          {role !== 'ADMIN' && role !== 'SUPER_ADMIN' && (
+            <>
+              <EditProfileButton name={userName} rekBank={rekBank ?? null} />
+              <ChangePasswordButton />
+            </>
+          )}
           <Button
             variant="ghost"
             onClick={handleLogout}

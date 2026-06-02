@@ -41,6 +41,7 @@ export function BrandingForm({ config, salesUsers = [] }: { config: AppConfig; s
   // tracks which slide/variant is mid-upload, e.g. "0:desktop"
   const [uploadingSlot, setUploadingSlot] = useState<string | null>(null);
   const [paymentEnabled, setPaymentEnabled] = useState(config.paymentEnabled);
+  const [setoranEnabled, setSetoranEnabled] = useState(config.setoranEnabled);
   const [midtransIsProduction, setMidtransIsProduction] = useState(config.midtransIsProduction);
   const [paymentMock, setPaymentMock] = useState(config.paymentMock);
   const logoRef = useRef<HTMLInputElement>(null);
@@ -238,6 +239,17 @@ export function BrandingForm({ config, salesUsers = [] }: { config: AppConfig; s
             </p>
           </div>
           <Switch checked={paymentEnabled} onCheckedChange={setPaymentEnabled} />
+        </div>
+
+        <input type="hidden" name="setoranEnabled" value={setoranEnabled ? 'true' : 'false'} />
+        <div className="flex items-center justify-between gap-4 mt-4 pt-4 border-t">
+          <div>
+            <p className="text-sm font-medium">Setoran sales</p>
+            <p className="text-xs text-muted-foreground">
+              Lacak uang yang ditagih sales langsung dari pembeli & setorannya ke perusahaan. Menu &quot;Setoran&quot; muncul untuk admin &amp; sales.
+            </p>
+          </div>
+          <Switch checked={setoranEnabled} onCheckedChange={setSetoranEnabled} />
         </div>
 
         <div className="flex flex-col gap-1.5 mt-4 pt-4 border-t">

@@ -1,14 +1,17 @@
+import { notFound } from 'next/navigation';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { DashboardShell } from '@/components/dashboard/dashboard-shell';
 import { formatRupiah } from '@/lib/format';
 import { getSalesBalance } from '@/app/actions/setoran';
+import { getAppConfig } from '@/lib/config/get-config';
 import { PaySetoran } from '@/components/dashboard/pay-setoran';
 
 export const dynamic = 'force-dynamic';
 
 export default async function SalesSetoranPage() {
   const profile = await requireAuth();
+  if (!(await getAppConfig()).setoranEnabled) notFound();
   const [{ owed, paid, outstanding }, history] = await Promise.all([
     getSalesBalance(profile.id),
     prisma.setoran.findMany({ where: { salesId: profile.id }, orderBy: { createdAt: 'desc' }, take: 20 }),

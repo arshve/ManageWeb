@@ -25,12 +25,15 @@ enum CashflowType {
 }
 
 model Cashflow {
-  id        String       @id @default(cuid())
-  type      CashflowType
-  name      String
-  amount    Float
-  category  String?
-  createdAt DateTime     @default(now())
+  id          String       @id @default(cuid())
+  type        CashflowType
+  name        String
+  amount      Float
+  category    String?
+  sourceBank  String?
+  description String?
+  tag         String?
+  createdAt   DateTime     @default(now())
 
   @@index([createdAt])
 }
@@ -420,6 +423,8 @@ model AppConfig {
   carouselSlides  Json?
   // Master on/off for online payment (Midtrans cart + sales charge). null → off.
   paymentEnabled  Boolean? @default(false)
+  // Master on/off for the setoran (sales→company remittance) feature. null → off.
+  setoranEnabled  Boolean? @default(false)
   // Profile.id that owns public catalogue orders (chosen from the sales list).
   publicSalesId   String?
   // Midtrans credentials (UI-configurable; env is the fallback). serverKey is a

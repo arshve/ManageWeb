@@ -13,7 +13,7 @@ export default async function DriverLayout({
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar role="DRIVER" userName={profile.name} brandName={cfg.brandName} logoUrl={cfg.logoUrl} />
+      <Sidebar role="DRIVER" userName={profile.name} brandName={cfg.brandName} logoUrl={cfg.logoUrl} rekBank={profile.rekBank} />
       <main className="flex-1 overflow-auto flex flex-col">
         <div className="flex-1">{children}</div>
         <Footer />

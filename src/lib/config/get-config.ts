@@ -44,6 +44,8 @@ export interface AppConfig {
   carouselSlides: CarouselSlide[] | null;
   // Master on/off for online payment (Midtrans cart + sales charge).
   paymentEnabled: boolean;
+  // Master on/off for the setoran (sales→company remittance) feature.
+  setoranEnabled: boolean;
   // Profile.id that owns public catalogue orders (chosen from the sales list).
   publicSalesId: string | null;
   // Midtrans — client-safe fields only. The server key is NEVER exposed here
@@ -81,6 +83,7 @@ const DEFAULTS: AppConfig = {
   coverColor: null,
   carouselSlides: null,
   paymentEnabled: false,
+  setoranEnabled: false,
   publicSalesId: null,
   midtransClientKey: null,
   midtransIsProduction: false,
@@ -140,6 +143,7 @@ export const getAppConfig = cache(async function getAppConfig(): Promise<AppConf
     brandScale: (row.brandScale as BrandScale | null) ?? null,
     coverColor: row.coverColor ?? null,
     carouselSlides: normalizeSlides(row.carouselSlides),
+    setoranEnabled: row.setoranEnabled ?? DEFAULTS.setoranEnabled,
     ...paymentPublicFields(row),
   };
 });

@@ -76,6 +76,9 @@ export default async function FinancePage() {
           name: c.name,
           amount: c.amount,
           category: c.category,
+          sourceBank: c.sourceBank,
+          description: c.description,
+          tag: c.tag,
           date: c.createdAt.toLocaleDateString('id-ID', {
             day: 'numeric',
             month: 'short',

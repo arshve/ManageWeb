@@ -83,6 +83,7 @@ export default async function FinancePage() {
             day: 'numeric',
             month: 'short',
           }),
+          dateISO: c.createdAt.toISOString().slice(0, 10),
         }))}
       />
     </DashboardShell>

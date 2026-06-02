@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useMemo, useRef, useEffect, useTransition, type Dispatch, type SetStateAction } from 'react';
-import { createCashflow, deleteCashflow } from '@/app/actions/cashflow';
+import { createCashflow, updateCashflow, deleteCashflow } from '@/app/actions/cashflow';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { RupiahInput } from '@/components/ui/rupiah-input';
 import { StatusToken, PAYMENT_STATUS } from '@/components/ui/status-token';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { formatRupiah } from '@/lib/format';
 import {
   ChevronDown,
@@ -23,6 +24,8 @@ import {
   Tag,
   Layers,
   X,
+  Pencil,
+  CalendarDays,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -65,6 +68,7 @@ interface CashflowItem {
   description: string | null;
   tag: string | null;
   date: string;
+  dateISO: string;
 }
 
 interface FinanceViewProps {
@@ -276,6 +280,222 @@ function FilterDropdown({
   );
 }
 
+type CfType = 'PENGELUARAN' | 'PEMASUKAN';
+
+// Map a saved row (from the server action) into the local list shape.
+function cfRowToItem(r: {
+  id: string; type: CfType; name: string; amount: number;
+  category: string | null; sourceBank: string | null; description: string | null; tag: string | null;
+  createdAt: string | Date;
+}): CashflowItem {
+  const d = new Date(r.createdAt);
+  return {
+    id: r.id, type: r.type, name: r.name, amount: r.amount, category: r.category,
+    sourceBank: r.sourceBank, description: r.description, tag: r.tag,
+    date: d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }),
+    dateISO: d.toISOString().slice(0, 10),
+  };
+}
+const byDateDesc = (a: CashflowItem, b: CashflowItem) => (a.dateISO < b.dateISO ? 1 : a.dateISO > b.dateISO ? -1 : 0);
+
+/**
+ * Shared cashflow input controls — used by the inline "add" panel and the edit
+ * dialog. Purely controlled; the caller owns the state + submit button.
+ */
+function CashflowFields(props: {
+  type: CfType; setType: (t: CfType) => void;
+  name: string; setName: (v: string) => void; nameRef?: React.Ref<HTMLInputElement>;
+  amount: string; setAmount: (v: string) => void;
+  date: string; setDate: (v: string) => void;
+  description: string; setDescription: (v: string) => void;
+  sourceBank: string; setSourceBank: (v: string) => void; banks: string[];
+  category: string; setCategory: (v: string) => void; categories: string[];
+  tag: string; setTag: (v: string) => void; tags: string[];
+  onEnterSubmit?: () => void;
+}) {
+  const isPengeluaran = props.type === 'PENGELUARAN';
+  const onEnter = (e: React.KeyboardEvent) => { if (e.key === 'Enter') props.onEnterSubmit?.(); };
+  return (
+    <>
+      <div className="flex gap-1 rounded-xl bg-muted p-1">
+        {(['PENGELUARAN', 'PEMASUKAN'] as const).map((tipe) => {
+          const isPel = tipe === 'PENGELUARAN';
+          const active = props.type === tipe;
+          const tint = isPel
+            ? { background: 'var(--danger-bg)', color: 'var(--danger-fg)' }
+            : { background: 'var(--success-bg)', color: 'var(--success-fg)' };
+          return (
+            <button
+              key={tipe}
+              type="button"
+              onClick={() => props.setType(tipe)}
+              style={active ? tint : undefined}
+              className={cn(
+                'flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs cursor-pointer transition-all duration-150',
+                active ? 'font-semibold shadow-sm' : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {isPel ? <ArrowDown className="size-3.5" /> : <ArrowUp className="size-3.5" />}
+              {isPel ? 'Pengeluaran' : 'Pemasukan'}
+            </button>
+          );
+        })}
+      </div>
+
+      <Input
+        ref={props.nameRef}
+        placeholder="Nama transaksi…"
+        value={props.name}
+        onChange={(e) => props.setName(e.target.value)}
+        onKeyDown={onEnter}
+      />
+
+      {/* Hero amount — tinted by intent as you type */}
+      <RupiahInput
+        placeholder="0"
+        value={props.amount}
+        onValueChange={props.setAmount}
+        onKeyDown={onEnter}
+        className={cn(
+          'h-12 text-xl! font-semibold tabular-nums',
+          props.amount && (isPengeluaran ? 'text-[color:var(--danger-ring)]' : 'text-[color:var(--success-ring)]'),
+        )}
+      />
+
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center gap-1.5 text-muted-foreground">
+          <CalendarDays className="size-3" />
+          <p className="text-[10px] font-semibold uppercase tracking-[0.08em]">Tanggal</p>
+        </div>
+        <Input type="date" value={props.date} onChange={(e) => props.setDate(e.target.value)} className="h-9 text-xs" />
+      </div>
+
+      <Input
+        placeholder="Deskripsi (opsional)…"
+        value={props.description}
+        onChange={(e) => props.setDescription(e.target.value)}
+        onKeyDown={onEnter}
+      />
+
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center gap-1.5 text-muted-foreground">
+          <CreditCard className="size-3" />
+          <p className="text-[10px] font-semibold uppercase tracking-[0.08em]">Bank / Sumber Dana</p>
+        </div>
+        <PillSelect value={props.sourceBank} onChange={props.setSourceBank} options={props.banks} placeholder="Pilih atau ketik bank baru…" icon={CreditCard} />
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center gap-1.5 text-muted-foreground">
+          <Layers className="size-3" />
+          <p className="text-[10px] font-semibold uppercase tracking-[0.08em]">Kategori</p>
+        </div>
+        <PillSelect value={props.category} onChange={props.setCategory} options={props.categories} placeholder="Pilih atau ketik kategori baru…" icon={Layers} />
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center gap-1.5 text-muted-foreground">
+          <Tag className="size-3" />
+          <p className="text-[10px] font-semibold uppercase tracking-[0.08em]">Tag</p>
+        </div>
+        <PillSelect value={props.tag} onChange={props.setTag} options={props.tags} placeholder="Pilih atau ketik tag baru…" icon={Tag} />
+      </div>
+    </>
+  );
+}
+
+/** Focused edit modal — opens on the row's pencil, seeded from that entry. */
+function EditCashflowDialog({
+  item, banks, categories, tags, onSaved,
+}: {
+  item: CashflowItem;
+  banks: string[];
+  categories: string[];
+  tags: string[];
+  onSaved: (it: CashflowItem) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const [type, setType] = useState<CfType>(item.type);
+  const [name, setName] = useState(item.name);
+  const [amount, setAmount] = useState(String(item.amount));
+  const [date, setDate] = useState(item.dateISO);
+  const [description, setDescription] = useState(item.description ?? '');
+  const [sourceBank, setSourceBank] = useState(item.sourceBank ?? '');
+  const [category, setCategory] = useState(item.category ?? '');
+  const [tag, setTag] = useState(item.tag ?? '');
+
+  function onOpenChange(o: boolean) {
+    if (o) {
+      // Re-seed from the latest item each time it opens.
+      setType(item.type); setName(item.name); setAmount(String(item.amount)); setDate(item.dateISO);
+      setDescription(item.description ?? ''); setSourceBank(item.sourceBank ?? '');
+      setCategory(item.category ?? ''); setTag(item.tag ?? '');
+    }
+    setOpen(o);
+  }
+
+  const accent = type === 'PENGELUARAN' ? 'var(--danger-ring)' : 'var(--success-ring)';
+
+  function save() {
+    const amt = parseFloat(amount);
+    if (!name.trim() || !amt || amt <= 0) return;
+    const fd = new FormData();
+    fd.set('type', type);
+    fd.set('name', name.trim());
+    fd.set('amount', String(amt));
+    fd.set('date', date);
+    if (category.trim()) fd.set('category', category.trim());
+    if (sourceBank.trim()) fd.set('sourceBank', sourceBank.trim());
+    if (description.trim()) fd.set('description', description.trim());
+    if (tag.trim()) fd.set('tag', tag.trim());
+    startTransition(async () => {
+      const res = await updateCashflow(item.id, fd);
+      if ('error' in res) { toast.error(res.error); return; }
+      onSaved(cfRowToItem(res.item));
+      toast.success('Catatan diperbarui');
+      setOpen(false);
+    });
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogTrigger
+        render={
+          <button
+            title="Edit"
+            className="size-6 rounded border border-border flex items-center justify-center shrink-0 cursor-pointer text-muted-foreground transition-colors hover:text-foreground hover:bg-muted mt-0.5"
+          />
+        }
+      >
+        <Pencil className="size-3" />
+      </DialogTrigger>
+      <DialogContent className="max-w-sm max-h-[88vh] overflow-y-auto p-0">
+        <div className="relative flex flex-col gap-3 p-5">
+          <span className="absolute inset-x-0 top-0 h-[3px]" style={{ background: accent }} />
+          <DialogHeader>
+            <DialogTitle>Edit Catatan</DialogTitle>
+          </DialogHeader>
+          <CashflowFields
+            type={type} setType={setType}
+            name={name} setName={setName}
+            amount={amount} setAmount={setAmount}
+            date={date} setDate={setDate}
+            description={description} setDescription={setDescription}
+            sourceBank={sourceBank} setSourceBank={setSourceBank} banks={banks}
+            category={category} setCategory={setCategory} categories={categories}
+            tag={tag} setTag={setTag} tags={tags}
+            onEnterSubmit={save}
+          />
+          <Button onClick={save} disabled={pending} className="w-full gap-1.5">
+            <Pencil className="size-3.5" /> Simpan Perubahan
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 /* ── Main Component ──────────────────────────────────────────────────────── */
 
 export function FinanceView({ entries, salesUsers, cashflows }: FinanceViewProps) {
@@ -291,6 +511,7 @@ export function FinanceView({ entries, salesUsers, cashflows }: FinanceViewProps
   const [cfSourceBank, setCfSourceBank] = useState('');
   const [cfDescription, setCfDescription] = useState('');
   const [cfTag, setCfTag] = useState('');
+  const [cfDate, setCfDate] = useState(() => new Date().toISOString().slice(0, 10));
   // Granular filters for the expense list.
   const [cfSearch, setCfSearch] = useState('');
   const [cfTypeFilter, setCfTypeFilter] = useState<'ALL' | 'PENGELUARAN' | 'PEMASUKAN'>('ALL');
@@ -401,13 +622,19 @@ export function FinanceView({ entries, salesUsers, cashflows }: FinanceViewProps
     });
   }
 
-  function addCashflow() {
+  function resetCfForm() {
+    setCfName(''); setCfAmount(''); setCfCategory(''); setCfSourceBank(''); setCfDescription(''); setCfTag('');
+    setCfDate(new Date().toISOString().slice(0, 10));
+  }
+
+  function submitCashflow() {
     const amount = parseFloat(cfAmount);
     if (!cfName.trim() || !amount || amount <= 0) return;
     const fd = new FormData();
     fd.set('type', cfType);
     fd.set('name', cfName.trim());
     fd.set('amount', String(amount));
+    fd.set('date', cfDate);
     if (cfCategory.trim()) fd.set('category', cfCategory.trim());
     if (cfSourceBank.trim()) fd.set('sourceBank', cfSourceBank.trim());
     if (cfDescription.trim()) fd.set('description', cfDescription.trim());
@@ -415,15 +642,16 @@ export function FinanceView({ entries, salesUsers, cashflows }: FinanceViewProps
     startCfTransition(async () => {
       const res = await createCashflow(fd);
       if ('error' in res) { toast.error(res.error); return; }
-      setCashflow((prev) => [{
-        id: res.item.id, type: res.item.type, name: res.item.name,
-        amount: res.item.amount, category: res.item.category,
-        sourceBank: res.item.sourceBank, description: res.item.description, tag: res.item.tag,
-        date: new Date(res.item.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }),
-      }, ...prev]);
-      setCfName(''); setCfAmount(''); setCfCategory(''); setCfSourceBank(''); setCfDescription(''); setCfTag('');
+      setCashflow((prev) => [cfRowToItem(res.item), ...prev].sort(byDateDesc));
+      toast.success('Catatan ditambah');
+      resetCfForm();
       nameRef.current?.focus();
     });
+  }
+
+  // Edit dialog returns the saved row → replace it in place + keep date order.
+  function handleCashflowSaved(item: CashflowItem) {
+    setCashflow((prev) => prev.map((x) => (x.id === item.id ? item : x)).sort(byDateDesc));
   }
 
   function removeCashflow(id: string) {
@@ -680,105 +908,24 @@ export function FinanceView({ entries, salesUsers, cashflows }: FinanceViewProps
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-start">
-          {/* Input form */}
+          {/* Input form — adding only; editing happens in a focused dialog */}
           <div className="relative flex flex-col gap-3 overflow-hidden rounded-xl border bg-card p-4">
             {/* Intent edge — recolors with the selected direction */}
             <span className="absolute inset-x-0 top-0 h-[3px] transition-colors" style={{ background: cfAccent }} />
 
-            <div className="flex gap-1 rounded-xl bg-muted p-1">
-              {(['PENGELUARAN', 'PEMASUKAN'] as const).map((tipe) => {
-                const isPel = tipe === 'PENGELUARAN';
-                const active = cfType === tipe;
-                const tint = isPel
-                  ? { background: 'var(--danger-bg)', color: 'var(--danger-fg)' }
-                  : { background: 'var(--success-bg)', color: 'var(--success-fg)' };
-                return (
-                  <button
-                    key={tipe}
-                    onClick={() => setCfType(tipe)}
-                    style={active ? tint : undefined}
-                    className={cn(
-                      'flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs cursor-pointer transition-all duration-150',
-                      active ? 'font-semibold shadow-sm' : 'text-muted-foreground hover:text-foreground',
-                    )}
-                  >
-                    {isPel ? <ArrowDown className="size-3.5" /> : <ArrowUp className="size-3.5" />}
-                    {isPel ? 'Pengeluaran' : 'Pemasukan'}
-                  </button>
-                );
-              })}
-            </div>
-
-            <Input
-              ref={nameRef}
-              placeholder="Nama transaksi…"
-              value={cfName}
-              onChange={(e) => setCfName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && addCashflow()}
+            <CashflowFields
+              type={cfType} setType={setCfType}
+              name={cfName} setName={setCfName} nameRef={nameRef}
+              amount={cfAmount} setAmount={setCfAmount}
+              date={cfDate} setDate={setCfDate}
+              description={cfDescription} setDescription={setCfDescription}
+              sourceBank={cfSourceBank} setSourceBank={setCfSourceBank} banks={cfBanks}
+              category={cfCategory} setCategory={setCfCategory} categories={cfCategories}
+              tag={cfTag} setTag={setCfTag} tags={cfTags}
+              onEnterSubmit={submitCashflow}
             />
 
-            {/* Hero amount — tinted by intent as you type */}
-            <RupiahInput
-              placeholder="0"
-              value={cfAmount}
-              onValueChange={setCfAmount}
-              onKeyDown={(e) => e.key === 'Enter' && addCashflow()}
-              className={cn(
-                'h-12 text-xl! font-semibold tabular-nums',
-                cfAmount && (isPengeluaran ? 'text-[color:var(--danger-ring)]' : 'text-[color:var(--success-ring)]'),
-              )}
-            />
-
-            <Input
-              placeholder="Deskripsi (opsional)…"
-              value={cfDescription}
-              onChange={(e) => setCfDescription(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && addCashflow()}
-            />
-
-            <div className="flex flex-col gap-1.5">
-              <div className="flex items-center gap-1.5 text-muted-foreground">
-                <CreditCard className="size-3" />
-                <p className="text-[10px] font-semibold uppercase tracking-[0.08em]">Bank / Sumber Dana</p>
-              </div>
-              <PillSelect
-                value={cfSourceBank}
-                onChange={setCfSourceBank}
-                options={cfBanks}
-                placeholder="Pilih atau ketik bank baru…"
-                icon={CreditCard}
-              />
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <div className="flex items-center gap-1.5 text-muted-foreground">
-                <Layers className="size-3" />
-                <p className="text-[10px] font-semibold uppercase tracking-[0.08em]">Kategori</p>
-              </div>
-              <PillSelect
-                value={cfCategory}
-                onChange={setCfCategory}
-                options={cfCategories}
-                placeholder="Pilih atau ketik kategori baru…"
-                icon={Layers}
-              />
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <div className="flex items-center gap-1.5 text-muted-foreground">
-                <Tag className="size-3" />
-                <p className="text-[10px] font-semibold uppercase tracking-[0.08em]">Tag</p>
-              </div>
-              <PillSelect
-                value={cfTag}
-                onChange={setCfTag}
-                options={cfTags}
-                placeholder="Pilih atau ketik tag baru…"
-                icon={Tag}
-              />
-            </div>
-
-            <Button onClick={addCashflow} disabled={cfPending} className="w-full gap-1.5">
+            <Button onClick={submitCashflow} disabled={cfPending} className="w-full gap-1.5">
               <Plus className="size-3.5" /> Tambah
             </Button>
           </div>
@@ -887,8 +1034,16 @@ export function FinanceView({ entries, salesUsers, cashflows }: FinanceViewProps
                         >
                           {isPemasukan ? '+' : '−'} {formatRupiah(item.amount)}
                         </span>
+                        <EditCashflowDialog
+                          item={item}
+                          banks={cfBanks}
+                          categories={cfCategories}
+                          tags={cfTags}
+                          onSaved={handleCashflowSaved}
+                        />
                         <button
                           onClick={() => removeCashflow(item.id)}
+                          title="Hapus"
                           className="size-6 rounded border border-border flex items-center justify-center shrink-0 cursor-pointer text-muted-foreground transition-colors hover:text-destructive hover:bg-destructive/5 mt-0.5"
                         >
                           <Trash2 className="size-3" />

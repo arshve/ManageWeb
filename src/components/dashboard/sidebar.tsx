@@ -35,6 +35,7 @@ import {
   FileBarChart,
   Palette,
   DatabaseBackup,
+  HandCoins,
 } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -54,6 +55,7 @@ const adminLinks = [
   { href: '/admin/livestock', label: 'Hewan', icon: Beef },
   { href: '/admin/deliveries', label: 'Delivery', icon: Truck },
   { href: '/admin/antrian', label: 'Antrian', icon: ListChecks },
+  { href: '/admin/setoran', label: 'Setoran', icon: HandCoins },
   { href: '/admin/users', label: 'Kelola User', icon: Users },
 ];
 
@@ -66,7 +68,7 @@ const superAdminExtras = [
 
 // OWNER-only — white-label configuration + data tools.
 const ownerExtras = [
-  { href: '/admin/owner/branding', label: 'Branding', icon: Palette },
+  { href: '/admin/owner/branding', label: 'Branding & Config', icon: Palette },
   { href: '/admin/owner/data', label: 'Data', icon: DatabaseBackup },
 ];
 
@@ -75,6 +77,7 @@ const salesLinks = [
   { href: '/sales/new', label: 'Tambah Entry', icon: Beef },
   { href: '/sales/catalogue', label: 'Katalog', icon: Beef },
   { href: '/sales/deliveries', label: 'Delivery', icon: Truck },
+  { href: '/sales/setoran', label: 'Setoran', icon: HandCoins },
 ];
 
 const manageLinks = [{ href: '/manage', label: 'Katalog', icon: Beef }];

@@ -81,6 +81,39 @@ enum PaymentStatus {
   LUNAS
 }
 
+enum PaymentMethod {
+  QRIS
+  VIRTUAL_ACCOUNT
+  EWALLET
+  CARD
+  MANUAL
+}
+
+// Who received the customer's money for an entry.
+enum PaymentChannel {
+  COMPANY // paid to us (gateway or company bank)
+  SALES   // collected by the salesperson/reseller — they owe us a setoran
+}
+
+// Sales → company remittance (setoran).
+enum SetoranStatus {
+  PENDING
+  PAID
+}
+
+enum SetoranMethod {
+  GATEWAY // paid via Midtrans (same gateway)
+  MANUAL  // marked paid by admin (cash/transfer handover)
+}
+
+enum PaymentTxnStatus {
+  PENDING
+  SETTLEMENT
+  EXPIRED
+  CANCELLED
+  FAILED
+}
+
 enum Pengiriman {
   HARI_H
   H_1
@@ -110,6 +143,7 @@ model Profile {
   availability   DriverAvailability[]
   proposedEdits  EntryEditRequest[]   @relation("EditRequestProposer")
   reviewedEdits  EntryEditRequest[]   @relation("EditRequestReviewer")
+  setoran        Setoran[]            @relation("SalesSetoran")
   createdAt      DateTime             @default(now())
   updatedAt      DateTime             @updatedAt
 
@@ -157,11 +191,15 @@ model Entry {
   pengiriman    Pengiriman?
   notes         String?
   buktiTransfer String[]      @default([])
+  // Who collected the customer's payment. COMPANY = paid to us; SALES = the
+  // salesperson collected it and owes a setoran (see Setoran).
+  collectedBy   PaymentChannel @default(COMPANY)
   isSent        Boolean       @default(false)
   approvedAt    DateTime?
   approvedBy    String?
   deliveryDate  DateTime?     @db.Date
   delivery      Delivery?
+  payments      Payment[]
   editRequests          EntryEditRequest[]
   deleteRequestedAt     DateTime?
   deleteRequestedById   String?
@@ -307,6 +345,46 @@ model AuditLog {
   @@index([actorId])
 }
 
+/// Online payment charge against an Entry (Midtrans). One Entry can have many
+/// (e.g. DP then pelunasan). Entry.paymentStatus is derived from settled rows.
+model Payment {
+  id          String           @id @default(cuid())
+  entryId     String
+  entry       Entry            @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  orderId     String           @unique // Midtrans order_id, e.g. `${invoiceNo}-${shortid}`
+  grossAmount Float
+  method      PaymentMethod?
+  status      PaymentTxnStatus @default(PENDING)
+  vaNumber    String?
+  transactionId String?        // Midtrans transaction_id — reference for bank reconciliation
+  raw         Json? // last webhook payload, for audit/debug
+  paidAt      DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([entryId])
+}
+
+/// Sales → company remittance. Running balance per sales: outstanding =
+/// Σ(totalBayar of APPROVED entries where collectedBy=SALES) − Σ(PAID setoran).
+/// Sales can pay via the same Midtrans gateway, or admin marks it paid manually.
+model Setoran {
+  id            String        @id @default(cuid())
+  salesId       String
+  sales         Profile       @relation("SalesSetoran", fields: [salesId], references: [id])
+  amount        Float
+  method        SetoranMethod @default(GATEWAY)
+  status        SetoranStatus @default(PENDING)
+  orderId       String?       @unique // Midtrans order_id when paid via gateway
+  transactionId String?
+  note          String?
+  recordedById  String?
+  createdAt     DateTime      @default(now())
+  paidAt        DateTime?
+
+  @@index([salesId, status])
+}
+
 /// Singleton white-label configuration. Exactly one row, id = "singleton".
 /// All fields nullable so an unconfigured install falls back to code defaults
 /// (see src/lib/config/get-config.ts which merges this over COMPANY + metadata).
@@ -340,5 +418,15 @@ model AppConfig {
   coverColor      String?
   // Landing-page hero carousel: array of { url, alt }. null → built-in default.
   carouselSlides  Json?
+  // Master on/off for online payment (Midtrans cart + sales charge). null → off.
+  paymentEnabled  Boolean? @default(false)
+  // Profile.id that owns public catalogue orders (chosen from the sales list).
+  publicSalesId   String?
+  // Midtrans credentials (UI-configurable; env is the fallback). serverKey is a
+  // SECRET — never serialized to the client or included in data exports.
+  midtransServerKey    String?
+  midtransClientKey    String?
+  midtransIsProduction Boolean?
+  paymentMock          Boolean? // demo mode — simulate the gateway via /mock-pay
   updatedAt       DateTime @updatedAt
 }

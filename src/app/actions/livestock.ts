@@ -197,15 +197,19 @@ export type AvailableLivestock = Pick<
 >;
 
 /**
- * Returns all healthy livestock (sold and unsold) for the public catalogue.
- * Sold items sorted after available; within each group, newest first.
+ * Returns healthy livestock available to buy on the public catalogue.
+ *
+ * An animal is hidden the moment it lands in an entry (the @unique EntryItem is
+ * its reservation lock) — whether that entry is PENDING or APPROVED. It only
+ * reappears once the entry is removed (e.g. admin rejects → auto-deleted), which
+ * frees the EntryItem. So `entryItem: null` == "not reserved / not sold".
  *
  * No authentication is required — this is intentionally a public query.
  */
 export async function getAvailableLivestock(): Promise<AvailableLivestock[]> {
   return prisma.livestock.findMany({
-    where: { condition: 'SEHAT' },
-    orderBy: [{ isSold: 'asc' }, { createdAt: 'desc' }],
+    where: { condition: 'SEHAT', isSold: false, entryItem: { is: null } },
+    orderBy: [{ createdAt: 'desc' }],
     select: {
       id: true,
       sku: true,

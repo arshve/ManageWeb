@@ -23,6 +23,7 @@ import { Pagination } from '@/components/ui/pagination';
 import { Lightbox } from '@/components/ui/lightbox';
 import { toThumbnailUrl } from '@/lib/image';
 import { Button } from '@/components/ui/button';
+import { ChargePayment } from '@/components/dashboard/charge-payment';
 import { Input } from '@/components/ui/input';
 import { RupiahInput } from '@/components/ui/rupiah-input';
 import { Field, FieldLabel } from '@/components/ui/field';
@@ -140,6 +141,9 @@ export interface EntryData {
   buyerMaps: string | null;
   pengiriman: string | null;
   notes: string | null;
+  collectedBy: string;
+  gatewayRef: string | null;
+  gatewayTxnId: string | null;
   buktiTransfer: string[];
   isSent: boolean;
   createdAt: string;
@@ -226,12 +230,14 @@ export function EntryTable({
   canViewFinancials = false,
   salesUsers = [],
   title,
+  canCharge = false,
 }: {
   entries: EntryData[];
   isAdmin?: boolean;
   canViewFinancials?: boolean;
   salesUsers?: SalesUser[];
   title?: string;
+  canCharge?: boolean;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const handleClearEditing = useCallback(() => setEditingId(null), []);
@@ -769,6 +775,7 @@ export function EntryTable({
                 entry={entry}
                 isAdmin={isAdmin}
                 canViewFinancials={canViewFinancials}
+                canCharge={canCharge}
                 isEditing={editingId === entry.id}
                 onEdit={setEditingId}
                 onCancel={handleClearEditing}
@@ -802,6 +809,7 @@ export function EntryTable({
             entry={entry}
             isAdmin={isAdmin}
             canViewFinancials={canViewFinancials}
+            canCharge={canCharge}
             isEditing={editingId === entry.id}
             onEdit={setEditingId}
             onCancel={handleClearEditing}
@@ -958,6 +966,7 @@ function useEntryRow(entry: EntryData, onSaved: () => void, isAdmin = false) {
     dp: entry.dp?.toString() ?? '',
     paymentStatus: entry.paymentStatus,
     pengiriman: entry.pengiriman ?? '',
+    collectedBy: entry.collectedBy ?? 'COMPANY',
     salesId: entry.sales.id,
     isSent: entry.isSent,
     notes: entry.notes ?? '',
@@ -1061,6 +1070,7 @@ function useEntryRow(entry: EntryData, onSaved: () => void, isAdmin = false) {
       if (form.paymentStatus === 'DP') formData.set('dp', form.dp);
       if (form.paymentStatus === 'LUNAS') formData.set('totalBayar', String(totalHargaJual));
       formData.set('pengiriman', form.pengiriman);
+      formData.set('collectedBy', form.collectedBy);
       formData.set('salesId', form.salesId);
       formData.set('isSent', form.isSent.toString());
       formData.set('notes', form.notes);
@@ -1518,7 +1528,7 @@ function EntryEditFields({
 
         {/* Payment + Bukti */}
         <div className="col-span-2 md:col-span-4">
-          <div className="flex flex-wrap items-end gap-4">
+          <div className="flex flex-wrap items-start gap-4">
             <Field className="w-[180px]">
               <FieldLabel className="text-xs">Pembayaran</FieldLabel>
               <Select
@@ -1532,6 +1542,21 @@ function EntryEditFields({
                   <SelectItem value="BELUM_BAYAR">Belum Bayar</SelectItem>
                   <SelectItem value="DP">DP</SelectItem>
                   <SelectItem value="LUNAS">Lunas</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field className="w-[180px]">
+              <FieldLabel className="text-xs">Dibayar ke</FieldLabel>
+              <Select
+                value={form.collectedBy}
+                onValueChange={(val) => update('collectedBy', val ?? form.collectedBy)}
+              >
+                <SelectTrigger className="h-8 text-sm">
+                  <SelectValue>{form.collectedBy === 'SALES' ? 'Sales (setoran)' : 'Perusahaan'}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="COMPANY">Perusahaan</SelectItem>
+                  <SelectItem value="SALES">Sales (setoran)</SelectItem>
                 </SelectContent>
               </Select>
             </Field>
@@ -1560,6 +1585,7 @@ const EntryRow = memo(function EntryRow({
   entry,
   isAdmin,
   canViewFinancials,
+  canCharge,
   isEditing,
   onEdit,
   onCancel,
@@ -1571,6 +1597,7 @@ const EntryRow = memo(function EntryRow({
   entry: EntryData;
   isAdmin: boolean;
   canViewFinancials: boolean;
+  canCharge?: boolean;
   isEditing: boolean;
   onEdit: (id: string) => void;
   onCancel: () => void;
@@ -1700,6 +1727,18 @@ const EntryRow = memo(function EntryRow({
             buktiTransfer={entry.buktiTransfer}
             paymentStatus={entry.paymentStatus}
           />
+          <ChargePayment
+            entryId={entry.id}
+            totalBayar={entry.totalBayar}
+            paymentStatus={entry.paymentStatus}
+            buyerName={entry.buyerName}
+            canCharge={canCharge}
+          />
+          {entry.gatewayRef && (
+            <div className="mt-1 text-[9px] font-mono text-muted-foreground" title={entry.gatewayTxnId ? `Midtrans txn: ${entry.gatewayTxnId}` : undefined}>
+              Ref: {entry.gatewayRef}
+            </div>
+          )}
         </td>
         <td className="p-3 text-center">
           <StatusCell
@@ -1865,6 +1904,7 @@ const MobileEntryCard = memo(function MobileEntryCard({
   entry,
   isAdmin,
   canViewFinancials,
+  canCharge,
   isEditing,
   onEdit,
   onCancel,
@@ -1876,6 +1916,7 @@ const MobileEntryCard = memo(function MobileEntryCard({
   entry: EntryData;
   isAdmin: boolean;
   canViewFinancials: boolean;
+  canCharge?: boolean;
   isEditing: boolean;
   onEdit: (id: string) => void;
   onCancel: () => void;
@@ -2158,7 +2199,13 @@ const MobileEntryCard = memo(function MobileEntryCard({
             {/* Pembayaran */}
             <div className="flex items-center justify-between px-3 py-2.5">
               <BandLabel>Pembayaran</BandLabel>
-              <HoverBuktiTransfer buktiTransfer={entry.buktiTransfer} paymentStatus={entry.paymentStatus} />
+              <div className="flex items-center gap-2">
+                <HoverBuktiTransfer buktiTransfer={entry.buktiTransfer} paymentStatus={entry.paymentStatus} />
+                <ChargePayment entryId={entry.id} totalBayar={entry.totalBayar} paymentStatus={entry.paymentStatus} buyerName={entry.buyerName} canCharge={canCharge} />
+                {entry.gatewayRef && (
+                  <span className="text-[9px] font-mono text-muted-foreground" title={entry.gatewayTxnId ? `Midtrans txn: ${entry.gatewayTxnId}` : undefined}>Ref: {entry.gatewayRef}</span>
+                )}
+              </div>
             </div>
 
             {/* Catatan */}

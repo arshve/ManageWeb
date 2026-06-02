@@ -10,11 +10,14 @@ import { cn } from '@/lib/utils';
 import { StatCard } from '@/components/ui/stat-card';
 import { Phone, MapPin, Map, Receipt, Route, Truck, PackageCheck, Banknote, CheckCircle2 } from 'lucide-react';
 import { getDeliveryProgressMap } from '@/lib/delivery/progress';
+import { getAppConfig } from '@/lib/config/get-config';
 
 
 export default async function AdminDashboardPage() {
   const profile = await requireAuth();
   const superAdmin = isSuperAdmin(profile.role);
+  const cfg = await getAppConfig();
+  const canCharge = cfg.paymentEnabled && (cfg.hasMidtransServerKey || cfg.paymentMock);
 
   const [
     totalLivestock,
@@ -66,6 +69,7 @@ export default async function AdminDashboardPage() {
           include: { proposedBy: { select: { name: true } } },
         },
         sales: { select: { id: true, name: true } },
+        payments: { where: { status: 'SETTLEMENT' }, select: { orderId: true, transactionId: true }, orderBy: { paidAt: 'desc' }, take: 1 },
         delivery: {
           select: {
             id: true,
@@ -133,6 +137,9 @@ export default async function AdminDashboardPage() {
       buyerAddress: entry.buyerAddress,
       buyerMaps: entry.buyerMaps,
       pengiriman: entry.pengiriman,
+      collectedBy: entry.collectedBy,
+      gatewayRef: entry.payments[0]?.orderId ?? null,
+      gatewayTxnId: entry.payments[0]?.transactionId ?? null,
       buktiTransfer: entry.buktiTransfer,
       notes: entry.notes,
       isSent: entry.isSent,
@@ -298,6 +305,7 @@ export default async function AdminDashboardPage() {
           isAdmin={true}
           canViewFinancials={superAdmin}
           salesUsers={salesUsers}
+          canCharge={canCharge}
           title="Entry Penjualan"
         />
       </div>

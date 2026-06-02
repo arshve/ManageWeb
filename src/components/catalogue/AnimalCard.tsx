@@ -1,11 +1,12 @@
 'use client';
 
 import Image from 'next/image';
-import { Scale, ArrowRight, Beef } from 'lucide-react';
+import { Scale, ArrowRight, Beef, ShoppingCart, Check } from 'lucide-react';
 import { formatRupiah, formatWeight } from '@/lib/format';
 import { toThumbnailUrl } from '@/lib/image';
 import type { AvailableLivestock } from '@/app/actions/livestock';
 import { StatusToken } from '@/components/ui/status-token';
+import { useCart } from '@/components/catalogue/cart-context';
 
 /* ─── Grade colour map ─────────────────────────────────────────────────────── */
 const gradeConfig: Record<
@@ -55,6 +56,9 @@ export function AnimalCard({ item, priority = false, isSold = false }: AnimalCar
   const gradeStyle = gradeConfig[grade] ?? gradeConfig['C'];
   const typeInfo = typeLabels[item.type] ?? { label: item.type, emoji: '🐾' };
   const weight = formatWeight(item.weightMin, item.weightMax);
+  const cart = useCart();
+  const showCart = cart.paymentEnabled && !!item.hargaJual && item.hargaJual > 0;
+  const inCart = cart.has(item.id);
 
   return (
     <article
@@ -199,6 +203,42 @@ export function AnimalCard({ item, priority = false, isSold = false }: AnimalCar
               Terjual
             </button>
           ) : (
+            <>
+            {showCart && (
+              inCart ? (
+                <button
+                  type="button"
+                  onClick={() => cart.remove(item.id)}
+                  className={[
+                    'w-full flex items-center justify-center gap-2',
+                    'min-h-[44px] px-4 py-2.5 rounded-xl',
+                    'border border-success-ring bg-success-bg text-success-fg',
+                    'text-sm font-semibold active:scale-95 transition-all duration-150',
+                  ].join(' ')}
+                >
+                  <Check className="size-4" /> Di Keranjang
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => cart.add({
+                    id: item.id,
+                    sku: item.sku,
+                    title: `${typeInfo.label}${item.grade ? ` Grade ${item.grade}` : ''}`,
+                    price: item.hargaJual!,
+                    photoUrl: item.photoUrl,
+                  })}
+                  className={[
+                    'w-full flex items-center justify-center gap-2',
+                    'min-h-[44px] px-4 py-2.5 rounded-xl',
+                    'bg-primary text-primary-foreground',
+                    'text-sm font-semibold active:scale-95 transition-all duration-150',
+                  ].join(' ')}
+                >
+                  <ShoppingCart className="size-4" /> Tambah ke Keranjang
+                </button>
+              )
+            )}
             <button
               type="button"
               onClick={() => {
@@ -212,8 +252,9 @@ export function AnimalCard({ item, priority = false, isSold = false }: AnimalCar
               className={[
                 'w-full flex items-center justify-center gap-2',
                 'min-h-[44px] px-4 py-2.5 rounded-xl',
-                'bg-primary',
-                'text-primary-foreground',
+                showCart
+                  ? 'border border-border text-foreground hover:bg-muted/50'
+                  : 'bg-primary text-primary-foreground',
                 'text-sm font-semibold',
                 'active:scale-95 transition-all duration-150',
                 'lg:group-hover:gap-3',
@@ -222,6 +263,7 @@ export function AnimalCard({ item, priority = false, isSold = false }: AnimalCar
               Hubungi Kami
               <ArrowRight className="size-4 lg:transition-transform lg:duration-200 lg:group-hover:translate-x-0.5" />
             </button>
+            </>
           )}
         </div>
       </div>

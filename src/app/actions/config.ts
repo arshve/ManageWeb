@@ -95,12 +95,22 @@ export async function updateAppConfig(formData: FormData) {
       coverColor,
       // [] when cleared — get-config normalizes empty back to the defaults.
       carouselSlides: carouselSlides ?? [],
+      paymentEnabled: formData.get('paymentEnabled') === 'true',
+      publicSalesId: str(formData, 'publicSalesId'),
+      midtransClientKey: str(formData, 'midtransClientKey'),
+      midtransIsProduction: formData.get('midtransIsProduction') === 'true',
+      paymentMock: formData.get('paymentMock') === 'true',
     };
+
+    // Server key is write-only: only overwrite when a new value is submitted, so
+    // saving the form without re-typing the secret keeps the stored one.
+    const newServerKey = str(formData, 'midtransServerKey');
+    const serverKeyPatch = newServerKey ? { midtransServerKey: newServerKey } : {};
 
     await prisma.appConfig.upsert({
       where: { id: 'singleton' },
-      create: { id: 'singleton', ...data },
-      update: data,
+      create: { id: 'singleton', ...data, ...serverKeyPatch },
+      update: { ...data, ...serverKeyPatch },
     });
 
     await logAudit({

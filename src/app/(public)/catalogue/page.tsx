@@ -7,6 +7,9 @@ import {
   CatalogueGrid,
   CatalogueGridSkeleton,
 } from '@/components/catalogue/CatalogueGrid';
+import { CartProvider } from '@/components/catalogue/cart-context';
+import { CartButton } from '@/components/catalogue/CartButton';
+import { getAppConfig } from '@/lib/config/get-config';
 
 /* ─── SEO Metadata ──────────────────────────────────────────────────────── */
 export const metadata: Metadata = {
@@ -28,8 +31,10 @@ async function CatalogueData() {
 }
 
 /* ─── Page ───────────────────────────────────────────────────────────────── */
-export default function CataloguePage() {
+export default async function CataloguePage() {
+  const { paymentEnabled } = await getAppConfig();
   return (
+    <CartProvider paymentEnabled={paymentEnabled}>
     <main className="min-h-screen bg-background">
       {/* ── Hero header ──────────────────────────────────────────────────── */}
       <header className="max-w-7xl mx-auto px-4 sm:px-6 pt-16 md:pt-24 pb-2">
@@ -56,5 +61,7 @@ export default function CataloguePage() {
         <CatalogueData />
       </Suspense>
     </main>
+    <CartButton />
+    </CartProvider>
   );
 }

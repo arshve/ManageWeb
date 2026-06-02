@@ -84,6 +84,7 @@ export function AdminNewEntryForm({ canViewFinancials }: { canViewFinancials: bo
   const [requests, setRequests] = useState<RequestRow[]>([emptyRow()]);
   const [pengiriman, setPengiriman] = useState('HARI_H');
   const [paymentStatus, setPaymentStatus] = useState('BELUM_BAYAR');
+  const [collectedBy, setCollectedBy] = useState('COMPANY');
   const [buktiTransferUrls, setBuktiTransferUrls] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -154,6 +155,7 @@ export function AdminNewEntryForm({ canViewFinancials }: { canViewFinancials: bo
     formData.set('mode', mode);
     formData.set('salesId', selectedSalesId);
     formData.set('paymentStatus', paymentStatus);
+    formData.set('collectedBy', collectedBy);
     buktiTransferUrls.forEach((url) => formData.append('buktiTransfer', url));
 
     if (mode === 'ANTRIAN') {
@@ -579,6 +581,18 @@ export function AdminNewEntryForm({ canViewFinancials }: { canViewFinancials: bo
               <RupiahInput id="dp" name="dp" placeholder="1000000" />
             </Field>
           )}
+          <Field>
+            <FieldLabel>Dibayar ke</FieldLabel>
+            <Select value={collectedBy} onValueChange={(val) => setCollectedBy(val ?? 'COMPANY')}>
+              <SelectTrigger>
+                <SelectValue>{collectedBy === 'SALES' ? 'Sales (setoran)' : 'Perusahaan'}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="COMPANY" label="Perusahaan">Perusahaan</SelectItem>
+                <SelectItem value="SALES" label="Sales (setoran)">Sales (setoran)</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
           <Field>
             <FieldLabel>Bukti Transfer</FieldLabel>
             <BuktiTransferUpload onChange={setBuktiTransferUrls} />

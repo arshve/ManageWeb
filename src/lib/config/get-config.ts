@@ -42,6 +42,16 @@ export interface AppConfig {
   coverColor: string | null;
   // Landing carousel — null means use the built-in default slides.
   carouselSlides: CarouselSlide[] | null;
+  // Master on/off for online payment (Midtrans cart + sales charge).
+  paymentEnabled: boolean;
+  // Profile.id that owns public catalogue orders (chosen from the sales list).
+  publicSalesId: string | null;
+  // Midtrans — client-safe fields only. The server key is NEVER exposed here
+  // (clients receive this object); `hasMidtransServerKey` just signals if one is set.
+  midtransClientKey: string | null;
+  midtransIsProduction: boolean;
+  paymentMock: boolean;
+  hasMidtransServerKey: boolean;
 }
 
 // A slide carries up to three responsive variants. `desktop` is required;
@@ -70,7 +80,32 @@ const DEFAULTS: AppConfig = {
   brandScale: null,
   coverColor: null,
   carouselSlides: null,
+  paymentEnabled: false,
+  publicSalesId: null,
+  midtransClientKey: null,
+  midtransIsProduction: false,
+  paymentMock: false,
+  hasMidtransServerKey: false,
 };
+
+// Env fallbacks for payment config (used until the Owner sets values in the UI).
+const ENV_SERVER_KEY = process.env.MIDTRANS_SERVER_KEY ?? '';
+const ENV_CLIENT_KEY = process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY ?? '';
+const ENV_IS_PROD = process.env.MIDTRANS_IS_PRODUCTION === 'true';
+const ENV_MOCK = process.env.NEXT_PUBLIC_MIDTRANS_MOCK === 'true';
+
+// Resolve the client-safe payment fields from a row (or null), with env fallback.
+type AppConfigRow = NonNullable<Awaited<ReturnType<typeof prisma.appConfig.findUnique>>>;
+function paymentPublicFields(row: AppConfigRow | null) {
+  return {
+    paymentEnabled: row?.paymentEnabled ?? DEFAULTS.paymentEnabled,
+    publicSalesId: row?.publicSalesId ?? DEFAULTS.publicSalesId,
+    midtransClientKey: row?.midtransClientKey || ENV_CLIENT_KEY || null,
+    midtransIsProduction: row?.midtransIsProduction ?? ENV_IS_PROD,
+    paymentMock: row?.paymentMock ?? ENV_MOCK,
+    hasMidtransServerKey: !!(row?.midtransServerKey || ENV_SERVER_KEY),
+  };
+}
 
 // Per-request memoized (React cache). Config changes rarely; the Owner save
 // action calls revalidatePath('/', 'layout') so the next render reads fresh.
@@ -80,9 +115,9 @@ export const getAppConfig = cache(async function getAppConfig(): Promise<AppConf
     row = await prisma.appConfig.findUnique({ where: { id: 'singleton' } });
   } catch {
     // Table missing (pre-migration) or DB down — fall back to defaults.
-    return DEFAULTS;
+    return { ...DEFAULTS, ...paymentPublicFields(null) };
   }
-  if (!row) return DEFAULTS;
+  if (!row) return { ...DEFAULTS, ...paymentPublicFields(null) };
 
   const companyName = row.companyName ?? DEFAULTS.companyName;
   return {
@@ -105,6 +140,29 @@ export const getAppConfig = cache(async function getAppConfig(): Promise<AppConf
     brandScale: (row.brandScale as BrandScale | null) ?? null,
     coverColor: row.coverColor ?? null,
     carouselSlides: normalizeSlides(row.carouselSlides),
+    ...paymentPublicFields(row),
+  };
+});
+
+/**
+ * SERVER-ONLY Midtrans runtime: includes the secret server key. Never pass the
+ * result to a client component. Reads the config row (env fallback per field).
+ */
+export const getMidtransRuntime = cache(async function getMidtransRuntime() {
+  let row: AppConfigRow | null = null;
+  try {
+    row = await prisma.appConfig.findUnique({ where: { id: 'singleton' } });
+  } catch {
+    row = null;
+  }
+  const serverKey = row?.midtransServerKey || ENV_SERVER_KEY;
+  const clientKey = row?.midtransClientKey || ENV_CLIENT_KEY;
+  return {
+    serverKey,
+    clientKey,
+    isProduction: row?.midtransIsProduction ?? ENV_IS_PROD,
+    mock: row?.paymentMock ?? ENV_MOCK,
+    configured: serverKey.length > 0,
   };
 });
 

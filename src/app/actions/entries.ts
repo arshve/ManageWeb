@@ -55,6 +55,7 @@ function buildEntryBaseData(formData: FormData, salesId: string, status: 'PENDIN
     buyerMaps: (formData.get('buyerMaps') as string) || null,
     pengiriman: (formData.get('pengiriman') as 'HARI_H' | 'H_1' | 'H_2' | 'H_3' | 'H_PLUS_1' | 'H_PLUS_2' | 'H_PLUS_3' | 'TITIP_POTONG') || null,
     notes: (formData.get('notes') as string) || null,
+    collectedBy: (formData.get('collectedBy') as 'COMPANY' | 'SALES') || 'COMPANY',
     buktiTransfer: formData.getAll('buktiTransfer') as string[],
     approvedAt,
     approvedBy,
@@ -270,23 +271,33 @@ export async function approveEntry(id: string) {
 export async function rejectEntry(id: string) {
   const admin = await requireRole('ADMIN', 'SUPER_ADMIN');
   try {
-    const entry = await prisma.entry.findUnique({ where: { id } });
+    const entry = await prisma.entry.findUnique({ where: { id }, include: { items: true } });
     if (!entry) return { error: 'Entry tidak ditemukan' };
 
-    await prisma.entry.update({ where: { id }, data: { status: 'REJECTED' } });
+    const livestockIds = entry.items.map((i) => i.livestockId);
 
+    // Keep the full record in the audit log for history, THEN delete the entry.
+    // Deleting cascades the EntryItems, which frees the livestock back onto the
+    // catalogue (getAvailableLivestock keys off EntryItem presence).
     await logAudit({
       actor: admin,
-      action: 'UPDATE',
+      action: 'DELETE',
       entity: 'Entry',
       entityId: id,
-      label: `${entry.invoiceNo} — reject`,
-      before: { status: entry.status },
-      after: { status: 'REJECTED' },
+      label: `${entry.invoiceNo} — ${entry.buyerName} — ditolak`,
+      before: entry,
     });
+
+    await prisma.$transaction([
+      prisma.entry.delete({ where: { id } }),
+      prisma.livestock.updateMany({ where: { id: { in: livestockIds } }, data: { isSold: false } }),
+    ]);
+
+    await deleteStorageFiles(entry.buktiTransfer);
 
     revalidatePath('/admin');
     revalidatePath('/sales');
+    revalidatePath('/catalogue');
     return { success: true };
   } catch (err) {
     console.error('[rejectEntry]', err);
@@ -347,6 +358,8 @@ export async function updateEntry(id: string, formData: FormData) {
         pengiriman:
           (formData.get('pengiriman') as 'HARI_H' | 'H_1' | 'H_2' | 'H_3' | 'H_PLUS_1' | 'H_PLUS_2' | 'H_PLUS_3' | 'TITIP_POTONG') || null,
         notes: (formData.get('notes') as string) || null,
+        collectedBy:
+          (formData.get('collectedBy') as 'COMPANY' | 'SALES') || entry.collectedBy,
         isSent: formData.get('isSent') === 'true',
         buktiTransfer,
         ...((isAdminRole(profile.role)) && formData.get('salesId')

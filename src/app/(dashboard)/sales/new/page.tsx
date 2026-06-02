@@ -52,6 +52,7 @@ export default function NewEntryPage() {
   const [requests, setRequests] = useState<RequestRow[]>([emptyRow()]);
   const [pengiriman, setPengiriman] = useState('HARI_H');
   const [paymentStatus, setPaymentStatus] = useState('BELUM_BAYAR');
+  const [collectedBy, setCollectedBy] = useState('COMPANY');
   const [buktiTransferUrls, setBuktiTransferUrls] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -123,6 +124,7 @@ export default function NewEntryPage() {
   async function handleSubmit(formData: FormData) {
     formData.set('mode', mode);
     formData.set('paymentStatus', paymentStatus);
+    formData.set('collectedBy', collectedBy);
     buktiTransferUrls.forEach((url) => formData.append('buktiTransfer', url));
 
     if (mode === 'ANTRIAN') {
@@ -375,6 +377,18 @@ export default function NewEntryPage() {
               <RupiahInput id="dp" name="dp" placeholder="1000000" />
             </Field>
           )}
+          <Field>
+            <FieldLabel>Dibayar ke</FieldLabel>
+            <Select value={collectedBy} onValueChange={(val) => setCollectedBy(val ?? 'COMPANY')}>
+              <SelectTrigger>
+                <SelectValue>{collectedBy === 'SALES' ? 'Sales (setoran)' : 'Perusahaan'}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="COMPANY">Perusahaan</SelectItem>
+                <SelectItem value="SALES">Sales (setoran)</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
           <Field>
             <FieldLabel>Bukti Transfer</FieldLabel>
             <BuktiTransferUpload onChange={setBuktiTransferUrls} />

@@ -56,8 +56,11 @@ export async function exportAll(): Promise<ExportPayload> {
     prisma.auditLog.findMany(),
   ]);
 
+  // Never export the Midtrans secret server key.
+  const safeAppConfig = appConfig.map((c) => ({ ...c, midtransServerKey: null }));
+
   const tables: Record<string, unknown[]> = {
-    appConfig, profile, pricing, livestock, cashflow, geocodeCache,
+    appConfig: safeAppConfig, profile, pricing, livestock, cashflow, geocodeCache,
     entry, entryItem, entryRequest, delivery, driverAvailability,
     entryEditRequest, auditLog,
   };

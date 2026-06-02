@@ -11,12 +11,15 @@ import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 import { updateAppConfig } from '@/app/actions/config';
 import { toast } from 'sonner';
 import { Upload, Loader2, ImagePlus, ArrowUp, ArrowDown, X } from 'lucide-react';
 import type { AppConfig } from '@/lib/config/get-config';
 
-export function BrandingForm({ config }: { config: AppConfig }) {
+type SalesOption = { id: string; name: string; username: string; isActive: boolean };
+
+export function BrandingForm({ config, salesUsers = [] }: { config: AppConfig; salesUsers?: SalesOption[] }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [logoUrl, setLogoUrl] = useState(config.logoUrl ?? '');
@@ -37,6 +40,9 @@ export function BrandingForm({ config }: { config: AppConfig }) {
   );
   // tracks which slide/variant is mid-upload, e.g. "0:desktop"
   const [uploadingSlot, setUploadingSlot] = useState<string | null>(null);
+  const [paymentEnabled, setPaymentEnabled] = useState(config.paymentEnabled);
+  const [midtransIsProduction, setMidtransIsProduction] = useState(config.midtransIsProduction);
+  const [paymentMock, setPaymentMock] = useState(config.paymentMock);
   const logoRef = useRef<HTMLInputElement>(null);
   const sigRef = useRef<HTMLInputElement>(null);
 
@@ -221,6 +227,73 @@ export function BrandingForm({ config }: { config: AppConfig }) {
         </Grid>
       </Section>
 
+      {/* Online payment + public sales */}
+      <Section title="Pembayaran & Penjualan Publik" desc="Aktifkan checkout online (QRIS / Virtual Account / e-wallet) lewat Midtrans, dan pilih akun sales yang menaungi pesanan dari katalog publik.">
+        <input type="hidden" name="paymentEnabled" value={paymentEnabled ? 'true' : 'false'} />
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium">Pembayaran online</p>
+            <p className="text-xs text-muted-foreground">
+              Saat aktif: keranjang muncul di katalog & tombol &quot;Tagih Online&quot; aktif di entry.
+            </p>
+          </div>
+          <Switch checked={paymentEnabled} onCheckedChange={setPaymentEnabled} />
+        </div>
+
+        <div className="flex flex-col gap-1.5 mt-4 pt-4 border-t">
+          <label htmlFor="publicSalesId" className="text-sm font-medium">Sales untuk pesanan katalog</label>
+          <p className="text-xs text-muted-foreground -mt-1 mb-1">Pesanan dari katalog publik dicatat atas nama akun ini.</p>
+          <select
+            id="publicSalesId" name="publicSalesId" defaultValue={config.publicSalesId ?? ''}
+            className="h-9 w-full max-w-sm rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+          >
+            <option value="">— Pilih akun sales —</option>
+            {salesUsers.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}{!s.isActive ? ' (nonaktif)' : ''} · @{s.username}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Midtrans credentials */}
+        <div className="mt-4 pt-4 border-t flex flex-col gap-3">
+          <p className="text-sm font-medium">Kredensial Midtrans</p>
+          <input type="hidden" name="midtransIsProduction" value={midtransIsProduction ? 'true' : 'false'} />
+          <input type="hidden" name="paymentMock" value={paymentMock ? 'true' : 'false'} />
+
+          <div className="grid sm:grid-cols-2 gap-3">
+            <FieldText
+              name="midtransServerKey"
+              label="Server Key (rahasia)"
+              type="password"
+              placeholder={config.hasMidtransServerKey ? '•••••••• tersimpan (kosongkan = tetap)' : 'Mid-server-…'}
+              defaultValue=""
+            />
+            <FieldText name="midtransClientKey" label="Client Key" defaultValue={config.midtransClientKey ?? ''} placeholder="Mid-client-…" />
+          </div>
+          <p className="text-[11px] text-muted-foreground -mt-1">
+            Ambil di dashboard.midtrans.com → Settings → Access Keys. Server Key tidak pernah ditampilkan ulang & tidak ikut diekspor.
+          </p>
+
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium">Mode produksi</p>
+              <p className="text-xs text-muted-foreground">Aktif = live (kunci produksi). Nonaktif = sandbox.</p>
+            </div>
+            <Switch checked={midtransIsProduction} onCheckedChange={setMidtransIsProduction} />
+          </div>
+
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium">Mode simulasi (mock)</p>
+              <p className="text-xs text-muted-foreground">Uji alur tanpa kunci asli — pembayaran disimulasikan via /mock-pay.</p>
+            </div>
+            <Switch checked={paymentMock} onCheckedChange={setPaymentMock} />
+          </div>
+        </div>
+      </Section>
+
       <div className="flex items-center gap-3">
         <Button type="submit" disabled={pending} className="gap-1.5">
           {pending && <Loader2 className="size-4 animate-spin" />}
@@ -248,12 +321,12 @@ function Grid({ children }: { children: React.ReactNode }) {
 }
 // Controlled so Base UI doesn't warn when the parent re-supplies a new
 // `config` (e.g. after router.refresh()); still submits via `name` in FormData.
-function FieldText({ name, label, defaultValue, className }: { name: string; label: string; defaultValue?: string; className?: string }) {
+function FieldText({ name, label, defaultValue, className, type, placeholder }: { name: string; label: string; defaultValue?: string; className?: string; type?: string; placeholder?: string }) {
   const [value, setValue] = useState(defaultValue ?? '');
   return (
     <div className={className}>
       <label className="text-xs text-muted-foreground mb-1 block">{label}</label>
-      <Input name={name} value={value} onChange={(e) => setValue(e.target.value)} />
+      <Input name={name} type={type} placeholder={placeholder} value={value} onChange={(e) => setValue(e.target.value)} />
     </div>
   );
 }

@@ -8,11 +8,15 @@ import Link from 'next/link';
 import { EntryTable } from '@/components/dashboard/entry-table';
 import { StatCard } from '@/components/ui/stat-card';
 import { getDeliveryProgressMap } from '@/lib/delivery/progress';
+import { getAppConfig } from '@/lib/config/get-config';
 
 const SERIF = "var(--font-dm-serif), 'DM Serif Display', serif";
 
 export default async function SalesPage() {
   const profile = await requireAuth();
+
+  const cfg = await getAppConfig();
+  const canCharge = cfg.paymentEnabled && (cfg.hasMidtransServerKey || cfg.paymentMock);
 
   const [entries] = await Promise.all([
     prisma.entry.findMany({
@@ -28,6 +32,7 @@ export default async function SalesPage() {
           include: { proposedBy: { select: { name: true } } },
         },
         sales: { select: { id: true, name: true } },
+        payments: { where: { status: 'SETTLEMENT' }, select: { orderId: true, transactionId: true }, orderBy: { paidAt: 'desc' }, take: 1 },
         delivery: {
           select: {
             id: true,
@@ -96,6 +101,9 @@ export default async function SalesPage() {
       buyerMaps: entry.buyerMaps,
       pengiriman: entry.pengiriman,
       notes: entry.notes,
+      collectedBy: entry.collectedBy,
+      gatewayRef: entry.payments[0]?.orderId ?? null,
+      gatewayTxnId: entry.payments[0]?.transactionId ?? null,
       buktiTransfer: entry.buktiTransfer,
       isSent: entry.isSent,
       createdAt: entry.createdAt.toISOString(),
@@ -228,7 +236,7 @@ export default async function SalesPage() {
             Entry Saya
           </h2>
         </div>
-        <EntryTable entries={serialized} isAdmin={false} />
+        <EntryTable entries={serialized} isAdmin={false} canCharge={canCharge} />
       </div>
     </DashboardShell>
   );

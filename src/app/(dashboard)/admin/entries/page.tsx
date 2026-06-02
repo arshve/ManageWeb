@@ -5,8 +5,11 @@ import { DashboardShell } from '@/components/dashboard/dashboard-shell';
 import { EntryTable } from '@/components/dashboard/entry-table';
 import { Card, CardContent } from '@/components/ui/card';
 import { getDeliveryProgressMap } from '@/lib/delivery/progress';
+import { getAppConfig } from '@/lib/config/get-config';
 
 export default async function AdminEntriesPage() {
+  const cfg = await getAppConfig();
+  const canCharge = cfg.paymentEnabled && (cfg.hasMidtransServerKey || cfg.paymentMock);
   const [entries, salesUsers] = await Promise.all([
     prisma.entry.findMany({
       where: { requests: { none: { isFulfilled: false } } },
@@ -21,6 +24,7 @@ export default async function AdminEntriesPage() {
           include: { proposedBy: { select: { name: true } } },
         },
         sales: { select: { id: true, name: true } },
+        payments: { where: { status: 'SETTLEMENT' }, select: { orderId: true, transactionId: true }, orderBy: { paidAt: 'desc' }, take: 1 },
         delivery: {
           select: {
             id: true,
@@ -76,6 +80,9 @@ export default async function AdminEntriesPage() {
       buyerMaps: entry.buyerMaps,
       pengiriman: entry.pengiriman,
       notes: entry.notes,
+      collectedBy: entry.collectedBy,
+      gatewayRef: entry.payments[0]?.orderId ?? null,
+      gatewayTxnId: entry.payments[0]?.transactionId ?? null,
       buktiTransfer: entry.buktiTransfer,
       isSent: entry.isSent,
       createdAt: entry.createdAt.toISOString(),
@@ -157,6 +164,7 @@ export default async function AdminEntriesPage() {
             entries={serialized}
             isAdmin={true}
             salesUsers={salesUsers}
+            canCharge={canCharge}
           />
         </CardContent>
       </Card>

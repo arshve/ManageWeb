@@ -196,6 +196,24 @@ export function SampulView({ data }: { data: ReportData }) {
                 />
               </Block>
             )}
+            {f.cashflow.byTag.length > 0 && (
+              <Block label="Arus kas per tag">
+                <Table
+                  head={['Tag', 'Tipe', 'Jumlah']}
+                  align={['left', 'left', 'right']}
+                  rows={f.cashflow.byTag.map((c) => [c.name, c.type === 'PEMASUKAN' ? 'Masuk' : 'Keluar', rpShort(c.amount)])}
+                />
+              </Block>
+            )}
+            {f.cashflow.byBank.length > 0 && (
+              <Block label="Arus kas per bank / sumber dana">
+                <Table
+                  head={['Bank / Sumber', 'Tipe', 'Jumlah']}
+                  align={['left', 'left', 'right']}
+                  rows={f.cashflow.byBank.map((c) => [c.name, c.type === 'PEMASUKAN' ? 'Masuk' : 'Keluar', rpShort(c.amount)])}
+                />
+              </Block>
+            )}
           </TwoCol>
         </Section>
 

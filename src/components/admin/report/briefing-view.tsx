@@ -160,11 +160,31 @@ export function BriefingView({ data }: { data: ReportData }) {
         </Card>
 
         {f.cashflow.categories.length > 0 && (
-          <Card title="Arus kas per kategori" span={12}>
+          <Card title="Arus kas per kategori" span={f.cashflow.byTag.length > 0 || f.cashflow.byBank.length > 0 ? 6 : 12}>
             <TableB
               head={['Kategori', 'Tipe', 'Jumlah']}
               align={['left', 'left', 'right']}
               rows={f.cashflow.categories.map((c) => [c.name, c.type === 'PEMASUKAN' ? 'Masuk' : 'Keluar', formatRupiah(c.amount)])}
+            />
+          </Card>
+        )}
+
+        {f.cashflow.byTag.length > 0 && (
+          <Card title="Arus kas per tag" span={6}>
+            <TableB
+              head={['Tag', 'Tipe', 'Jumlah']}
+              align={['left', 'left', 'right']}
+              rows={f.cashflow.byTag.map((c) => [c.name, c.type === 'PEMASUKAN' ? 'Masuk' : 'Keluar', formatRupiah(c.amount)])}
+            />
+          </Card>
+        )}
+
+        {f.cashflow.byBank.length > 0 && (
+          <Card title="Arus kas per bank / sumber dana" span={6}>
+            <TableB
+              head={['Bank / Sumber', 'Tipe', 'Jumlah']}
+              align={['left', 'left', 'right']}
+              rows={f.cashflow.byBank.map((c) => [c.name, c.type === 'PEMASUKAN' ? 'Masuk' : 'Keluar', formatRupiah(c.amount)])}
             />
           </Card>
         )}

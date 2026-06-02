@@ -51,6 +51,8 @@ export type ReportData = {
       pengeluaran: number;
       net: number;
       categories: { name: string; amount: number; type: 'PEMASUKAN' | 'PENGELUARAN' }[];
+      byTag: { name: string; amount: number; type: 'PEMASUKAN' | 'PENGELUARAN' }[];
+      byBank: { name: string; amount: number; type: 'PEMASUKAN' | 'PENGELUARAN' }[];
     };
     deltas: { penjualan: Delta; profit: Delta; entryCount: Delta };
   };
@@ -157,7 +159,7 @@ export async function getReportData(start: Date, end: Date): Promise<ReportData>
     }),
     prisma.cashflow.findMany({
       where: { createdAt: { gte: start, lte: endInclusive } },
-      select: { type: true, amount: true, name: true, category: true },
+      select: { type: true, amount: true, name: true, category: true, tag: true, sourceBank: true },
     }),
     prisma.delivery.findMany({
       where: { entry: { deliveryDate: { gte: start, lte: end } } },
@@ -296,17 +298,28 @@ export async function getReportData(start: Date, end: Date): Promise<ReportData>
   const topBuyers = Array.from(buyerMap.values()).sort((a, b) => b.penjualan - a.penjualan).slice(0, 5);
   const bestDay = perDay.length ? perDay.reduce((m, d) => (d.penjualan > m.penjualan ? d : m)) : null;
 
-  // cashflow
+  // cashflow — totals + breakdowns across the ledger's dimensions (kategori / tag / bank)
+  type CfRow = { name: string; amount: number; type: 'PEMASUKAN' | 'PENGELUARAN' };
   let pemasukan = 0, pengeluaran = 0;
-  const cfCatMap = new Map<string, { name: string; amount: number; type: 'PEMASUKAN' | 'PENGELUARAN' }>();
+  const cfCatMap = new Map<string, CfRow>();
+  const cfTagMap = new Map<string, CfRow>();
+  const cfBankMap = new Map<string, CfRow>();
+  const bump = (map: Map<string, CfRow>, name: string, type: CfRow['type'], amount: number) => {
+    const key = `${type}|${name}`;
+    const rec = map.get(key) ?? { name, amount: 0, type };
+    rec.amount += amount;
+    map.set(key, rec);
+  };
   for (const c of cashflows) {
     if (c.type === 'PEMASUKAN') pemasukan += c.amount; else pengeluaran += c.amount;
-    const key = `${c.type}|${c.category || c.name || 'Lainnya'}`;
-    const rec = cfCatMap.get(key) ?? { name: c.category || c.name || 'Lainnya', amount: 0, type: c.type };
-    rec.amount += c.amount;
-    cfCatMap.set(key, rec);
+    bump(cfCatMap, c.category || c.name || 'Lainnya', c.type, c.amount);
+    if (c.tag) bump(cfTagMap, c.tag, c.type, c.amount);
+    if (c.sourceBank) bump(cfBankMap, c.sourceBank, c.type, c.amount);
   }
-  const cfCategories = Array.from(cfCatMap.values()).sort((a, b) => b.amount - a.amount).slice(0, 6);
+  const byAmount = (a: CfRow, b: CfRow) => b.amount - a.amount;
+  const cfCategories = Array.from(cfCatMap.values()).sort(byAmount).slice(0, 6);
+  const cfByTag = Array.from(cfTagMap.values()).sort(byAmount).slice(0, 8);
+  const cfByBank = Array.from(cfBankMap.values()).sort(byAmount).slice(0, 8);
 
   // ── Delivery ──
   let terkirim = 0, gagal = 0, proses = 0;
@@ -422,6 +435,12 @@ export async function getReportData(start: Date, end: Date): Promise<ReportData>
   if (byType[0]) insights.push(`Jenis terlaris: ${byType[0].label} — ${byType[0].qty} ekor, ${formatRupiah(byType[0].penjualan)}.`);
   if (biggestTxn) insights.push(`Transaksi terbesar: ${biggestTxn.buyer} — ${formatRupiah(biggestTxn.penjualan)} (${fmtDay(new Date(biggestTxn.date + 'T00:00:00Z'))}).`);
   if (bestDay) insights.push(`Hari tertinggi: ${fmtDay(new Date(bestDay.date + 'T00:00:00Z'))} (${formatRupiah(bestDay.penjualan)}).`);
+  if (pemasukan > 0 || pengeluaran > 0) {
+    const topPel = cfByTag.find((t) => t.type === 'PENGELUARAN') ?? cfCategories.find((t) => t.type === 'PENGELUARAN');
+    insights.push(
+      `Arus kas: masuk ${formatRupiah(pemasukan)}, keluar ${formatRupiah(pengeluaran)} (net ${formatRupiah(pemasukan - pengeluaran)})${topPel ? ` — pengeluaran terbesar "${topPel.name}" ${formatRupiah(topPel.amount)}` : ''}.`,
+    );
+  }
   if (piutang > 0) insights.push(`Piutang ${formatRupiah(piutang)} dari ${countBelum + countDp} transaksi belum lunas (tertagih ${(collectionRate * 100).toFixed(0)}%).`);
   if (deliveries.length) insights.push(`Pengiriman: ${terkirim}/${deliveries.length} terkirim (${(successRate * 100).toFixed(0)}%${gagal ? `, ${gagal} gagal` : ''}).`);
   insights.push(`Stok tersedia ${availableLs.length} ekor (sehat) — nilai modal ${formatRupiah(invModal)}.`);
@@ -449,7 +468,7 @@ export async function getReportData(start: Date, end: Date): Promise<ReportData>
       diterima, piutang, collectionRate, countLunas, countDp, countBelum,
       uniqueBuyers, bestDay, biggestTxn, peakMonth,
       perDay, perMonth, quarters, perSales, byType, topBuyers, paymentMix,
-      cashflow: { pemasukan, pengeluaran, net: pemasukan - pengeluaran, categories: cfCategories },
+      cashflow: { pemasukan, pengeluaran, net: pemasukan - pengeluaran, categories: cfCategories, byTag: cfByTag, byBank: cfByBank },
       deltas: { penjualan: dPenjualan, profit: dProfit, entryCount: dEntry },
     },
     reseller: {

@@ -252,6 +252,30 @@ export function ReportDocument({ data, company = COMPANY }: { data: ReportData; 
               />
             </>
           )}
+
+          {f.cashflow.byTag.length > 0 && (
+            <>
+              <Text style={s.subHead}>Cashflow per tag</Text>
+              <Table
+                head={['Tag', 'Tipe', 'Jumlah']}
+                widths={['flex', 70, 100]}
+                rightFrom={2}
+                rows={f.cashflow.byTag.map((c) => [c.name, c.type === 'PEMASUKAN' ? 'Masuk' : 'Keluar', formatRupiah(c.amount)])}
+              />
+            </>
+          )}
+
+          {f.cashflow.byBank.length > 0 && (
+            <>
+              <Text style={s.subHead}>Cashflow per bank / sumber dana</Text>
+              <Table
+                head={['Bank / Sumber', 'Tipe', 'Jumlah']}
+                widths={['flex', 70, 100]}
+                rightFrom={2}
+                rows={f.cashflow.byBank.map((c) => [c.name, c.type === 'PEMASUKAN' ? 'Masuk' : 'Keluar', formatRupiah(c.amount)])}
+              />
+            </>
+          )}
         </View>
 
         {/* Pengiriman */}
